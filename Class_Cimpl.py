@@ -373,13 +373,25 @@ class Cimpl:
         def navToDetailsTab(self,browser):
             detailsTabString = "//cimpl-tabs-panel/div/div/div/div/span[starts-with(@class,'cimpl-tabs-panel__tabLink')][text()='Details']"
             h.simpleSafeClick(browser,detailsTabString)
-            Cimpl.waitForLoadingScreen(browser)
+            self.waitForLoadingScreen(browser)
 
         # This method reads all information from the summary page. It assumes that the driver is currently
         # on the summary page.
         def readSummaryInfo(self,browser):
 
-            actionTypeString = "//div/div/ng-transclude/div/div/div[contains(@class,'col-md-4')][text()='Operation Type:']//following-sibling::div[@ng-bind='service.actionType')]"
+            workorderNumberString = "//div/div/div/div/div/div/div[starts-with(@class,'workorder-details__woNumber')]"
+            workorderNumber = h.getElementText(browser,workorderNumberString)
+
+            if(self.info_WONumber == None):
+                self.info_WONumber = workorderNumber
+            else:
+                if (self.info_WONumber == workorderNumber):
+                    pass
+                else:
+                    input("ERROR: Workorder object (" + str(self.info_WONumber) + ") is trying to read a workorder other than itself: " + workorderNumber + "!\n")
+
+
+            actionTypeString = "//div/div/ng-transclude/div/div/div[contains(@class,'col-md-4')][text()='Operation Type:']/following-sibling::div[@ng-bind='service.actionType']"
             self.info_ActionType = h.getElementText(browser,actionTypeString)
 
             providerString = "//ng-transclude/div/div/div[@ng-bind='item.provider']"
@@ -403,6 +415,16 @@ class Cimpl:
 
 
             # Now we read in all Notes of the Cimpl WO into a list of Cimpl_Workorder_Note objects.
+            revealNotesArrowOpenString = "//i[contains(@class,'cimpl-collapsible-box__headerArrowOpen')]"
+            revealNotesArrowCloseString = "//i[contains(@class,'cimpl-collapsible-box__headerArrowClose')]"
+            for i in range(0, 5):
+                if(h.elementExists(browser,revealNotesArrowCloseString)):
+                    h.simpleSafeClick(browser,revealNotesArrowCloseString)
+                    time.sleep(3)
+                    if(h.elementExists(browser,revealNotesArrowOpenString)):
+                        break
+                else:
+                    time.sleep(1)
 
             # This xpath finds all currently displayed note objects on the page in a list.
             allDisplayedNotesString = "//div/div[starts-with(@class,'entity-notes__noteContainerHeight')]/div[starts-with(@class,'entity-notes__noteContainer__')][@ng-repeat='note in vm.noteList']"
@@ -424,7 +446,7 @@ class Cimpl:
                     nextNote.type = h.getElementText(browser,nextNoteTypeString)
                     nextNoteStatusString = nextNoteString + "/div[starts-with(@class,'entity-notes__noteContent')]/div[@ng-bind='note.status']"
                     nextNote.status = h.getElementText(browser,nextNoteStatusString)
-                    nextNoteBodyString = "/div[starts-with(@class,'entity-notes__noteContent')]/div[@ng-bind='note.description']"
+                    nextNoteBodyString = nextNoteString + "/div[starts-with(@class,'entity-notes__noteContent')]/div[@ng-bind-html='note.description']"
                     nextNote.body = h.getElementText(browser,nextNoteBodyString)
 
                     self.info_Notes.append(nextNote)
@@ -432,7 +454,12 @@ class Cimpl:
 
                 # Finally, we check to see if there are multiple pages of notes. If so, we click through them and continue reading.
                 nextButtonString = "/ul[starts-with(@class,'cimpl-pager__pagination')]/following-sibling::div[starts-with(@class,'cimpl-pager__iconContainer')]/cimpl-material-icon[@icon-name='chevron_right']"
-                isNextButtonDisabled = browser.find_element_by_xpath(nextButtonString).get_attribute("is-disabled")
+
+                if(h.elementExists(browser,nextButtonString)):
+                    isNextButtonDisabled = browser.find_element_by_xpath(nextButtonString).get_attribute("is-disabled")
+                else:
+                    isNextButtonDisabled = "true"
+
                 if(isNextButtonDisabled == "true"):
                     break
                 else:
@@ -492,14 +519,11 @@ class Cimpl:
                     wait.until(expected_conditions.invisibility_of_element((By.XPATH, loaderMessageString)))
                     time.sleep(0.3)
             else:
-                print("WE IS DOIN THIS NIBBA\n")
                 loaderMessageString = "//div/div[contains(@class,'loader__message')]"
 
                 wait = WebDriverWait(browser, 120)
                 wait.until(expected_conditions.invisibility_of_element((By.XPATH, loaderMessageString)))
                 time.sleep(0.3)
-
-
 
         def __str__(self):
             returnString = ""
@@ -523,7 +547,7 @@ class Cimpl:
 
             returnString += "HARDWARE:\n"
             for item in self.info_HardwareList:
-                returnString += item[0] + ", " + item[1] + "\n"
+                returnString += "-" + item + "\n"
             returnString += "\nContract: " + self.info_Contract + "\n"
             returnString += "Shipping Address: " + self.info_ShippingAddress
 
@@ -543,7 +567,6 @@ class Cimpl:
                 wait.until(expected_conditions.invisibility_of_element((By.XPATH,loaderMessageString)))
                 time.sleep(0.3)
         else:
-            print("WE IS DOIN THIS NIBBA\n")
             loaderMessageString = "//div/div[contains(@class,'loader__message')]"
 
             wait = WebDriverWait(browser, 120)
@@ -563,9 +586,12 @@ myCimpl = Cimpl(ff)
 #myCimpl.initializeMainWindow()
 myCimpl.loginToCimpl()
 
-myCimpl.filterForMyOrders()
+#myCimpl.filterForMyOrders()
+
+'''
 input("Please navigate to a order you'd like to read. Press enter once you're ready to begin the read process.\n\n")
 
 myWorkOrder = myCimpl.Cimpl_Workorder()
 myWorkOrder.readFullWorkorder(myCimpl.browser)
 print(myWorkOrder)
+'''
