@@ -1,0 +1,23 @@
+# Use this file to load single users to be built in TMA.
+#
+# (NetID)
+# (Service)
+# (Device Type)
+# (Order Date)
+# (IMEI)
+#
+# OPTIONS FOR DEVICE:
+# 1. iPhone 11
+# 2. iPhone 12
+# 3. Galaxy S20
+# 4. Mifi
+# 5. iPhone SE
+#
+#
+# ===========================================================================
+
+sshe4388
+734-664-5251
+2
+12/09/2021
+351588827540211
