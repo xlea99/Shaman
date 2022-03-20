@@ -41,7 +41,23 @@ import helpers as h
 cwd = os.getcwd()
 
 
+# This class serves as a struct for storing information about individual workorder notes.
+class Cimpl_Workorder_Note:
 
+    def __init__(self,creator = None, timestamp = None,subject = None,type = None,status = None,noteBody = None):
+
+        self.creator = creator
+        self.timestamp = timestamp
+
+        self.subject = subject
+        self.type = type
+        self.status = status
+        self.noteBody = noteBody
+
+
+
+    def __str__(self):
+        pass
 
 
 # This class manages and drives the Upland Cimpl site. Unlike Class_TMA, which requires an entire,
@@ -250,7 +266,7 @@ class Cimpl:
         self.waitForLoadingScreen()
         # Now we can select Contains.
 
-        containsOptionString = "//html/body/div[16]/div/div/ul/li[starts-with(@class,'k-item')][text()='Contains']"
+        containsOptionString = "//html/body/div/div/div/ul/li[starts-with(@class,'k-item')][text()='Contains']"
         containsOption = self.browser.find_element_by_xpath(containsOptionString)
         containsOption.click()
         self.waitForLoadingScreen()
@@ -266,15 +282,15 @@ class Cimpl:
         workorderStatusCriteriaDropdown = self.browser.find_element_by_xpath(workorderStatusCriteriaDropdownString)
         workorderStatusCriteriaDropdown.click()
         self.waitForLoadingScreen()
-        isNotOptionString = "//html/body/div[17]/div/div/ul/li[starts-with(@class,'k-item')][text()='Is not']"
+        isNotOptionString = "//html/body/div/div/div/ul/li[starts-with(@class,'k-item')][text()='Is not']"
         isNotOption = self.browser.find_element_by_xpath(isNotOptionString)
         isNotOption.click()
         self.waitForLoadingScreen()
         # Now we enter in our three status conditions: Completed, Cancelled, Confirmed
         workorderStatusFieldString = "//div[starts-with(@class,'selected-filter-container')]/div/div[starts-with(@class,'selected-filter-container__filterLabel')][text()='Workorder Status']/following-sibling::div[starts-with(@class,'selected-filter-container__filterInputs')]/div[starts-with(@class,'selected-filter-container__fieldFilter')]/cimpl-meta-field/div/div/div/div/div/div/input"
         workorderStatusField = self.browser.find_element_by_xpath(workorderStatusFieldString)
-        cancelledOptionString = "//html/body/div[18]/div/div/ul/li[starts-with(@class,'k-item')][text()='Cancelled']"
-        completedOptionString = "//html/body/div[18]/div/div/ul/li[starts-with(@class,'k-item')][text()='Completed']"
+        cancelledOptionString = "//html/body/div/div/div/ul/li[starts-with(@class,'k-item')][text()='Cancelled']"
+        completedOptionString = "//html/body/div/div/div/ul/li[starts-with(@class,'k-item')][text()='Completed']"
         workorderStatusField.click()
         cancelledOption = self.browser.find_element_by_xpath(cancelledOptionString)
         cancelledOption.click()
@@ -353,15 +369,15 @@ class Cimpl:
         def navToSummaryTab(self,browser):
             summaryTabString = "//cimpl-tabs-panel/div/div/div/div/span[starts-with(@class,'cimpl-tabs-panel__tabLink')][text()='Summary']"
             h.simpleSafeClick(browser,summaryTabString)
-            Cimpl.waitForLoadingScreen(browser)
-        def navToDetailsTAb(self,browser):
+            self.waitForLoadingScreen(browser)
+        def navToDetailsTab(self,browser):
             detailsTabString = "//cimpl-tabs-panel/div/div/div/div/span[starts-with(@class,'cimpl-tabs-panel__tabLink')][text()='Details']"
             h.simpleSafeClick(browser,detailsTabString)
             Cimpl.waitForLoadingScreen(browser)
 
-        # This method reads all simple information from the summary page. It assumes that the driver is currently
+        # This method reads all information from the summary page. It assumes that the driver is currently
         # on the summary page.
-        def readSimpleSummaryInfo(self,browser):
+        def readSummaryInfo(self,browser):
 
             actionTypeString = "//div/div/ng-transclude/div/div/div[contains(@class,'col-md-4')][text()='Operation Type:']//following-sibling::div[@ng-bind='service.actionType')]"
             self.info_ActionType = h.getElementText(browser,actionTypeString)
@@ -383,6 +399,46 @@ class Cimpl:
 
             requesterString = "//ng-transclude/div/div[starts-with(@class,'control-label')][text()='Requester']/following-sibling::div[contains(@ng-class,'cimpl-form')]/ng-transclude/employee-modal-popup-selector/div/div/div[starts-with(@class,'cimpl-modal-popup-selector')]/div[@ng-bind='vm.labelToShow']"
             self.info_Requestor = h.getElementText(browser, requesterString)
+
+
+
+            # Now we read in all Notes of the Cimpl WO into a list of Cimpl_Workorder_Note objects.
+
+            # This xpath finds all currently displayed note objects on the page in a list.
+            allDisplayedNotesString = "//div/div[starts-with(@class,'entity-notes__noteContainerHeight')]/div[starts-with(@class,'entity-notes__noteContainer__')][@ng-repeat='note in vm.noteList']"
+            allDisplayedNotes = browser.find_elements_by_xpath(allDisplayedNotesString)
+
+            while True:
+                for i in range(0,len(allDisplayedNotes)):
+                    nextNoteString = "//div/div[starts-with(@class,'entity-notes__noteContainerHeight')]/div[starts-with(@class,'entity-notes__noteContainer__')][@ng-repeat='note in vm.noteList'][" + str(i + 1) + "]"
+                    nextNote = Cimpl_Workorder_Note()
+
+                    nextNoteCreatorString = nextNoteString + "/div[starts-with(@class,'entity-notes__noteHeader')]/div[@ng-bind='note.user']"
+                    nextNote.creator = h.getElementText(browser,nextNoteCreatorString)
+                    nextNoteTimestampString = nextNoteString + "/div[starts-with(@class,'entity-notes__noteHeader')]/div/div[@ng-bind='note.createdDate']"
+                    nextNote.timestamp = h.getElementText(browser,nextNoteTimestampString)
+
+                    nextNoteSubjectString = nextNoteString + "/div[starts-with(@class,'entity-notes__noteContent')]/div[@ng-bind='note.subject']"
+                    nextNote.subject = h.getElementText(browser,nextNoteSubjectString)
+                    nextNoteTypeString = nextNoteString + "/div[starts-with(@class,'entity-notes__noteContent')]/div[@ng-bind='note.type']"
+                    nextNote.type = h.getElementText(browser,nextNoteTypeString)
+                    nextNoteStatusString = nextNoteString + "/div[starts-with(@class,'entity-notes__noteContent')]/div[@ng-bind='note.status']"
+                    nextNote.status = h.getElementText(browser,nextNoteStatusString)
+                    nextNoteBodyString = "/div[starts-with(@class,'entity-notes__noteContent')]/div[@ng-bind='note.description']"
+                    nextNote.body = h.getElementText(browser,nextNoteBodyString)
+
+                    self.info_Notes.append(nextNote)
+
+
+                # Finally, we check to see if there are multiple pages of notes. If so, we click through them and continue reading.
+                nextButtonString = "/ul[starts-with(@class,'cimpl-pager__pagination')]/following-sibling::div[starts-with(@class,'cimpl-pager__iconContainer')]/cimpl-material-icon[@icon-name='chevron_right']"
+                isNextButtonDisabled = browser.find_element_by_xpath(nextButtonString).get_attribute("is-disabled")
+                if(isNextButtonDisabled == "true"):
+                    break
+                else:
+                    h.simpleSafeClick(browser,nextButtonString)
+                    time.sleep(1)
+                    continue
 
         # This method reads all information from the details page. It assumes that the driver is currently
         # on the details page.
@@ -417,17 +473,61 @@ class Cimpl:
                 nextHardwareItem = h.getElementText(browser,(thisHardwareItemString + "/td[1]"))
                 self.info_HardwareList.append(nextHardwareItem)
 
-        # This class serves as a struct for storing information about individual workorder notes.
-        class Cimpl_Workorder_Note:
+        # This method combines a few helper methods to read an entire Workorder in this object, assuming the driver
+        # is currently on a workorder page.
+        def readFullWorkorder(self,browser):
 
-            def __init__(self,subject = None,type = None,status = None,noteBody = None):
+            self.navToSummaryTab(browser)
+            self.readSummaryInfo(browser)
 
-                self.subject = subject
-                self.type = type
-                self.status = status
-                self.noteBody = noteBody
+            self.navToDetailsTab(browser)
+            self.readDetailsInfo(browser)
+
+        def waitForLoadingScreen(self, browser=None):
+            if (browser == None):
+                for i in range(3):
+                    loaderMessageString = "//div/div[contains(@class,'loader__message')]"
+
+                    wait = WebDriverWait(self.browser, 120)
+                    wait.until(expected_conditions.invisibility_of_element((By.XPATH, loaderMessageString)))
+                    time.sleep(0.3)
+            else:
+                print("WE IS DOIN THIS NIBBA\n")
+                loaderMessageString = "//div/div[contains(@class,'loader__message')]"
+
+                wait = WebDriverWait(browser, 120)
+                wait.until(expected_conditions.invisibility_of_element((By.XPATH, loaderMessageString)))
+                time.sleep(0.3)
 
 
+
+        def __str__(self):
+            returnString = ""
+
+            returnString += "============================\n"
+            returnString += "=======CIMPL WO " + self.info_WONumber + "=======\n"
+            returnString += "============================\n\n"
+
+            returnString += "Workorder: " + self.info_WONumber + ", a " + self.info_Provider + " " + self.info_ActionType + "\n"
+            returnString += "Current Subject: " + self.info_Subject + "\n"
+            returnString += "Assigned To: " + self.info_ReferenceNumber + "\n\n"
+
+            returnString += "Comment: " + self.info_Comment + "\n\n"
+
+            returnString += "Owned by '" + self.info_Owner + "', requested by '" + self.info_Requestor + "'\n"
+            returnString += "Assigned to " + self.info_AssignedEmployeeID + " - '" + self.info_AssignedEmployeeName + "'\n\n"
+
+            returnString += "Current Service ID: " + self.info_ServiceID + "\n"
+            returnString += "Current Assigned Account: " + self.info_Account + "\n"
+            returnString += "Current Upgrade El. Date: " + self.info_UpgradeEligibilityDate + "\n\n"
+
+            returnString += "HARDWARE:\n"
+            for item in self.info_HardwareList:
+                returnString += item[0] + ", " + item[1] + "\n"
+            returnString += "\nContract: " + self.info_Contract + "\n"
+            returnString += "Shipping Address: " + self.info_ShippingAddress
+
+            return returnString
 
 
 
@@ -443,6 +543,7 @@ class Cimpl:
                 wait.until(expected_conditions.invisibility_of_element((By.XPATH,loaderMessageString)))
                 time.sleep(0.3)
         else:
+            print("WE IS DOIN THIS NIBBA\n")
             loaderMessageString = "//div/div[contains(@class,'loader__message')]"
 
             wait = WebDriverWait(browser, 120)
@@ -462,4 +563,9 @@ myCimpl = Cimpl(ff)
 #myCimpl.initializeMainWindow()
 myCimpl.loginToCimpl()
 
-myCimpl.filterForPendingOrders()
+myCimpl.filterForMyOrders()
+input("Please navigate to a order you'd like to read. Press enter once you're ready to begin the read process.\n\n")
+
+myWorkOrder = myCimpl.Cimpl_Workorder()
+myWorkOrder.readFullWorkorder(myCimpl.browser)
+print(myWorkOrder)

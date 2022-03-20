@@ -39,6 +39,12 @@ def simpleSafeClick(browser,xpathString,attempts = 5):
             time.sleep(1)
             continue
 
+
+    thisElement = browser.find_element_by_xpath(xpathString)
+    thisElement.click()
+    return True
+
+
 def getElementText(browser,xpathString,isTextAttribute = False,attempts = 5):
     for i in range(0,attempts):
         try:
@@ -52,6 +58,13 @@ def getElementText(browser,xpathString,isTextAttribute = False,attempts = 5):
             print("whoopsiedaisy!")
             time.sleep(1)
             continue
+
+    thisElement = browser.find_element_by_xpath(xpathString)
+    if (isTextAttribute):
+        returnString = thisElement.get_attribute("text")
+    else:
+        returnString = thisElement.text
+    return returnString
 
 # This class encapsulates a regular webdriver.Ie() object, but includes many custom safeguards for use
 # with automation.
