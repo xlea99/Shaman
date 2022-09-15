@@ -1,19 +1,112 @@
-import Class_TMA
 import time
 import datetime
 import Prebuilt_TMA_Objects as pb
-from selenium import webdriver
+import Browser
+import TMADriver
 
-#browser = webdriver.Ie()
+# (NetID)
+# (Service)
+# (Device Type)
+# (Order Date)
+# (IMEI)
+#
+# OPTIONS FOR DEVICE:
+# 1. iPhone 11
+# 2. iPhone 12
+# 3. Galaxy S20
+# 4. Mifi
+# 5. iPhone SE
 
-myTMA = Class_TMA.TMA(False)
+orderList = [["whrdm214","404-967-5369","1","9/7/2022","358845630052609"]]
+
+b = Browser.Browser()
+myTMA = TMADriver.TMADriver(b)
 myTMA.logInToTMA()
-time.sleep(2)
-myTMA.navToClientHome("Sysco")
-time.sleep(2)
+for order in orderList:
+    userID = order[0]
+    serviceNumber = order[1]
+    simplifiedServiceType = order[2]
+    orderDateString = order[3]
+    IMEINumber = order[4]
+    client = "Sysco"
 
-myService = myTMA.TMAService(myTMA.browser,"Sysco")
+    year = ""
+    month = ""
+    day = ""
+    slashCount = 0
+    for c in orderDateString:
+        if (c == "/"):
+            slashCount += 1
+            continue
 
+        if (slashCount == 0):
+            month += c
+        elif (slashCount == 1):
+            day += c
+        elif (slashCount == 2):
+            year += c
+    year = int(year)
+    month = int(month)
+    day = int(day)
+    orderDate = datetime.date(year, month, day)
+
+    myTMA.navToClientHome("Sysco")
+    myTMA.navToLocation(client=client,entryType="People",entryID=userID,isInactive=False)
+    myPerson = myTMA.TMAPeople(myTMA.browser, client)
+    myTMA.browser.implicitly_wait(10)
+    myPerson.readAllInformation()
+
+    myService = myTMA.TMAService(myTMA.browser, client)
+
+    myService.info_UserName = (myPerson.info_FirstName + " " + myPerson.info_LastName)
+    myService.info_ServiceNumber = serviceNumber
+
+    installDate = orderDate.strftime("%m/%d/%Y")
+    expirationDate = (orderDate + datetime.timedelta(days=730)).strftime("%m/%d/%Y")
+    myService.info_InstalledDate = installDate
+    myService.info_ContractStartDate = installDate
+    myService.info_ContractEndDate = expirationDate
+    myService.info_UpgradeEligibilityDate = expirationDate
+    myService.info_Carrier = "Verizon Wireless"
+    # TODO add support for other carriers
+    if (simplifiedServiceType == "1"):
+        myService.info_ServiceType = "iPhone"
+        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("iPhone 11")
+        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
+    elif (simplifiedServiceType == "2"):
+        myService.info_ServiceType = "iPhone"
+        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("iPhone 12")
+        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
+    elif (simplifiedServiceType == "3"):
+        myService.info_ServiceType = "Android"
+        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("Galaxy S20")
+        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
+    elif (simplifiedServiceType == "4"):
+        myService.info_ServiceType = "Mifi"
+        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("Jetpack")
+        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Mifi"))
+    elif (simplifiedServiceType == "5"):
+        myService.info_ServiceType = "iPhone"
+        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("iPhone SE")
+        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
+    else:
+        input("YOU FUCKING MORON GOD FUCKING DAMMIT WHAT THE FUCK")
+
+    myService.info_LinkedEquipment.info_IMEI = IMEINumber
+
+    myAssignment = myTMA.TMAAssignment(client, "Verizon Wireless")
+    myAssignment.info_Client = "Sysco"
+    myAssignment.info_SiteCode = myPerson.scrapeSyscoOpCo()
+
+    myService.info_Assignment = myAssignment
+
+    myService.writeNewFullServiceFromUser(myPerson)
+
+
+
+
+
+'''
 print("===========================================")
 print("=======WELCOME TO SERVICE FUN TIME=========")
 print("===========================================")
@@ -159,7 +252,6 @@ while True:
 
 
 
-'''
 while True:
     userOption = input("Pick one:\n1: Read the current page.\n2: Navigate to a new page. \n3: Read location history.\n4: Quit\n\n")
     if(userOption == '1'):

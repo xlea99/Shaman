@@ -1,33 +1,86 @@
-from selenium.webdriver.support.ui import Select
-import helpers as h
+import Browser
 import time
+from selenium.webdriver.support.ui import Select
+
 
 # How many TMA Location Datas will be stored at maximum, to conserve the TMA object from endlessly inflating.
 MAXIMUM_STORED_HISTORY = 20
+# This is a dictionary of verified clientHome pages. Using the
+# goToClientHome method, the browser can access ATI, LYB, and Sysco client
+# home pages.
+CLIENT_DICT = {
+    "ATI": "417469544D415F76333030",
+    "Sysco": "537973636F544D415F76333030"
+}
 
+class TMADriver():
 
+    # To initialize our TMA driver class, we have to first attach an existing
+    # Browser object.
+    def __init__(self,browserObject = Browser.Browser(False)):
+        self.browser = browserObject
 
-class TMA:
-    # This value will eventually connect to a live (IE) browser.
-    browser = None
-
-    # This is a dictionary of verified clientHome pages. Using the
-    # goToClientHome method, the browser can access ATI, LYB, and Sysco client
-    # home pages.
-    __clientDict = {
-        "ATI": "417469544D415F76333030",
-        "Lyondell Basell": "4C796F6E64656C6C426173656C6C544D415F76333030",
-        "Sysco": "537973636F544D415F76333030"
-    }
-
-    # Basic init method automatically generates a new browser for TMA, unless one is given.
-    def __init__(self, browser = False):
-        if (browser == False):
-            self.browser = h.SafeIEBrowser()
-        #else:
-            #self.browser = browser
-        self.currentLocation = self.locationData(self.browser)
         self.locationHistory = []
+        self.currentLocation = self.locationData(self.browser)
+
+        self.currentTabIndex = 0
+        self.previousTabIndex = 0
+
+    # This method simply logs in to TMA (with 5 attempts, to overcome potential glitch) from the TMA login screen. If not at TMA login screen,
+    # it simply warns and does nothing.
+    def logInToTMA(self):
+        self.browser.switchToTab("TMA")
+
+        self.readPage()
+        if (self.currentLocation.isLoggedIn == False):
+            TMAurl = "https://tma4.icomm.co/tma/NonAuthentic/Login.aspx"
+            for i in range(5):
+                self.browser.get(TMAurl)
+                self.browser.switch_to_window(self.browser.get_window_handles()[0])
+                self.browser.implicitly_wait(10)
+                self.readPage()
+                usernameField = self.browser.find_element_by_xpath("//tbody/tr/td/table/tbody/tr/td/input[@name='ctl00$ContentPlaceHolder1$Login1$UserName'][@id='ctl00_ContentPlaceHolder1_Login1_UserName']")
+                passwordField = self.browser.find_element_by_xpath("//tbody/tr/td/table/tbody/tr/td/input[@name='ctl00$ContentPlaceHolder1$Login1$Password'][@id='ctl00_ContentPlaceHolder1_Login1_Password']")
+                defaultUsername = "asomheil@icomm.co"
+                defaultPassword = "P@ssw0rd"
+                usernameField.clear()
+                passwordField.clear()
+                usernameField.send_keys(defaultUsername)
+                passwordField.send_keys(defaultPassword)
+                loginButtonString = "//tbody/tr/td/table/tbody/tr/td/input[@name='ctl00$ContentPlaceHolder1$Login1$LoginButton'][@id='ctl00_ContentPlaceHolder1_Login1_LoginButton']"
+                self.browser.click(loginButtonString)
+                self.browser.implicitly_wait(10)
+                if (self.browser.get_current_url() == "https://tma4.icomm.co/tma/Authenticated/Domain/Default.aspx"):
+                    self.readPage()
+                    if (self.currentLocation.isLoggedIn == True):
+                        print("Successfully logged in to TMA.")
+                        return True
+        else:
+            print("WARNNING: Tried to run logInToTMA, but TMA is already logged in!")
+
+    # These 2 methods help streamline the process of switching to a new popup tab when certain
+    # TMA actions happen.
+    def switchToNewTab(self,timeout=30):
+        for i in range(timeout):
+            oldTMAList = self.browser.tabs.get("TMA")
+            self.browser.updateOpenTabs()
+            if(len(oldTMAList) < len(self.browser.tabs.get("TMA"))):
+                self.previousTabIndex = len(oldTMAList) - 1
+                self.currentTabIndex = len(self.browser.tabs.get("TMA")) - 1
+                self.browser.switchToTab("TMA",index = self.currentTabIndex)
+                return True
+            time.sleep(1)
+        return False
+    def returnToPreviousTab(self):
+        if(self.previousTabIndex == self.currentTabIndex):
+            input("ERROR: No previous tab to switch to!")
+            return False
+        else:
+            self.browser.switchToTab("TMA",index=self.previousTabIndex)
+
+    # ================================================================================
+    # =======================LOCATION DATA AND HISTORY================================
+    # ================================================================================
 
     # This class functions more as a struct, storing information about exactly
     # where the TMA object is currently operating. In case of crashes, oddities,
@@ -35,21 +88,41 @@ class TMA:
     class locationData:
 
         # Basic init method initializes a few used variables.
-        def __init__(self,_browser):
-            self.browser = _browser
-            self.isLoggedIn = False
-            self.client = None
-            self.entryType = None
-            self.entryID = None
-            self.isInactive = None
-            '''
-            self.isEntrySubWindowOpen = False
-            self.isAssignmentSubWindowOpen = False
-            self.subWindowEntryID = None
-            self.subWindowEntryTab = None
-            self.subWindowEntryType = None
-            '''
+        def __init__(self,browserObject):
+            self.browser = browserObject
 
+            # This variable simply denotes whether or not the TMA object is currently
+            # logged in to TMA or not.
+            self.isLoggedIn = False
+
+            # This is the current client that is being operated under. At the moment,
+            # the only supported clients are Sysco and (to a lesser extent) LYB. However,
+            # a placeholder title "DOMAIN" serves to show that no client is currently
+            # being operated on.
+            self.client = None
+
+            # This shows what type of entry we're currently working under. Possibilities include:
+            # -Services
+            # -Orders
+            # -People
+            # -Interactions
+            # -Equipment
+            # SPECIAL PAGES:
+            # -LoginPage
+            # -DomainPage
+            # -ClientHomePage
+            self.entryType = None
+
+            # This is a unique, identifiable ID that separates this entry from all others in TMA.
+            # For different type of entries, the actual ID will be different. Examples:
+            # -Services (Service Number)
+            # -Orders ([TMAOrderNumber,ticketOrderNumber,vendorOrderNumber])
+            # -People (Network ID)
+            # -Interactions (Interaction Number)
+            # -Always will be RegularEquipment
+            self.entryID = None
+
+            self.isInactive = None
             self.rawURL = None
 
         # Equal operator == method compares the values of each important data point.
@@ -68,7 +141,7 @@ class TMA:
             returnString = ""
 
             if(self.isLoggedIn):
-                returnString += "º "
+                returnString += "* "
             else:
                 returnString += u"\u26A0" + " "
                 if(self.entryType == "LoginPage"):
@@ -108,7 +181,7 @@ class TMA:
 
             return returnString
 
-        # Get's a fancier, sexier version of the __str__ method.
+        # Gets a fancier, sexier version of the __str__ method.
         def getFancyString(self):
             returnString = ""
 
@@ -119,58 +192,6 @@ class TMA:
             returnString += "\nIs Inactive: " + str(self.isInactive)
 
             return returnString
-
-        # Variable to connect to the exterior browser.
-        browser = None
-
-        # This variable simply denotes whether or not the TMA object is currently
-        # logged in to TMA or not.
-        isLoggedIn = False
-
-        # This is the current client that is being operated under. At the moment,
-        # the only supported clients are Sysco and (to a lesser extent) LYB. However,
-        # a placeholder title "DOMAIN" serves to show that no client is currently
-        # being operated on.
-        client = None
-
-        # This shows what type of entry we're currently working under. Possibilities include:
-        # -Services
-        # -Orders
-        # -People
-        # -Interactions
-        # -Equipment
-        # SPECIAL PAGES:
-        # -LoginPage
-        # -DomainPage
-        # -ClientHomePage
-        entryType = None
-
-        # This is a unique, identifiable ID that separates this entry from all others in TMA.
-        # For different type of entries, the actual ID will be different. Examples:
-        # -Services (Service Number)
-        # -Orders ([TMAOrderNumber,ticketOrderNumber,vendorOrderNumber])
-        # -People (Network ID)
-        # -Interactions (Interaction Number)
-        # -Always will be RegularEquipment
-        entryID = None
-
-        '''
-        # This variable stores if there is currently a sub-window open (think
-        # when you create a new linked service, or create a new linked order,
-        # and a new window pops up)
-        isSubWindowOpen = False
-
-        # These three variables specifically store data about when there is an
-        # entry sub-window open.
-        isEntrySubWindowOpen = False
-        subWindowEntryType = None
-        subWindowEntryID = None
-
-        # This is specifically for when there is currently an "Assignment"
-        # sub window open.
-        isAssignmentSubWindowOpen = False
-        '''
-
 
         # This method checks which client we're currently working under.
         def checkClient(self):
@@ -199,7 +220,7 @@ class TMA:
 
         # This method figures out the entry type of the page we're currently on.
         def checkEntryType(self):
-            url = self.browser.getCurrentUrl()
+            url = self.browser.get_current_url()
 
             if("Client/People/" in url):
                 self.entryType = "People"
@@ -280,17 +301,16 @@ class TMA:
                 employmentStatus = self.browser.find_element_by_xpath(employmentStatusSearchString)
                 employmentStatusResultString = employmentStatus.text
                 if(employmentStatusResultString == "Active"):
-                    self.isInactive = True
-                elif(employmentStatusResultString == "Terminated"):
                     self.isInactive = False
+                elif(employmentStatusResultString == "Terminated"):
+                    self.isInactive = True
                 else:
                     print("ERROR: Got bad value for checkIsInactive of this value: " + employmentStatusSearchString)
-
 
         # This is the main method of this class. It combines other methods to read exactly
         # what page we're currently on in TMA.
         def readPage(self):
-            self.rawURL = self.browser.getCurrentUrl()
+            self.rawURL = self.browser.get_current_url()
             if ("tma4.icomm.co" in self.rawURL):
                 if ("https://tma4.icomm.co/tma/Authenticated" in self.rawURL):
                     self.isLoggedIn = True
@@ -315,21 +335,10 @@ class TMA:
                 self.entryType = "Null"
                 self.isInactive = "Null"
                 self.entryID = "Null"
-    currentLocation = None
-    # Helper method that simply copies the inputted locationData.
-    def copyLocationData(self,locationData):
-        newLocationData = self.locationData(None)
-
-        newLocationData.isLoggedIn = locationData.isLoggedIn
-        newLocationData.client = locationData.client
-        newLocationData.entryType = locationData.entryType
-        newLocationData.entryID = locationData.entryID
-        newLocationData.isInactive = locationData.isInactive
-        newLocationData.rawURL = locationData.rawURL
-
-        return newLocationData
     # Reads the current page, as well as stores it in history if the page is not the same as the last page stored.
     def readPage(self):
+        self.browser.switchToTab("TMA")
+
         self.currentLocation.readPage()
 
         currentLength = len(self.locationHistory)
@@ -356,52 +365,105 @@ class TMA:
             locationToStore = self.copyLocationData(self.currentLocation)
             self.locationHistory.append(locationToStore)
             return True
-    # Reads all currently stored history
-    def readHistory(self):
-        #print(self.locationHistory)
-        for i in self.locationHistory:
-            print(i)
-    # This primarily serves as a debug method. It will immediately read the current
-    # locationData of the page, then print it out.
-    def printLocationData(self):
-        self.currentLocation.readPage()
-        print(self.currentLocation)
+    # Helper method that simply copies the inputted locationData.
+    def copyLocationData(self,locationData):
+        newLocationData = self.locationData(None)
+
+        newLocationData.isLoggedIn = locationData.isLoggedIn
+        newLocationData.client = locationData.client
+        newLocationData.entryType = locationData.entryType
+        newLocationData.entryID = locationData.entryID
+        newLocationData.isInactive = locationData.isInactive
+        newLocationData.rawURL = locationData.rawURL
+
+        return newLocationData
+
+    # ================================================================================
+    # ==============================SITE NAVIGATION===================================
+    # ================================================================================
+
+    # This method simply navigates to a specific client's home page, from the Domain. If not on DomainPage,
+    # it simply warns and does nothing.
+    def navToClientHome(self,clientName):
+        self.browser.switchToTab("TMA")
+
+        if(self.currentLocation.isLoggedIn != True):
+            print("WARNING: Could not call navToClientHome, as TMA is not currently logged in.")
+            return False
+
+        clientHomeUrl = "https://tma4.icomm.co/tma/Authenticated/Client/ClientHome.aspx?436C69656E744442="
+        clientHomeUrl += CLIENT_DICT.get(clientName)
+
+        self.browser.get(clientHomeUrl)
+
+        time.sleep(1)
+
+        # Tries to verify that the clienthomepage has been reached 5 times.
+        for i in range(5):
+            self.readPage()
+            if(self.currentLocation.client == clientName):
+                if(self.currentLocation.entryType == "ClientHomePage"):
+                    return True
+                else:
+                    print("WARNING: Successfully navigated to client " + clientName + ", but got a different page than ClientHomePage!")
+                    return True
+            time.sleep(2)
+
+        print("ERROR: Could not navigate to ClientHomePage for " + clientName + " for an unknown reason!")
+    # This method return TMA to the homepage from wherever it currently is, as long as TMA is logged in.
+    def navToDomain(self):
+        self.browser.switchToTab("TMA")
+
+        self.readPage()
+        if(self.currentLocation.isLoggedIn == False):
+            print("ERROR: Could not execute navToDomain, as TMA is not currently logged in!")
+            return False
+
+
+        TMAHeader = self.browser.find_element_by_xpath("//form[@name='aspnetForm']/div[@id='container-main']/div[@id='container-top']/div[@id='header-left']/a[@id='ctl00_lnkDomainHome'][contains(@href,'Default.aspx')]")
+        self.browser.click(TMAHeader)
+
+        for i in range(5):
+            self.readPage()
+            if(self.currentLocation.entryType == "DomainPage"):
+                return True
+            time.sleep(1)
+
+        print("ERROR: Could not navigate to DomainPage for an unknown reason!")
     # This method intelligently searches for and opens an entry as specified by a locationData. Method is able to be called from anywhere as long as TMA is
     # currently logged in, and locationData is valid.
-    def navToLocation(self,locationData = False, client = False, entryType = False, entryID = False, isInactive = False):
-        if(str(type(locationData)) == "<class 'bool'>"):
-            if(locationData == True):
-                locationData = self.locationData(self.browser)
-                locationData.isLoggedIn = True
+    def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData = None, ):
+        self.browser.switchToTab("TMA")
 
-                if(client == False):
-                    locationData.client = "DOMAIN"
-                    locationData.entryType = "DomainPage"
+        if(locationData == None):
+            locationData = self.locationData(self.browser)
+            locationData.isLoggedIn = True
+
+            if(client == None):
+                locationData.client = "DOMAIN"
+                locationData.entryType = "DomainPage"
+                locationData.entryID = "Null"
+                locationData.isInactive = False
+            else:
+                locationData.client = client
+                if(entryType == None):
+                    locationData.entryType = "ClientHomePage"
                     locationData.entryID = "Null"
                     locationData.isInactive = False
                 else:
-                    locationData.client = client
-                    if(entryType == False):
+                    locationData.entryType = entryType
+                    if(entryType == "DomainPage"):
+                        locationData.client = "DOMAIN"
+                        locationData.entryType = "DomainPage"
+                        locationData.entryID = "Null"
+                        locationData.isInactive = False
+                    elif(entryType == "ClientHomePage"):
                         locationData.entryType = "ClientHomePage"
                         locationData.entryID = "Null"
                         locationData.isInactive = False
                     else:
-                        locationData.entryType = entryType
-                        if(entryType == "DomainPage"):
-                            locationData.client = "DOMAIN"
-                            locationData.entryType = "DomainPage"
-                            locationData.entryID = "Null"
-                            locationData.isInactive = False
-                        elif(entryType == "ClientHomePage"):
-                            locationData.entryType = "ClientHomePage"
-                            locationData.entryID = "Null"
-                            locationData.isInactive = False
-                        else:
-                            locationData.entryID = entryID
-                            locationData.isInactive = isInactive
-            elif(locationData == False):
-                print("ERROR: Could not execute navToLocation, as no locationData was provided!")
-                return False
+                        locationData.entryID = entryID
+                        locationData.isInactive = isInactive
 
         copyOfTargetLocation = self.copyLocationData(locationData)
 
@@ -422,8 +484,9 @@ class TMA:
                     self.navToLocation(locationData)
                     return True
             else:
-                selectionMenuString = "//div/div/div/div/div/div/select[@id='ctl00_LeftPanel_TMAExplorer1_ddlSearchType']/option"
-                searchBarString = "//div/div/div/div/div/div/fieldset/input[@id='ctl00_LeftPanel_TMAExplorer1_txtKeyword']"
+                selectionMenuString = "//div/div/div/div/div/div/select[starts-with(@id,'ctl00_LeftPanel')]/option"
+                searchBarString = "//div/div/fieldset/input[@title='Press (ENTER) to submit. ']"
+                inactiveCheckboxString = "//div/div/div/input[starts-with(@id,'ctl00_LeftPanel')][contains(@id,'chkClosed')][@type='checkbox']"
 
                 if(locationData.entryType == "Interaction"):
                     interactionsOption = self.browser.find_element_by_xpath(selectionMenuString + "[@value='interactions']")
@@ -435,8 +498,8 @@ class TMA:
                     time.sleep(2)
                     searchBar.send_keys(u'\ue007')
 
-                    resultString = "//div[@id='ctl00_LeftPanel_TMAExplorer1_UpdatePanelResults']/fieldset/div/div/table/tbody/tr/td/a[starts-with(text(),'" + locationData.entryID + " (')]/parent::td/parent::tr[@class='sgvitems item']"
-                    resultItem = self.browser.find_element_by_xpath(resultString,30)
+                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr/td/a[starts-with(text(),'" + locationData.entryID + " (')]/parent::td/parent::tr[@class='sgvitems item']"
+                    resultItem = self.browser.find_element_by_xpath(resultString,timeout=30)
 
                     resultItem.click()
                 elif(locationData.entryType == "Service"):
@@ -444,7 +507,6 @@ class TMA:
                     servicesOption.click()
                     time.sleep(2)
                     if(locationData.isInactive == True):
-                        inactiveCheckboxString = "//div/div/div/div/div/div/input[@name='ctl00$LeftPanel$TMAExplorer1$chkClosed'][@id='ctl00_LeftPanel_TMAExplorer1_chkClosed'][@type='checkbox']"
                         inactiveCheckbox = self.browser.find_element_by_xpath(inactiveCheckboxString)
 
                         if(str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
@@ -453,7 +515,6 @@ class TMA:
                         elif(str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
                             pass
                     elif(locationData.isInactive == False):
-                        inactiveCheckboxString = "//div/div/div/div/div/div/input[@name='ctl00$LeftPanel$TMAExplorer1$chkClosed'][@id='ctl00_LeftPanel_TMAExplorer1_chkClosed'][@type='checkbox']"
                         inactiveCheckbox = self.browser.find_element_by_xpath(inactiveCheckboxString)
 
                         if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
@@ -469,8 +530,8 @@ class TMA:
                     time.sleep(2)
                     searchBar.send_keys(u'\ue007')
 
-                    resultString = "//div[@id='ctl00_LeftPanel_TMAExplorer1_UpdatePanelResults']/fieldset/div/div/table/tbody/tr/td/a[starts-with(text(),'" + locationData.entryID + " (')]/parent::td/parent::tr[@class='sgvitems item']"
-                    resultItem = self.browser.find_element_by_xpath(resultString, 30)
+                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr/td/a[starts-with(text(),'" + locationData.entryID + " (')]/parent::td/parent::tr[@class='sgvitems item']"
+                    resultItem = self.browser.find_element_by_xpath(resultString,timeout=30)
 
                     resultItem.click()
                 elif(locationData.entryType == "People"):
@@ -478,7 +539,6 @@ class TMA:
                     peopleOption.click()
                     time.sleep(2)
                     if (locationData.isInactive == True):
-                        inactiveCheckboxString = "//div/div/div/div/div/div/input[@name='ctl00$LeftPanel$TMAExplorer1$chkClosed'][@id='ctl00_LeftPanel_TMAExplorer1_chkClosed'][@type='checkbox']"
                         inactiveCheckbox = self.browser.find_element_by_xpath(inactiveCheckboxString)
 
                         if (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
@@ -487,7 +547,6 @@ class TMA:
                         elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
                             pass
                     elif (locationData.isInactive == False):
-                        inactiveCheckboxString = "//div/div/div/div/div/div/input[@name='ctl00$LeftPanel$TMAExplorer1$chkClosed'][@id='ctl00_LeftPanel_TMAExplorer1_chkClosed'][@type='checkbox']"
                         inactiveCheckbox = self.browser.find_element_by_xpath(inactiveCheckboxString)
 
                         if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
@@ -504,8 +563,8 @@ class TMA:
                     searchBar.send_keys(u'\ue007')
 
                     caseAdjustedPeopleID = locationData.entryID.lower()
-                    resultString = "//div[@id='ctl00_LeftPanel_TMAExplorer1_UpdatePanelResults']/fieldset/div/div/table/tbody/tr/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + caseAdjustedPeopleID + " ')]/parent::td/parent::tr[@class='sgvitems item']"
-                    resultItem = self.browser.find_element_by_xpath(resultString, 30)
+                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + caseAdjustedPeopleID + " ')]/parent::td/parent::tr[@class='sgvitems item']"
+                    resultItem = self.browser.find_element_by_xpath(resultString,timeout=30)
 
                     resultItem.click()
                 elif(locationData.entryType == "Order"):
@@ -521,22 +580,22 @@ class TMA:
                             orderNumber = locationData.entryID[1]
                             orderNumber = orderNumber.lower()
                             orderNumberIndex = 1
-                            resultString = "//div[@id='ctl00_LeftPanel_TMAExplorer1_UpdatePanelResults']/fieldset/div/div/table/tbody/tr/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/ " + orderNumber + " (')]/parent::td/parent::tr[@class='sgvitems item']"
+                            resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/ " + orderNumber + " (')]/parent::td/parent::tr[@class='sgvitems item']"
                         else:
                             orderNumber = locationData.entryID[2]
                             orderNumber = orderNumber.lower()
                             orderNumberIndex = 2
-                            resultString = "//div[@id='ctl00_LeftPanel_TMAExplorer1_UpdatePanelResults']/fieldset/div/div/table/tbody/tr/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + orderNumber + " ')]/parent::td/parent::tr[@class='sgvitems item']"
+                            resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + orderNumber + " ')]/parent::td/parent::tr[@class='sgvitems item']"
                     else:
                         orderNumber = locationData.entryID[0]
                         orderNumber = orderNumber.lower()
                         orderNumberIndex = 0
-                        resultString = "//div[@id='ctl00_LeftPanel_TMAExplorer1_UpdatePanelResults']/fieldset/div/div/table/tbody/tr/td/a[starts-with(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'" + orderNumber + ": ')]/parent::td/parent::tr[@class='sgvitems item']"
+                        resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr/td/a[starts-with(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'" + orderNumber + ": ')]/parent::td/parent::tr[@class='sgvitems item']"
                     searchBar.send_keys(str(orderNumber))
                     time.sleep(2)
                     searchBar.send_keys(u'\ue007')
 
-                    resultItem = self.browser.find_element_by_xpath(resultString, 30)
+                    resultItem = self.browser.find_element_by_xpath(resultString,timeout=30)
 
                     resultItem.click()
 
@@ -566,7 +625,6 @@ class TMA:
 
                     print(errorString)
                     return False
-
                 else:
                     print("ERROR: Can not search for entryType: " + str(locationData.entryType))
                     return False
@@ -580,92 +638,18 @@ class TMA:
                     continue
             print("WARNING: Executed navToLocation trying to find: '" + str(copyOfTargetLocation) + "' but ended up at: '" + str(self.currentLocation) + "'!")
             return False
-    # This method simply logs in to TMA (with 5 attempts, to overcome potential glitch) from the TMA login screen. If not at TMA login screen,
-    # it simply warns and does nothing.
-    def logInToTMA(self):
-        self.readPage()
-        if(self.currentLocation.isLoggedIn == False):
-            TMAurl = "https://tma4.icomm.co/tma/NonAuthentic/Login.aspx"
-            for i in range(5):
-                self.browser.get(TMAurl)
-                self.browser.switch_to_window(self.browser.getWindowHandles()[0])
-                self.browser.implicitly_wait(10)
-                self.readPage()
-                usernameField = self.browser.find_element_by_xpath("//tbody/tr/td/table/tbody/tr/td/input[@name='ctl00$ContentPlaceHolder1$Login1$UserName'][@id='ctl00_ContentPlaceHolder1_Login1_UserName']")
-                passwordField = self.browser.find_element_by_xpath("//tbody/tr/td/table/tbody/tr/td/input[@name='ctl00$ContentPlaceHolder1$Login1$Password'][@id='ctl00_ContentPlaceHolder1_Login1_Password']")
-                defaultUsername = "asomheil@icomm.co"
-                defaultPassword = "P@ssw0rd"
-                usernameField.clear()
-                passwordField.clear()
-                usernameField.send_keys(defaultUsername)
-                passwordField.send_keys(defaultPassword)
-                loginButtonString = "//tbody/tr/td/table/tbody/tr/td/input[@name='ctl00$ContentPlaceHolder1$Login1$LoginButton'][@id='ctl00_ContentPlaceHolder1_Login1_LoginButton']"
-                self.browser.simpleClick(loginButtonString)
-                time.sleep(5)
-                self.browser.implicitly_wait(10)
-                if (self.browser.getCurrentUrl() == "https://tma4.icomm.co/tma/Authenticated/Domain/Default.aspx"):
-                    self.readPage()
-                    if(self.currentLocation.isLoggedIn == True):
-                        print("Successfully logged in to TMA.")
-                        return True
-        else:
-            print("WARNNING: Tried to run logInToTMA, but TMA is already logged in!")
-    # This method simply navigates to a specific client's home page, from the Domain. If not on DomainPage,
-    # it simply warns and does nothing.
-    def navToClientHome(self,clientName):
-        if(self.currentLocation.isLoggedIn != True):
-            print("WARNING: Could not call navToClientHome, as TMA is not currently logged in.")
-            return False
 
-        clientHomeUrl = "https://tma4.icomm.co/tma/Authenticated/Client/ClientHome.aspx?436C69656E744442="
-        clientHomeUrl += self.__clientDict.get(clientName)
-
-        self.browser.get(clientHomeUrl)
-
-        time.sleep(1)
-
-        # Tries to verify that the clienthomepage has been reached 5 times.
-        for i in range(5):
-            self.readPage()
-            if(self.currentLocation.client == clientName):
-                if(self.currentLocation.entryType == "ClientHomePage"):
-                    return True
-                else:
-                    print("WARNING: Successfully navigated to client " + clientName + ", but got a different page than ClientHomePage!")
-                    return True
-            time.sleep(2)
-
-        print("ERROR: Could not navigate to ClientHomePage for " + clientName + " for an unknown reason!")
-    # This method return TMA to the homepage from wherever it currently is, as long as TMA is logged in.
-    def navToDomain(self):
-        self.readPage()
-        if(self.currentLocation.isLoggedIn == False):
-            print("ERROR: Could not execute navToDomain, as TMA is not currently logged in!")
-            return False
-
-
-        TMAheader = self.browser.find_element_by_xpath("//form[@name='aspnetForm']/div[@id='container-main']/div[@id='container-top']/div[@id='header-left']/a[@id='ctl00_lnkDomainHome'][contains(@href,'Default.aspx')]")
-        self.browser.safeClick(TMAheader,False,"https://tma4.icomm.co/tma/Authenticated/Domain/Default.aspx")
-
-        for i in range(5):
-            self.readPage()
-            if(self.currentLocation.entryType == "DomainPage"):
-                return True
-            time.sleep(1)
-
-        print("ERROR: Could not navigate to DomainPage for an unknown reason!")
-
-    # ==================================================================
-    # ==================================================================
-    # ==================================================================
+    # ================================================================================
+    # ==============================SITE NAVIGATION===================================
+    # ================================================================================
 
     # This class represents a full service in TMA. It has many various values and subclasses to represent
     # basic service information, cost items, and linked equipment.
     class TMAService:
 
         # Basic init method to initialize all instance variables.
-        def __init__(self, browser, client):
-            self.browser = browser
+        def __init__(self,TMADriverObject, client):
+            self.TMADriver = TMADriverObject
             self.client = client
 
             self.info_ServiceNumber = None
@@ -747,18 +731,18 @@ class TMA:
         def updateService(self):
             windowButton = "//span[@class='buttons']/div[@class='buttons']/input[contains(@name,'ButtonControl1$ctl02')][@value='Update']"
             mainPageButton = "//span[@class='buttons']/div[@class='buttons']/input[contains(@name,'ButtonControl1$ctl04')][@value='Update']"
-            if (h.elementExists(self.browser, windowButton)):
-                self.browser.safeClick(windowButton)
-                self.browser.safeClick(windowButton)
-                self.browser.safeClick(windowButton)
-                self.browser.safeClick(windowButton)
-                self.browser.safeClick(windowButton)
-            elif (h.elementExists(self.browser, mainPageButton)):
-                self.browser.safeClick(mainPageButton)
-                self.browser.safeClick(mainPageButton)
-                self.browser.safeClick(mainPageButton)
-                self.browser.safeClick(mainPageButton)
-                self.browser.safeClick(mainPageButton)
+            if (self.TMADriver.browser.elementExists(windowButton)):
+                self.TMADriver.browser.click(windowButton)
+                self.TMADriver.browser.click(windowButton)
+                self.TMADriver.browser.click(windowButton)
+                self.TMADriver.browser.click(windowButton)
+                self.TMADriver.browser.click(windowButton)
+            elif (self.TMADriver.browser.elementExists(mainPageButton)):
+                self.TMADriver.browser.click(mainPageButton)
+                self.TMADriver.browser.click(mainPageButton)
+                self.TMADriver.browser.click(mainPageButton)
+                self.TMADriver.browser.click(mainPageButton)
+                self.TMADriver.browser.click(mainPageButton)
             else:
                 print("ERROR: Could not click update button, as it was not found.")
 
@@ -777,48 +761,48 @@ class TMA:
             xpathPrefix = "//div/fieldset/ol/li"
 
             if(self.client == "LYB"):
-                self.info_ServiceNumber = self.browser.find_element_by_xpath(
+                self.info_ServiceNumber = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtServiceId')][contains(@id,'Detail_txtServiceId')]").get_attribute(
                     "value")
-                self.info_UserName = self.browser.find_element_by_xpath(
+                self.info_UserName = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtUserName')][contains(@id,'Detail_txtUserName')]").get_attribute(
                     "value")
-                self.info_Alias = self.browser.find_element_by_xpath(
+                self.info_Alias = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtDescription1')][contains(@id,'Detail_txtDescription1')]").get_attribute(
                     "value")
-                self.info_ContractStartDate = self.browser.find_element_by_xpath(
+                self.info_ContractStartDate = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$ICOMMTextbox1')][contains(@id,'Detail_ICOMMTextbox1')]").get_attribute(
                     "value")
-                self.info_ContractEndDate = self.browser.find_element_by_xpath(
+                self.info_ContractEndDate = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtDescription3')][contains(@id,'Detail_txtDescription3')]").get_attribute(
                     "value")
-                self.info_UpgradeEligibilityDate = self.browser.find_element_by_xpath(
+                self.info_UpgradeEligibilityDate = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtContractEligibilityDate')][contains(@id,'Detail_txtContractEligibilityDate')]").get_attribute(
                     "value")
-                self.info_ServiceType = Select(self.browser.find_element_by_xpath(
+                self.info_ServiceType = Select(self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/select[contains(@name,'Detail$ddlServiceType$ddlServiceType_ddl')][contains(@id,'Detail_ddlServiceType_ddlServiceType_ddl')]")).first_selected_option.text
-                self.info_Carrier = Select(self.browser.find_element_by_xpath(
+                self.info_Carrier = Select(self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/select[contains(@name,'Detail$ddlCarrier$ddlCarrier_ddl')][contains(@id,'Detail_ddlCarrier_ddlCarrier_ddl')]")).first_selected_option.text
             elif(self.client == "Sysco"):
-                self.info_ServiceNumber = self.browser.find_element_by_xpath(
+                self.info_ServiceNumber = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtServiceId')][contains(@id,'Detail_txtServiceId')]").get_attribute(
                     "value")
-                self.info_UserName = self.browser.find_element_by_xpath(
+                self.info_UserName = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtUserName')][contains(@id,'Detail_txtUserName')]").get_attribute(
                     "value")
-                self.info_Alias = self.browser.find_element_by_xpath(
+                self.info_Alias = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtDescription1')][contains(@id,'Detail_txtDescription1')]").get_attribute(
                     "value")
                 self.info_ContractStartDate = None
-                self.info_ContractEndDate = self.browser.find_element_by_xpath(
+                self.info_ContractEndDate = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtDescription5')][contains(@id,'Detail_txtDescription5')]").get_attribute(
                     "value")
-                self.info_UpgradeEligibilityDate = self.browser.find_element_by_xpath(
+                self.info_UpgradeEligibilityDate = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/input[contains(@name,'Detail$txtContractEligibilityDate')][contains(@id,'Detail_txtContractEligibilityDate')]").get_attribute(
                     "value")
-                self.info_ServiceType = Select(self.browser.find_element_by_xpath(
+                self.info_ServiceType = Select(self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/select[contains(@name,'Detail$ddlServiceType$ddlServiceType_ddl')][contains(@id,'Detail_ddlServiceType_ddlServiceType_ddl')]")).first_selected_option.text
-                self.info_Carrier = Select(self.browser.find_element_by_xpath(
+                self.info_Carrier = Select(self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/select[contains(@name,'Detail$ddlCarrier$ddlCarrier_ddl')][contains(@id,'Detail_ddlCarrier_ddlCarrier_ddl')]")).first_selected_option.text
 
         # ========================================
@@ -826,7 +810,7 @@ class TMA:
             if(self.info_ServiceNumber == None):
                 return False
 
-            serviceNumberInput = self.browser.find_element_by_xpath(
+            serviceNumberInput = self.TMADriver.browser.find_element_by_xpath(
                 "//div/fieldset/ol/li/input[contains(@name,'Detail$txtServiceId')][contains(@id,'Detail_txtServiceId')]")
             serviceNumberInput.clear()
             serviceNumberInput.send_keys(self.info_ServiceNumber)
@@ -834,14 +818,14 @@ class TMA:
             if (self.info_UserName == None):
                 return False
 
-            userNameInput = self.browser.find_element_by_xpath(
+            userNameInput = self.TMADriver.browser.find_element_by_xpath(
                 "//div/fieldset/ol/li/input[contains(@name,'Detail$txtUserName')][contains(@id,'Detail_txtUserName')]")
             userNameInput.clear()
             userNameInput.send_keys(self.info_UserName)
         def writeAlias(self):
             if (self.info_Alias == None):
                 return False
-            aliasInput = self.browser.find_element_by_xpath(
+            aliasInput = self.TMADriver.browser.find_element_by_xpath(
                 "//div/fieldset/ol/li/input[contains(@name,'Detail$txtDescription1')][contains(@id,'Detail_txtDescription1')]")
             aliasInput.clear()
             aliasInput.send_keys(self.info_Alias)
@@ -849,7 +833,7 @@ class TMA:
             if (self.info_ContractStartDate == None):
                 return False
             if(self.client == "LYB"):
-                contractStartDateInput = self.browser.find_element_by_xpath(
+                contractStartDateInput = self.TMADriver.browser.find_element_by_xpath(
                     "//div/fieldset/ol/li/input[contains(@name,'Detail$ICOMMTextbox1')][contains(@id,'Detail_ICOMMTextbox1')]")
                 contractStartDateInput.clear()
                 contractStartDateInput.send_keys(self.info_ContractStartDate)
@@ -859,7 +843,7 @@ class TMA:
             if (self.info_ContractEndDate == None):
                 print("Hey yo so we skipped this again")
                 return False
-            contractEndDateInput = self.browser.find_element_by_xpath(
+            contractEndDateInput = self.TMADriver.browser.find_element_by_xpath(
                 "//div/fieldset/ol/li/input[contains(@name,'Detail$txtDescription5')][contains(@id,'Detail_txtDescription5')]")
             contractEndDateInput.clear()
             contractEndDateInput.send_keys(self.info_ContractEndDate)
@@ -867,7 +851,7 @@ class TMA:
             if (self.info_UpgradeEligibilityDate == None):
                 print("Hey yo so we skipped this again2")
                 return False
-            upgradeEligibilityDateInput = self.browser.find_element_by_xpath(
+            upgradeEligibilityDateInput = self.TMADriver.browser.find_element_by_xpath(
                 "//div/fieldset/ol/li/input[contains(@name,'Detail$txtContractEligibilityDate')][contains(@id,'Detail_txtContractEligibilityDate')]")
             upgradeEligibilityDateInput.clear()
             upgradeEligibilityDateInput.send_keys(self.info_UpgradeEligibilityDate)
@@ -876,8 +860,8 @@ class TMA:
                 return False
             serviceTypeSelect = "//div/fieldset/ol/li/select[contains(@name,'Detail$ddlServiceType$ddlServiceType_ddl')][contains(@id,'Detail_ddlServiceType_ddlServiceType_ddl')]"
             targetValue = serviceTypeSelect + "/option[text()='" + self.info_ServiceType + "']"
-            if (h.elementExists(self.browser, targetValue)):
-                self.browser.find_element_by_xpath(targetValue).click()
+            if (self.TMADriver.browser.elementExists(targetValue)):
+                self.TMADriver.browser.find_element_by_xpath(targetValue).click()
             else:
                 print("ERROR: Could not writeServiceType with this value: " + self.info_ServiceType)
         def writeCarrier(self):
@@ -885,8 +869,8 @@ class TMA:
                 return False
             carrierSelect = "//div/fieldset/ol/li/select[contains(@name,'Detail$ddlCarrier$ddlCarrier_ddl')][contains(@id,'Detail_ddlCarrier_ddlCarrier_ddl')]"
             targetValue = carrierSelect + "/option[text()='" + self.info_Carrier + "']"
-            if (h.elementExists(self.browser, targetValue)):
-                self.browser.find_element_by_xpath(targetValue).click()
+            if (self.TMADriver.browser.elementExists(targetValue)):
+                self.TMADriver.browser.find_element_by_xpath(targetValue).click()
             else:
                 print("ERROR: Could not writeCarrier with this value: " + self.info_Carrier)
         def writeMainInformation(self):
@@ -910,35 +894,35 @@ class TMA:
 
         def readLineInfoInformation(self):
             prefix = "//div/div/ol/li"
-            self.info_InstalledDate = self.browser.find_element_by_xpath(
+            self.info_InstalledDate = self.TMADriver.browser.find_element_by_xpath(
                 prefix + "/input[contains(@name,'Detail$txtDateInstalled')][contains(@id,'Detail_txtDateInstalled')]").get_attribute(
                 "value")
-            self.info_DisconnectedDate = self.browser.find_element_by_xpath(
+            self.info_DisconnectedDate = self.TMADriver.browser.find_element_by_xpath(
                 prefix + "/input[contains(@name,'Detail$txtDateDisco')][contains(@id,'Detail_txtDateDisco')]").get_attribute(
                 "value")
-            self.info_IsInactiveService = self.browser.find_element_by_xpath(
+            self.info_IsInactiveService = self.TMADriver.browser.find_element_by_xpath(
                 prefix + "/input[contains(@name,'Detail$chkInactive$ctl01')][contains(@id,'Detail_chkInactive_ctl01')]").is_selected()
 
         # ========================================
         def writeInstalledDate(self):
             if (self.info_InstalledDate == None):
                 return False
-            installedDateInput = self.browser.find_element_by_xpath(
+            installedDateInput = self.TMADriver.browser.find_element_by_xpath(
                 "//div/div/ol/li/input[contains(@name,'Detail$txtDateInstalled')][contains(@id,'Detail_txtDateInstalled')]")
             installedDateInput.clear()
             installedDateInput.send_keys(self.info_InstalledDate)
         def writeDisconnectedDate(self):
             if (self.info_DisconnectedDate == None):
                 return False
-            disconnectedDateInput = self.browser.find_element_by_xpath(
+            disconnectedDateInput = self.TMADriver.browser.find_element_by_xpath(
                 "//div/div/ol/li/input[contains(@name,'Detail$txtDateDisco')][contains(@id,'Detail_txtDateDisco')]")
             disconnectedDateInput.clear()
             disconnectedDateInput.send_keys(self.info_DisconnectedDate)
         def writeIsInactiveService(self):
-            inactiveServiceCheckbox = self.browser.find_element_by_xpath(
+            inactiveServiceCheckbox = self.TMADriver.browser.find_element_by_xpath(
                 "//div/div/ol/li/input[contains(@name,'Detail$chkInactive$ctl01')][contains(@id,'Detail_chkInactive_ctl01')]")
             for i in range(20):
-                self.browser.implicitly_wait(5)
+                self.TMADriver.browser.implicitly_wait(5)
                 boxToggle = inactiveServiceCheckbox.is_selected()
                 if (boxToggle == True):
                     return True
@@ -948,10 +932,10 @@ class TMA:
             print("ERROR: Could not toggle inactiveServiceCheckbox to 'on'.")
             return False
         def writeIsActiveService(self):
-            inactiveServiceCheckbox = self.browser.find_element_by_xpath(
+            inactiveServiceCheckbox = self.TMADriver.browser.find_element_by_xpath(
                 "//div/div/ol/li/input[contains(@name,'Detail$chkInactive$ctl01')][contains(@id,'Detail_chkInactive_ctl01')]")
             for i in range(20):
-                self.browser.implicitly_wait(5)
+                self.TMADriver.browser.implicitly_wait(5)
                 boxToggle = inactiveServiceCheckbox.is_selected()
                 if (boxToggle == False):
                     return True
@@ -966,7 +950,7 @@ class TMA:
                 self.writeIsInactiveService()
             else:
                 self.writeInstalledDate()
-                currentlyInactive = self.browser.find_element_by_xpath(
+                currentlyInactive = self.TMADriver.browser.find_element_by_xpath(
                     "//div/div/ol/li/input[contains(@name,'Detail$chkInactive$ctl01')][contains(@id,'Detail_chkInactive_ctl01')]").is_selected()
                 if (currentlyInactive):
                     input("WARNING: About to make an inactive service active. Press any button to continue.")
@@ -979,11 +963,11 @@ class TMA:
         # info_Assignment
         def readAssignment(self):
             assignmentPathString = "//table[contains(@id,'Accounts_sites_link1_sgvAssignments')]/tbody/tr[contains(@class,'sgvitems')]"
-            newAssignment = TMA.TMAAssignment(self.client,self.info_Carrier)
-            newAssignment.readPreexistingAccount(self.browser, assignmentPathString)
+            newAssignment = TMADriver.TMAAssignment(self.client,self.info_Carrier)
+            newAssignment.readPreexistingAccount(self.TMADriver.browser, assignmentPathString)
             self.info_Assignment = newAssignment
         def writeAssignment(self):
-            self.info_Assignment.createAssignment(self.browser, True)
+            self.info_Assignment.createAssignment(self.TMADriver.browser, True)
 
         # Various costs (Base and Features) for a TMA service, along
         # with an accompanying class and read methods to read cost
@@ -1082,7 +1066,7 @@ class TMA:
                 createNewButton = '//a[contains(@id, "_lnkNewFeature")][text()="Create New"]'
                 commentBoxTestFor = prefix + '/div/div/textarea[contains(@name, "$txtComments")]'
 
-                browser.safeClick(createNewButton, commentBoxTestFor)
+                browser.click(element=createNewButton, repeat=True, repeatUntilNewElementExists=commentBoxTestFor)
 
                 browser.find_element_by_xpath(
                     prefix + "/div/div/select[contains(@name,'$ddlFeature$ddlFeature_ddl')]/option[text()='" + self.info_FeatureString + "']").click()
@@ -1100,14 +1084,13 @@ class TMA:
 
                 insertButton = browser.find_element_by_xpath(
                     prefix + '/span[contains(@id,"btnsSingle")]/div/input[contains(@name, "$btnsSingle$ctl01")][contains(@value, "Insert")]')
-                browser.simpleClick(insertButton)
+                browser.click(insertButton)
         # info_BaseCost = None
         # info_FeatureCosts = []
         def readBaseCost(self):
-            if (h.elementExists(self.browser,
-                                "//table[contains(@id,'Detail_sfBaseCosts_sgvFeatures')]/tbody/tr[contains(@class,'sgvitems')]")):
+            if (self.TMADriver.browser.elementExists("//table[contains(@id,'Detail_sfBaseCosts_sgvFeatures')]/tbody/tr[contains(@class,'sgvitems')]")):
                 baseCost = self.TMACost()
-                baseCost.readPreexistingCost(self.browser.find_element_by_xpath(
+                baseCost.readPreexistingCost(self.TMADriver.browser.find_element_by_xpath(
                     "//table[contains(@id,'Detail_sfBaseCosts_sgvFeatures')]/tbody/tr[contains(@class,'sgvitems')]"),
                                              True)
                 self.info_BaseCost = baseCost
@@ -1115,7 +1098,7 @@ class TMA:
                 print("INFO: Could not read Base Cost for service, as there is no Base Cost present.")
         def readFeatureCosts(self):
             featureCosts = []
-            featureCostElements = self.browser.find_elements_by_xpath(
+            featureCostElements = self.TMADriver.browser.find_elements_by_xpath(
                 "//table[contains(@id,'Detail_sfStandardFeatures_sgvFeatures')]/tbody/tr[contains(@class,'sgvitems')]")
             for i in featureCostElements:
                 newCost = self.TMACost()
@@ -1125,10 +1108,10 @@ class TMA:
         def writeBaseCost(self):
             if (self.info_BaseCost == None or self.info_BaseCost == []):
                 return False
-            self.info_BaseCost.writeCostToTMA(self.browser)
+            self.info_BaseCost.writeCostToTMA(self.TMADriver.browser)
         def writeFeatureCosts(self):
             for i in self.info_FeatureCosts:
-                i.writeCostToTMA(self.browser)
+                i.writeCostToTMA(self.TMADriver.browser)
         # Helper method to read prebuilt TMA cost objects into this service object.
         def generateFromPrebuiltCost(self,prebuiltCostArray):
             # Should never go above 1, if it does, this function errors out.
@@ -1153,9 +1136,9 @@ class TMA:
             targetTab = "//table[contains(@id,'Detail_ucassociations_link_gvTable2')]/tbody/tr[contains(@class,'gridviewbuttons')]/td/span[contains(text(),'" + lowerLinkedTabName + "')]"
             targetTabTestFor = "//span[contains(text(),'" + lowerLinkedTabName + "')]/parent::td/parent::tr[contains(@class,'gridviewbuttonsSelected')]"
 
-            self.browser.safeClick(targetTab, targetTabTestFor)
+            self.TMADriver.browser.click(element=targetTab,repeat=True,repeatUntilNewElementExists=targetTabTestFor)
 
-            if(h.elementExists(self.browser,targetTabTestFor)):
+            if(self.TMADriver.browser.elementExists(targetTabTestFor)):
                 return True
             else:
                 input("ERROR: Could not navigate to the supplied linked tab!")
@@ -1174,21 +1157,21 @@ class TMA:
 
         def readLinkedPersonName(self):
             self.navToLinkedTab("people")
-            self.info_LinkedPersonName = self.browser.find_element_by_xpath(
+            self.info_LinkedPersonName = self.TMADriver.browser.find_element_by_xpath(
                 "//table[contains(@id,'ucassociations_link_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')]/td[5]").text
             return True
         def readLinkedPersonNID(self):
             self.navToLinkedTab("people")
-            self.info_LinkedPersonNID = self.browser.find_element_by_xpath(
+            self.info_LinkedPersonNID = self.TMADriver.browser.find_element_by_xpath(
                 "//table[contains(@id,'ucassociations_link_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')]/td[7]").text
         def readLinkedPersonEmail(self):
             self.navToLinkedTab("people")
-            self.info_LinkedPersonEmail = self.browser.find_element_by_xpath(
+            self.info_LinkedPersonEmail = self.TMADriver.browser.find_element_by_xpath(
                 "//table[contains(@id,'ucassociations_link_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')]/td[11]").text
         def readLinkedInteractions(self):
             self.navToLinkedTab("interactions")
 
-            pageCountText = self.browser.find_element_by_xpath(
+            pageCountText = self.TMADriver.browser.find_element_by_xpath(
                 "//table/tbody/tr/td/span[contains(@id,'Detail_ucassociations_link_lblPages')]").text
             checkForSpace = False
             readNumbers = False
@@ -1211,7 +1194,7 @@ class TMA:
 
             arrayOfLinkedIntNumbers = []
             for i in range(pageCount):
-                arrayOfLinkedInteractionsOnPage = self.browser.find_elements_by_xpath(
+                arrayOfLinkedInteractionsOnPage = self.TMADriver.browser.find_elements_by_xpath(
                     "//table[contains(@id,'ucassociations_link_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')]/td[4]")
                 arrayOfLinkedIntNumbersOnPage = []
                 for j in arrayOfLinkedInteractionsOnPage:
@@ -1225,14 +1208,14 @@ class TMA:
                 time.sleep(1)
                 print("going to test i (" + str(i) + ") against pageCount (" + str(pageCount) + ")")
                 if ((i + 1) < pageCount):
-                    nextButton = self.browser.find_element_by_xpath(
+                    nextButton = self.TMADriver.browser.find_element_by_xpath(
                         "//table/tbody/tr/td/div/div/input[contains(@name,'Detail$ucassociations_link$btnNext')][contains(@id,'Detail_ucassociations_link_btnNext')]")
 
                     while True:
-                        self.browser.simpleClick(nextButton)
+                        self.TMADriver.browser.click(nextButton)
                         time.sleep(3)
                         currentPageNumber = ''
-                        pageCountText = self.browser.find_element_by_xpath(
+                        pageCountText = self.TMADriver.browser.find_element_by_xpath(
                             "//table/tbody/tr/td/span[contains(@id,'Detail_ucassociations_link_lblPages')]").text
                         spaceCheck = False
                         for j in pageCountText:
@@ -1256,7 +1239,7 @@ class TMA:
         def readLinkedOrders(self):
             self.navToLinkedTab("orders")
 
-            pageCountText = self.browser.find_element_by_xpath(
+            pageCountText = self.TMADriver.browser.find_element_by_xpath(
                 "//table/tbody/tr/td/span[contains(@id,'Detail_ucassociations_link_lblPages')]").text
             checkForSpace = False
             readNumbers = False
@@ -1280,7 +1263,7 @@ class TMA:
 
             arrayOfLinkedOrderNumbers = []
             for i in range(pageCount):
-                arrayOfLinkedOrdersOnPage = self.browser.find_elements_by_xpath(
+                arrayOfLinkedOrdersOnPage = self.TMADriver.browser.find_elements_by_xpath(
                     "//table[contains(@id,'ucassociations_link_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')]/td[6]")
                 arrayOfLinkedOrderNumbersOnPage = []
                 for j in arrayOfLinkedOrdersOnPage:
@@ -1295,10 +1278,10 @@ class TMA:
                     nextButton = "//table/tbody/tr/td/div/div/input[contains(@name,'Detail$ucassociations_link$btnNext')][contains(@id,'Detail_ucassociations_link_btnNext')]"
 
                     while True:
-                        self.browser.simpleClick(nextButton)
+                        self.TMADriver.browser.click(nextButton)
                         time.sleep(3)
                         currentPageNumber = ''
-                        pageCountText = self.browser.find_element_by_xpath(
+                        pageCountText = self.TMADriver.browser.find_element_by_xpath(
                             "//table/tbody/tr/td/span[contains(@id,'Detail_ucassociations_link_lblPages')]").text
                         spaceCheck = False
                         for j in pageCountText:
@@ -1325,7 +1308,9 @@ class TMA:
         class TMAEquipment:
 
             # Simple constructor with option to specify linkedService, and to initialize instance variables.
-            def __init__(self, linkedService=None,mainType = None,subType = None,make = None,model = None):
+            def __init__(self, TMADriver,linkedService=None,mainType = None,subType = None,make = None,model = None):
+                self.TMADriver = TMADriver
+
                 self.info_MainType = mainType
                 self.info_SubType = subType
                 self.info_Make = make
@@ -1350,32 +1335,32 @@ class TMA:
 
             # This method reads all the information from an opened equipment on TMA
             # into this object.
-            def readEquipmentInformation(self, browser):
+            def readEquipmentInformation(self):
                 xpathPrefix = "//div/fieldset/ol/li"
 
-                self.info_MainType = browser.find_element_by_xpath(
+                self.info_MainType = self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/span[contains(@id,'Detail_ddlEquipmentTypeComposite_ddlEquipmentTypeComposite__lblType')]/following-sibling::span").text
 
-                self.info_SubType = Select(browser.find_element_by_xpath(
+                self.info_SubType = Select(self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/select[contains(@name,'Detail$ddlEquipmentTypeComposite$ddlEquipmentTypeComposite_ddlSubType')][contains(@id,'Detail_ddlEquipmentTypeComposite_ddlEquipmentTypeComposite_ddlSubType')]")).first_selected_option.text
-                self.info_Make = Select(browser.find_element_by_xpath(
+                self.info_Make = Select(self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/select[contains(@name,'Detail$ddlEquipmentTypeComposite$ddlEquipmentTypeComposite_ddlMake')][contains(@id,'Detail_ddlEquipmentTypeComposite_ddlEquipmentTypeComposite_ddlMake')]")).first_selected_option.text
-                self.info_Model = Select(browser.find_element_by_xpath(
+                self.info_Model = Select(self.TMADriver.browser.find_element_by_xpath(
                     xpathPrefix + "/select[contains(@name,'Detail$ddlEquipmentTypeComposite$ddlEquipmentTypeComposite_ddlModel')][contains(@id,'Detail_ddlEquipmentTypeComposite_ddlEquipmentTypeComposite_ddlModel')]")).first_selected_option.text
 
-                self.info_IMEI = browser.find_element_by_xpath(
+                self.info_IMEI = self.TMADriver.browser.find_element_by_xpath(
                     "//fieldset/fieldset/ol/li/input[contains(@name,'Detail$txtimei')][contains(@id,'Detail_txtimei')]").get_attribute(
                     "value")
-                self.info_SIM = browser.find_element_by_xpath(
+                self.info_SIM = self.TMADriver.browser.find_element_by_xpath(
                     "//fieldset/fieldset/ol/li/input[contains(@name,'Detail$txtSIM')][contains(@id,'Detail_txtSIM')]").get_attribute(
                     "value")
             # This method navigates TMA from a service to its linked equipment. Method
             # assumes that the Service is currently on the "Linked Equipment" tab, and that there
             # is only one linked equipment.
 
-            def navToEquipmentFromService(self, browser):
+            def navToEquipmentFromService(self):
 
-                equipmentArray = browser.find_elements_by_xpath(
+                equipmentArray = self.TMADriver.browser.find_elements_by_xpath(
                     "//table[contains(@id,'ucassociations_link_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')]")
                 if (len(equipmentArray) == 0):
                     input("ERROR: Could not navToEquipmentFromService, as there is no equipment presently linked.")
@@ -1389,14 +1374,14 @@ class TMA:
                 equipmentDoor = "//table[contains(@id,'ucassociations_link_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')][" + str(
                     equipmentIndex) + "]/td[2]"
                 for i in range(12):
-                    if ("https://tma4.icomm.co/tma/Authenticated/Client/Equipment" in browser.getCurrentUrl()):
+                    if ("https://tma4.icomm.co/tma/Authenticated/Client/Equipment" in self.TMADriver.browser.get_current_url()):
                         return True
                     else:
                         if (i > 9):
                             print("ERROR: Could not successfully navToServiceFromEquipment.")
                             return False
-                        browser.implicitly_wait(10)
-                        browser.simpleClick(equipmentDoor)
+                        self.TMADriver.browser.implicitly_wait(10)
+                        self.TMADriver.browser.click(equipmentDoor)
                         time.sleep(5)
 
                 return True
@@ -1404,20 +1389,20 @@ class TMA:
             # Method assumes that Equipment is currently on the "Links" tab, and that
             # there is only one linked service.
 
-            def navToServiceFromEquipment(self, browser):
+            def navToServiceFromEquipment(self):
                 serviceTab = "//table[contains(@id,'Detail_associations_link1_gvTable2')]/tbody/tr[contains(@class,'gridviewbuttons')]/td/span[contains(text(),'services')]"
                 serviceTabTestFor = "//span[contains(text(),'services')]/parent::td/parent::tr[contains(@class,'gridviewbuttonsSelected')]"
 
-                browser.safeClick(serviceTab, serviceTabTestFor)
+                self.TMADriver.browser.click(element=serviceTab,repeat=True,repeatUntilNewElementExists=serviceTabTestFor)
 
                 linkedService = "//table[contains(@id,'associations_link1_sgvAssociations')]/tbody/tr[contains(@class,'sgvitems')]/td[2]"
 
                 for i in range(12):
-                    if ("https://tma4.icomm.co/tma/Authenticated/Client/Services" in browser.getCurrentUrl()):
+                    if ("https://tma4.icomm.co/tma/Authenticated/Client/Services" in self.TMADriver.browser.get_current_url()):
                         return True
                     else:
-                        browser.implicitly_wait(10)
-                        browser.simpleClick(linkedService)
+                        self.TMADriver.browser.implicitly_wait(10)
+                        self.TMADriver.browser.click(linkedService)
                         time.sleep(5)
                 print("ERROR: Could not successfully navToServiceFromEquipment.")
                 return False
@@ -1429,50 +1414,27 @@ class TMA:
             # testMode runs the function right until the end, but doesn't actually insert the item and just
             # closes it. Used for debug, so I don't create 1500 random duplicate equipments and piss everyone
             # at ICOMM off.
-            def createEquipmentFromLinkedService(self,browser,testMode = False):
+            def createEquipmentFromLinkedService(self,testMode = False):
 
                 createNewString = "//table/tbody/tr/td/div/table/tbody/tr/td/a[contains(@id,'link_lnkCreateNew')][text()='Create New Linked Item']"
+                self.TMADriver.browser.click(createNewString)
 
-                equipmentWindow = ""
-                serviceWindow = browser.getCurrentWindowHandle()
-                windowHandleListBeforeClick = browser.getWindowHandles()
-
-
-                for i in range(6):
-                    browser.simpleClick(createNewString)
-                    equipmentWindow = browser.findNewWindow(windowHandleListBeforeClick)
-
-                    if(equipmentWindow == False):
-                        if(i == 5):
-                            input("ERROR: Could not create a new equipment linked to a service!")
-                            return False
-                        else:
-                            continue
-                    else:
-                        break
-
-                if(equipmentWindow == False):
-                    print("ERROR: Could not switch to Equipment Window from createEquipmentFromLinkedService!")
-                    return False
-
-                browser.switch_to_window(equipmentWindow)
-                print(browser.getCurrentWindowHandle())
-
+                self.TMADriver.switchToNewTab()
 
                 # For now, we will ALWAYS select wireless for equipment type.
                 wirelessTypeString = "//body/form/div/div/fieldset/a[contains(@id,'ctl00_modalLinkButton')][text()='Wireless']"
-                browser.safeClick(wirelessTypeString)
+                self.TMADriver.browser.click(wirelessTypeString)
                 time.sleep(0.3)
 
                 # We now write all information for the equipment.
-                self.writeSubType(browser)
+                self.writeSubType()
                 time.sleep(1.5)
-                self.writeMake(browser)
+                self.writeMake()
                 time.sleep(1.5)
-                self.writeModel(browser)
+                self.writeModel()
                 time.sleep(1.5)
-                self.writeIMEI(browser)
-                self.writeSIM(browser)
+                self.writeIMEI()
+                self.writeSIM()
 
 
                 if(testMode == False):
@@ -1480,64 +1442,65 @@ class TMA:
                     # we click update once again to be sure.
                     insertButtonString = "//div/div/span/div/input[contains(@name,'ButtonControl1$ctl02')][@value = 'Insert']"
                     updateButtonString = "//div/div/span/div/input[contains(@name,'ButtonControl1$ctl02')][@value = 'Insert']"
-                    browser.safeClick(insertButtonString,updateButtonString)
-                    browser.simpleClick(updateButtonString)
+                    self.TMADriver.browser.click(element=insertButtonString,repeat=True,repeatUntilNewElementExists=updateButtonString)
+                    self.TMADriver.browser.click(updateButtonString)
 
                 # We now switch back to the original service window.
-                browser.closeCurrentWindow()
-                browser.switch_to_window(serviceWindow)
-            def writeSubType(self,browser):
+                self.TMADriver.returnToPreviousTab()
+
+
+            def writeSubType(self,):
                 if(self.info_SubType == None):
                     return False
                 subTypeDropdownString = "//div/fieldset/div/fieldset/ol/li/select[contains(@id,'ddlEquipmentTypeComposite_ddlSubType')][contains(@name,'$ddlEquipmentTypeComposite_ddlSubType')]/option[text()='" + self.info_SubType + "']"
-                browser.simpleClick(subTypeDropdownString)
+                self.TMADriver.browser.click(subTypeDropdownString)
                 return True
-            def writeMake(self,browser):
+            def writeMake(self):
                 if (self.info_Make == None):
                     return False
                 makeDropdownString = "//div/fieldset/div/fieldset/ol/li/select[contains(@id,'ddlEquipmentTypeComposite_ddlMake')][contains(@name,'$ddlEquipmentTypeComposite_ddlMake')]/option[text()='" + self.info_Make + "']"
-                browser.simpleClick(makeDropdownString)
+                self.TMADriver.browser.click(makeDropdownString)
                 return True
-            def writeModel(self,browser):
+            def writeModel(self):
                 if (self.info_Model == None):
                     return False
                 modelDropdownString = "//div/fieldset/div/fieldset/ol/li/select[contains(@id,'ddlEquipmentTypeComposite_ddlModel')][contains(@name,'$ddlEquipmentTypeComposite_ddlModel')]/option[text()='" + self.info_Model + "']"
-                browser.simpleClick(modelDropdownString)
+                self.TMADriver.browser.click(modelDropdownString)
                 return True
-            def writeIMEI(self,browser):
+            def writeIMEI(self):
                 if (self.info_IMEI == None):
                     return False
                 IMEIString = "//div/fieldset/div/fieldset/fieldset/ol/li/input[contains(@id,'Detail_Equipment_txtimei')]"
-                IMEIElement = browser.find_element_by_xpath(IMEIString)
+                IMEIElement = self.TMADriver.browser.find_element_by_xpath(IMEIString)
                 IMEIElement.clear()
                 IMEIElement.send_keys(self.info_IMEI)
-            def writeSIM(self,browser):
+            def writeSIM(self):
                 if (self.info_SIM == None):
                     return False
                 SIMString = "//div/fieldset/div/fieldset/fieldset/ol/li/input[contains(@id,'Detail_Equipment_txtSIM')]"
-                SIMElement = browser.find_element_by_xpath(SIMString)
+                SIMElement = self.TMADriver.browser.find_element_by_xpath(SIMString)
                 SIMElement.clear()
                 SIMElement.send_keys(self.info_SIM)
             # This method assumes TMA is currently on an equipment, and it simply updates
             # all equipment information with the info stored in this object.
             def updateEquipmentInformation(self,browser):
-                self.writeSubType(browser)
+                self.writeSubType()
                 time.sleep(1.5)
-                self.writeMake(browser)
+                self.writeMake()
                 time.sleep(1.5)
-                self.writeModel(browser)
+                self.writeModel()
                 time.sleep(1.0)
-                self.writeIMEI(browser)
-                self.writeSIM(browser)
+                self.writeIMEI()
+                self.writeSIM()
         # This method assumes that TMA is currently on the "Links" tab of a service. It opens up the
         # linked equipment, reads all information, and stores it as a new "info_LinkedEquipment" item
         # within this service object.
         def readLinkedEquipment(self):
             self.navToLinkedTab("equipment")
-            newEquipment = self.TMAEquipment(self.info_ServiceNumber)
-            newEquipment.navToEquipmentFromService(self.browser)
-            newEquipment.readEquipmentInformation(self.browser)
-            newEquipment.navToServiceFromEquipment(self.browser)
+            newEquipment = self.TMAEquipment(TMADriver=self.TMADriver,linkedService=self.info_ServiceNumber)
+            newEquipment.navToEquipmentFromService()
+            newEquipment.readEquipmentInformation()
+            newEquipment.navToServiceFromEquipment()
 
             self.info_LinkedEquipment = newEquipment
             return True
@@ -1561,18 +1524,18 @@ class TMA:
         def linkItemToService(self, itemType, itemName):
             pass
 
-        # This method will create a completely new service based off of the "info_LinkedEquipment" item
+        # This method will create a completely new equipment based off of the "info_LinkedEquipment" item
         # within this service object. It assumes that TMA is currently on the "Linked Equipment" tab of a service,
         # then clicks "create new linked item" to generate the new Equipment. Once it's finished, it will
         # make the original service window active again.
         def writeNewLinkedEquipment(self):
-            self.info_LinkedEquipment.createEquipmentFromLinkedService(self.browser)
+            self.info_LinkedEquipment.createEquipmentFromLinkedService(self.TMADriver.browser)
         # This method assumes TMA is currently on the "Linked Equipment" tab of a service. It opens the linked equipment,
         # updates all information stored in "info_LinkedEquipment", then returns back to the original service.
         def updateExistingEquipment(self):
-            self.info_LinkedEquipment.navToEquipmentFromService(self.browser)
-            self.info_LinkedEquipment.updateEquipmentInformation(self.browser)
-            self.info_LinkedEquipment.navToServiceFromEquipment(self.browser)
+            self.info_LinkedEquipment.navToEquipmentFromService(self.TMADriver.browser)
+            self.info_LinkedEquipment.updateEquipmentInformation(self.TMADriver.browser)
+            self.info_LinkedEquipment.navToServiceFromEquipment(self.TMADriver.browser)
 
             return True
 
@@ -1612,25 +1575,25 @@ class TMA:
             peopleWindow = newOldWindowArray[0]
             serviceWindow = newOldWindowArray[1]
             # We switch to the serviceWindow, which we will be working in going forward.
-            self.browser.switch_to_window(serviceWindow)
+            self.TMADriver.browser.switch_to_window(serviceWindow)
 
             cellularItemString = "//body/form/div/div/fieldset/a[contains(@id,'ctl01_modalLinkButton')][text()='Cellular']"
-            self.browser.safeClick(cellularItemString)
+            self.TMADriver.browser.click(cellularItemString)
 
 
             self.writeMainInformation()
             self.writeLineInfoInformation()
 
-            beforeInsertWindowArray = self.browser.getWindowHandles()
+            beforeInsertWindowArray = self.TMADriver.browser.getWindowHandles()
             insertButtonString = "//div/div/span/div/input[contains(@name,'ButtonControl1$ctl02')][@value='Insert']"
             updateButtonString = "//div/div/span/div/input[contains(@name,'ButtonControl1$ctl02')][@value='Update']"
 
-            self.browser.safeClick(insertButtonString,updateButtonString)
+            self.TMADriver.browser.click(element=insertButtonString,repeat=True,repeatUntilNewElementExists=updateButtonString)
 
-            self.info_Assignment.createAssignment(self.browser,False,beforeInsertWindowArray)
+            self.info_Assignment.createAssignment(self.TMADriver.browser,False,beforeInsertWindowArray)
 
-            self.browser.simpleClick(updateButtonString)
-            self.browser.simpleClick(updateButtonString)
+            self.TMADriver.browser.click(updateButtonString)
+            self.TMADriver.browser.click(updateButtonString)
 
 
             self.navToServiceTab("Base Costs")
@@ -1646,11 +1609,7 @@ class TMA:
             self.updateService()
 
             print("Well... how'd we do?")
-            self.browser.switch_to_window(peopleWindow)
-
-
-
-
+            self.TMADriver.browser.switch_to_window(peopleWindow)
 
 
         # This method accepts a string to represent a service tab in a TMA
@@ -1663,7 +1622,7 @@ class TMA:
             targetTab = "//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[contains(@name,'" + nameXPATH + "')][@value='" + serviceTab + "']"
             serviceTabTestFor = self.serviceTabCheckFor.get(serviceTab)
 
-            if (self.browser.safeClick(targetTab, serviceTabTestFor, False, False, False,"ERROR: Failed at navToServiceTab(" + serviceTab + ")")):
+            if (self.TMADriver.browser.click(element=targetTab,repeat=True,repeatUntilNewElementExists=serviceTabTestFor)):
                 return True
             else:
                 return False
@@ -1789,7 +1748,7 @@ class TMA:
                         "//table/tbody/tr/td/div/div/input[contains(@name,'Detail$associations_link1$btnNext')][contains(@id,'Detail_associations_link1_btnNext')]")
 
                     while True:
-                        self.browser.simpleClick(nextButton)
+                        self.browser.click(nextButton)
                         time.sleep(3)
                         currentPageNumber = ''
                         pageCountText = self.browser.find_element_by_xpath(
@@ -1856,7 +1815,7 @@ class TMA:
                         "//table/tbody/tr/td/div/div/input[contains(@name,'Detail$associations_link1$btnNext')][contains(@id,'Detail_associations_link1_btnNext')]")
 
                     while True:
-                        self.browser.simpleClick(nextButton)
+                        self.browser.click(nextButton)
                         time.sleep(3)
                         currentPageNumber = ''
                         pageCountText = self.browser.find_element_by_xpath(
@@ -1893,7 +1852,7 @@ class TMA:
             targetTab = "//table[contains(@id,'Detail_associations_link1_gvTable2')]/tbody/tr[contains(@class,'gridviewbuttons')]/td/span[contains(text(),'" + linkedTabName + "')]"
             targetTabTestFor = "//span[contains(text(),'" + lowerLinkedTabName + "')]/parent::td/parent::tr[contains(@class,'gridviewbuttonsSelected')]"
 
-            self.browser.safeClick(targetTab, targetTabTestFor)
+            self.browser.click(element=targetTab, repeat=True,repeatUntilNewElementExists=targetTabTestFor)
 
         # This function assumes that TMA is currently on a "People" page. It navigates to
         # the 'linked Services' tab, then simply clicks create new until it finds that a
@@ -1904,24 +1863,16 @@ class TMA:
             createNewString = "//table/tbody/tr/td/div/table/tbody/tr/td/a[contains(@id,'link1_lnkCreateNew')][text()='Create New Linked Item']"
 
 
-            peopleWindow = self.browser.getCurrentWindowHandle()
-            newServiceWindow = None
-
-            windowHandleListBeforeClick = self.browser.getWindowHandles()
+            originalTMAWindowCount = len(self.browser.tabs.get("TMA"))
 
             for i in range(6):
-                self.browser.simpleClick(createNewString)
-                newServiceWindow = self.browser.findNewWindow(windowHandleListBeforeClick)
+                self.browser.click(createNewString)
+                self.browser.updateOpenTabs()
 
-                if(newServiceWindow != False and newServiceWindow != None):
-                    break
-
-                if(i == 5 and newServiceWindow == False):
-                    input("ERROR: Could not create a new linked service from People!")
-                    return False
-
-            newOldWindowArray = [peopleWindow,newServiceWindow]
-            return newOldWindowArray
+                if(len(self.browser.tabs.get("TMA")) > originalTMAWindowCount):
+                    self.browser.switchToTab("TMA",index=originalTMAWindowCount)
+                    return True
+            return False
 
         # This function simply returns the first 3 characters of the "info_OpCo" attribute.
         def scrapeSyscoOpCo(self):
@@ -2004,7 +1955,7 @@ class TMA:
         # and it will use this to intelligently locate the assignment window, switch to it, and switch
         # back to the original window.
         def createAssignment(self, browser, clickCreateNew = False,oldListOfWindowHandles= False):
-            baseHandle = browser.getCurrentWindowHandle()
+            baseHandle = browser.get_current_window_handle()
             windowHandlesBeforeClick = browser.getWindowHandles()
             assignmentWindow = None
 
@@ -2017,7 +1968,7 @@ class TMA:
 
 
                 for i in range(5):
-                    browser.simpleClick(createNewButton)
+                    browser.click(createNewButton)
                     assignmentWindow = browser.findNewWindow(windowHandlesBeforeClick)
 
                 if(assignmentWindow == False):
@@ -2049,7 +2000,7 @@ class TMA:
 
 
             yesMakeAssignmentButton = "//table/tbody/tr/td/div/ol/li/a[contains(@id,'wizFindExistingAssigment_lnkLinkAssignment')][text()='Yes, make the assignment.']"
-            browser.safeClick(yesMakeAssignmentButton)
+            browser.click(yesMakeAssignmentButton)
 
             browser.switch_to_window(baseHandle)
 
@@ -2060,17 +2011,17 @@ class TMA:
 
             existingSitesButton = "//td/div/div/a[contains(@id,'wizFindExistingAssigment_lnkFindSite')]"
             sitesTabTestFor = "//a[contains(@id,'ctl02_SideBarButton')][text()='Sites']/parent::div"
-            browser.safeClick(existingSitesButton,sitesTabTestFor)
+            browser.click(element=existingSitesButton,repeat=True,repeatUntilNewElementExists=sitesTabTestFor)
 
             browser.implicitly_wait(5)
 
             locationCodeSelection = browser.find_element_by_xpath(
                 "//div/fieldset/ol/li/select[contains(@name,'wizFindExistingAssigment$ddlSiteCodes')]/option[text()='" + self.info_SiteCode + "']")
-            browser.simpleClick(locationCodeSelection)
+            browser.click(locationCodeSelection)
 
             selectButton = "//div/fieldset/ol/li/input[contains(@name,'wizFindExistingAssigment$btnSearchedSiteSelect')][contains(@id,'wizFindExistingAssigment_btnSearchedSiteSelect')]"
             vendorColumnTestFor = "//table[contains(@id,'wizFindExistingAssigment_sgvAccounts')]/tbody/tr/th/a[text()='Vendor']"
-            browser.safeClick(selectButton,vendorColumnTestFor,False,False,True,"ERROR: Could not click on selectButton for createAssignmentFromSite.")
+            browser.click(element=selectButton,repeat=True,repeatUntilNewElementExists=vendorColumnTestFor)
 
             pageCountText = browser.find_element_by_xpath(
                 "//table/tbody/tr/td/span[contains(@id,'wizFindExistingAssigment')][contains(@id,'lblPages')]").text
@@ -2095,13 +2046,13 @@ class TMA:
             for i in range(pageCount):
                 validAccount = "//table[contains(@id,'wizFindExistingAssigment_sgvAccounts')]/tbody/tr[(contains(@class,'sgvitems')) and not(contains(@class,'sgvaccounts closed'))]/td[text()='" + self.info_Vendor + "']/following-sibling::td[text()='" + self.thisAccountDict.get(
                     self.info_Vendor) + "']/parent::tr"
-                if (h.elementExists(browser, validAccount)):
+                if (browser.elementExists(validAccount)):
                     break
                 else:
                     if ((i + 1) < pageCount):
                         nextButton = "//table/tbody/tr/td/div/div/input[contains(@id,'wizFindExistingAssigment')][contains(@id,'btnNext')][contains(@name,'btnNext')]"
                         while True:
-                            browser.simpleClick(nextButton)
+                            browser.click(nextButton)
                             time.sleep(3)
                             currentPageNumber = ''
                             pageCountText = browser.find_element_by_xpath(
@@ -2130,7 +2081,7 @@ class TMA:
             validAccount = "//table[contains(@id,'wizFindExistingAssigment_sgvAccounts')]/tbody/tr[(contains(@class,'sgvitems')) and not(contains(@class,'sgvaccounts closed'))]/td[text()='" + self.info_Vendor + "']/following-sibling::td[text()='" + self.__accountNumber + "']/parent::tr"
             yesMakeAssignmentTestFor = "//table/tbody/tr/td/div/ol/li/a[contains(@id,'wizFindExistingAssigment_lnkLinkAssignment')][text()='Yes, make the assignment.']"
 
-            browser.safeClick(validAccount, yesMakeAssignmentTestFor, False, False, True)
+            browser.click(element=validAccount, timeout=60,repeat=True,repeatUntilNewElementExists=yesMakeAssignmentTestFor)
 
             print(
                 "INFO: Successfully made assignment to site '" + self.info_SiteCode + "' and vendor '" + self.info_Vendor + "'.")
@@ -2141,13 +2092,13 @@ class TMA:
         def createAssignmentFromAccount(self, browser):
             existingAccountsButton = "//td/div/div/a[contains(@id,'wizFindExistingAssigment_lnkFindAccount')]"
             accountsTabTestFor = "//a[contains(@id,'ctl01_SideBarButton')][text()='Accounts']/parent::div"
-            browser.safeClick(existingAccountsButton, accountsTabTestFor)
+            browser.click(element=existingAccountsButton,repeat=True,repeatUntilNewElementExists=accountsTabTestFor)
 
             browser.implicitly_wait(5)
 
             # Always select "Wireless" as assignment type.
             wirelessTypeDropdownSelection = browser.find_element_by_xpath("//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlAccountType')]/option[text()='Wireless']")
-            browser.simpleClick(wirelessTypeDropdownSelection)
+            browser.click(wirelessTypeDropdownSelection)
 
             vendorString = ""
             if("Verizon" in self.info_Vendor):
@@ -2163,7 +2114,7 @@ class TMA:
 
             # Select the vendor from the dropdown.
             vendorDropdownSelection = browser.find_element_by_xpath("//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlVendor')]/option[text()='" + vendorString + "']")
-            browser.simpleClick(vendorDropdownSelection)
+            browser.click(vendorDropdownSelection)
 
             accountNumber = ""
             # TODO: Add more clients
@@ -2173,12 +2124,12 @@ class TMA:
             time.sleep(3)
             # Now select the appropriate account as found based on the vendor.
             accountNumberDropdownSelection = browser.find_element_by_xpath("//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlAccount')]/option[text()='" + accountNumber + "']")
-            browser.simpleClick(accountNumberDropdownSelection)
+            browser.click(accountNumberDropdownSelection)
 
 
             searchedAccountSelectButton = "//tr/td/div/fieldset/ol/li/input[contains(@id,'wizFindExistingAssigment_btnSearchedAccountSelect')]"
             sitesTabTestFor = "//a[contains(@id,'ctl02_SideBarButton')][text()='Sites']/parent::div"
-            browser.safeClick(searchedAccountSelectButton,sitesTabTestFor)
+            browser.click(element=searchedAccountSelectButton,repeat=True,repeatUntilNewElementExists=sitesTabTestFor)
 
 
 
@@ -2207,13 +2158,13 @@ class TMA:
             targetSiteString = "//tbody/tr/td/table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/child::td[1][starts-with(text(),'" + self.info_SiteCode + "')]"
             # Now, we flip through each page, searching for the specific site. Once we find it...
             for i in range(pageCount):
-                if (h.elementExists(browser, targetSiteString,1)):
+                if (browser.elementExists(targetSiteString,1)):
                     break
                 else:
                     if ((i + 1) < pageCount):
                         nextButton = "//table/tbody/tr/td/div/div/input[contains(@id,'wizFindExistingAssigment')][contains(@id,'btnNext')][contains(@name,'btnNext')]"
                         while True:
-                            browser.simpleClick(nextButton)
+                            browser.click(nextButton)
                             time.sleep(0.1)
                             currentPageNumber = ''
                             pageCountText = browser.find_element_by_xpath(
@@ -2239,7 +2190,7 @@ class TMA:
                             "ERROR: Site '" + self.info_SiteCode + "' not found while searching through list of accounts!")
                         return False
             # We click on it.
-            browser.safeClick(targetSiteString)
+            browser.click(targetSiteString)
 
 
             # At this point, what will pop up next is completely and utterly unpredictable. To remedy this,
@@ -2257,11 +2208,11 @@ class TMA:
                 # If TMA pops up with "Company" selection. This usually only happens with OpCo 000,in which case
                 # we'd select 000. Since I know of no other scenarios where Company pops up, for now, if it pops up
                 # on an OpCo that's NOT 000, this will throw an error.
-                if(h.elementExists(browser,companyTab,0)):
+                if(browser.elementExists(companyTab,0)):
                     print("doing company...")
                     if(self.info_SiteCode == "000"):
                         selectorFor000String = "//table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td[text()='000']"
-                        browser.safeClick(selectorFor000String,companyTab,False,True)
+                        browser.click(element=selectorFor000String,repeat=True,repeatUntilNewElementExists=companyTab)
                     else:
                         input("ERROR: Company tab is asking for information on a non-000 OpCo! Edits will be required. God help you! (Press anything to continue)")
                         return False
@@ -2269,11 +2220,11 @@ class TMA:
                 # If TMA pops up with "Division" selection. Again, this usually only occurs (to my knowledge) on 000
                 # OpCo, in which case the only selectable option is "Corp Offices". If this shows up on a non-000
                 # OpCo, the method will throw an error.
-                if(h.elementExists(browser,divisionTab,0)):
+                if(browser.elementExists(divisionTab,0)):
                     print("doing division...")
                     if (self.info_SiteCode == "000"):
                         selectorForCorpOfficesString = "//table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td[text()='Corp Offices']"
-                        browser.safeClick(selectorForCorpOfficesString, divisionTab,False,True)
+                        browser.click(element=selectorForCorpOfficesString,repeat=True,repeatUntilNewElementExists=divisionTab)
                     else:
                         input("ERROR: Division tab is asking for information on a non-000 OpCo! Edits will be required. God help you! (Press anything to continue)")
                         return False
@@ -2281,41 +2232,41 @@ class TMA:
                 # If TMA pops up with "Department" selection. In almost every case, I believe we should be selecting
                 # Wireless-OPCO. The one exception seems to be, of course, OpCo 000. In that case, we select
                 # "Wireless-Corp Liable".
-                if(h.elementExists(browser,departmentTab,0)):
+                if(browser.elementExists(departmentTab,0)):
                     print("doing department...")
                     if (self.info_SiteCode == "000"):
                         selectorForCorpLiableString = "//table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td[text()='Wireless-Corp Liable']"
-                        browser.safeClick(selectorForCorpLiableString, departmentTab, False, True)
+                        browser.click(element=selectorForCorpLiableString,repeat=True,repeatUntilNewElementExists=departmentTab)
                     else:
                         selectorForWirelessOPCOString = "//table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td[text()='Wireless-OPCO']"
-                        browser.safeClick(selectorForWirelessOPCOString, departmentTab, False, True)
+                        browser.click(element=selectorForWirelessOPCOString,repeat=True,repeatUntilNewElementExists=departmentTab)
 
                 # If TMA pops up with "CostCenters" selection. We've been told to essentially ignore this, and pick whatever
                 # the last option is. However, for OpCo 000, it seems to be better to select "CAFINA".
-                if(h.elementExists(browser,costCentersTab,0)):
+                if(browser.elementExists(costCentersTab,0)):
                     print("doing costcenters...")
                     if (self.info_SiteCode == "000"):
                         selectorForCAFINAString = "//table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td[text()='CAFINA']"
-                        browser.safeClick(selectorForCAFINAString, costCentersTab, False, True)
+                        browser.click(element=selectorForCAFINAString,repeat=True,repeatUntilNewElementExists=costCentersTab)
                     else:
                         selectorForAllEntries = "//table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td"
                         allEntries = browser.find_elements_by_xpath(selectorForAllEntries)
                         entriesQuantity = len(allEntries)
                         lastEntry = allEntries[entriesQuantity - 1]
-                        browser.safeClick(lastEntry, costCentersTab, False, True)
+                        browser.click(element=lastEntry,repeat=True,repeatUntilNewElementExists=costCentersTab)
 
                 # If TMA pops up with "ProfitCenter" selection. This is essentially the same as CostCenters, with no necessary
                 # special exception for OpCo 000.
-                if(h.elementExists(browser,profitCenterTab,0)):
+                if(browser.elementExists(profitCenterTab,0)):
                     print("doing profitcenter...")
                     selectorForAllEntries = "//table/tbody/tr/td/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td"
                     allEntries = browser.find_elements_by_xpath(selectorForAllEntries)
                     entriesQuantity = len(allEntries)
                     lastEntry = allEntries[entriesQuantity - 1]
-                    browser.safeClick(lastEntry, profitCenterTab, False, True)
+                    browser.click(element=lastEntry,repeat=True,repeatUntilNewElementExists=profitCenterTab)
 
                 # If TMA brings us to "Finalize" we exit the loop as finish with making the assignment.
-                if(h.elementExists(browser,finalizeTab,0)):
+                if(browser.elementExists(finalizeTab,0)):
                     pass
                     break
 
@@ -2329,4 +2280,12 @@ class TMA:
             # Sysco, we use a while loop to organically respond to whatever options is presents
             # us with after the site is selected.
 
+
+
+
+b = Browser.Browser()
+t = TMADriver(b)
+t.logInToTMA()
+t.navToClientHome("Sysco")
+input("BITCH please navigate to a service to create an equipment from. THAX press enter wehn done")
 
