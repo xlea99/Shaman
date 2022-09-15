@@ -140,7 +140,11 @@ class Browser:
                     raise UnopenedTab(tabName)
             else:
                 # We use the special index value here, since multiple TMA tabs may be open.
-                if (self.browser.current_window_handle != self.tabs.get(tabName)[index]):
+                try:
+                    if (self.browser.current_window_handle != self.tabs.get(tabName)[index]):
+                        self.browser.switch_to.window(self.tabs.get(tabName)[index])
+                        self.updateOpenTabs()
+                except:
                     self.browser.switch_to.window(self.tabs.get(tabName)[index])
                     self.updateOpenTabs()
         # If tab is any of the below, we switch to them.
@@ -155,11 +159,13 @@ class Browser:
                     raise UnopenedTab(tabName)
             else:
                 # Only one of these tabs should EVER be open.
-                if(self.browser.current_window_handle != self.tabs.get(tabName)[0]):
+                try:
+                    if(self.browser.current_window_handle != self.tabs.get(tabName)[0]):
+                        self.browser.switch_to.window(self.tabs.get(tabName)[0])
+                        self.updateOpenTabs()
+                except:
                     self.browser.switch_to.window(self.tabs.get(tabName)[0])
                     self.updateOpenTabs()
-                else:
-                    pass
         else:
             self.updateOpenTabs()
             raise InvalidTabName(tabName)
@@ -244,6 +250,8 @@ class Browser:
         self.browser.refresh()
     def get(self,url):
         self.browser.get(url)
+    def close(self):
+        self.browser.close()
 
 
 class BrowserError(TypeError):

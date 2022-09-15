@@ -62,7 +62,10 @@ class TMADriver():
     # TMA actions happen.
     def switchToNewTab(self,timeout=30):
         for i in range(timeout):
-            oldTMAList = self.browser.tabs.get("TMA")
+            oldTMAList = []
+            for entry in self.browser.tabs.get("TMA"):
+                oldTMAList.append(entry)
+
             self.browser.updateOpenTabs()
             if(len(oldTMAList) < len(self.browser.tabs.get("TMA"))):
                 self.previousTabIndex = len(oldTMAList) - 1
@@ -1446,6 +1449,7 @@ class TMADriver():
                     self.TMADriver.browser.click(updateButtonString)
 
                 # We now switch back to the original service window.
+                self.TMADriver.browser.close()
                 self.TMADriver.returnToPreviousTab()
 
 
@@ -1492,6 +1496,26 @@ class TMADriver():
                 time.sleep(1.0)
                 self.writeIMEI()
                 self.writeSIM()
+        def generateEquipment(self,equipmentOption,imei=None):
+            # Some prebuilt equipments for easier access.
+            prebuiltTMAEquipment = {
+                "iPhone SE": TMADriver.TMAService.TMAEquipment(self.TMADriver,None, "Wireless", "Smart Phone", "Apple", "IPHONE SE 64GB"),
+                "iPhone XR": TMADriver.TMAService.TMAEquipment(self.TMADriver,None, "Wireless", "Smart Phone", "Apple", "iPhone XR 64GB"),
+                "iPhone 11": TMADriver.TMAService.TMAEquipment(self.TMADriver,None, "Wireless", "Smart Phone", "Apple", "iPhone 11 64GB"),
+                "iPhone 12": TMADriver.TMAService.TMAEquipment(self.TMADriver,None, "Wireless", "Smart Phone", "Apple", "iPhone 12 64GB"),
+                "Galaxy S10e": TMADriver.TMAService.TMAEquipment(self.TMADriver,None, "Wireless", "Smart Phone", "Samsung", "Galaxy S10e"),
+                "Galaxy S20": TMADriver.TMAService.TMAEquipment(self.TMADriver,None, "Wireless", "Smart Phone", "Samsung", "Galaxy S20 FE 5G"),
+                "Jetpack": TMADriver.TMAService.TMAEquipment(self.TMADriver,None, "Wireless", "Aircard", "Verizon", "JETPACK 4G 8800L")
+            }
+            selectedEquipment = prebuiltTMAEquipment.get(equipmentOption)
+            if(selectedEquipment == None):
+                input("ERROR: Invalid equipment type given.")
+                return False
+            else:
+                self.info_LinkedEquipment = selectedEquipment
+                if(imei != None):
+                    self.info_LinkedEquipment.info_IMEI = imei
+                return True
         # This method assumes that TMA is currently on the "Links" tab of a service. It opens up the
         # linked equipment, reads all information, and stores it as a new "info_LinkedEquipment" item
         # within this service object.
@@ -1528,8 +1552,8 @@ class TMADriver():
         # within this service object. It assumes that TMA is currently on the "Linked Equipment" tab of a service,
         # then clicks "create new linked item" to generate the new Equipment. Once it's finished, it will
         # make the original service window active again.
-        def writeNewLinkedEquipment(self):
-            self.info_LinkedEquipment.createEquipmentFromLinkedService(self.TMADriver.browser)
+        def writeNewLinkedEquipment(self,testMode = False):
+            self.info_LinkedEquipment.createEquipmentFromLinkedService(testMode=testMode)
         # This method assumes TMA is currently on the "Linked Equipment" tab of a service. It opens the linked equipment,
         # updates all information stored in "info_LinkedEquipment", then returns back to the original service.
         def updateExistingEquipment(self):
@@ -2282,10 +2306,22 @@ class TMADriver():
 
 
 
+# Some prebuilt plans for easier access, meant to be used to build cost objects.
+prebuiltTMAPlans = {
+    "Sysco Verizon Smartphone" : [TMADriver.TMAService.TMACost(True,"Bus Unl Mins 2gb Data Shr+Mhs",37,0,0)],
+    "Sysco Verizon Cell Phone" : [TMADriver.TMAService.TMACost(True,"Basic Unl Mins&Msg 100mb Shr",27,0,0)],
+    "Sysco Verizon Mifi" : [TMADriver.TMAService.TMACost(True,"Mobile Broadband 2gb Share",17,0,0)]
+}
+
 
 b = Browser.Browser()
 t = TMADriver(b)
 t.logInToTMA()
 t.navToClientHome("Sysco")
-input("BITCH please navigate to a service to create an equipment from. THAX press enter wehn done")
+t.navToLocation(client="Sysco",entryType="Service",entryID="636-445-4608")
 
+
+input("BITCH please navigate to a service to create an equipment from. THAX press enter wehn done")
+service = t.TMAService(t,"Sysco")
+service.generateEquipment(equipmentOption="iPhone 11")
+service.writeNewLinkedEquipment(testMode=True)
