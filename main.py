@@ -3,6 +3,7 @@ import datetime
 import Prebuilt_TMA_Objects as pb
 import Browser
 import TMADriver
+from selenium import webdriver
 
 # (NetID)
 # (Service)
@@ -17,15 +18,16 @@ import TMADriver
 # 4. Mifi
 # 5. iPhone SE
 
-orderList = [["whrdm214","404-967-5369","1","9/7/2022","358845630052609"]]
+orderList = [["jbed1010","361-254-4975","iPhone 11","9/9/2022","351010397552583"]]
 
+'''
 b = Browser.Browser()
 myTMA = TMADriver.TMADriver(b)
 myTMA.logInToTMA()
 for order in orderList:
     userID = order[0]
     serviceNumber = order[1]
-    simplifiedServiceType = order[2]
+    equipmentType = order[2]
     orderDateString = order[3]
     IMEINumber = order[4]
     client = "Sysco"
@@ -52,11 +54,11 @@ for order in orderList:
 
     myTMA.navToClientHome("Sysco")
     myTMA.navToLocation(client=client,entryType="People",entryID=userID,isInactive=False)
-    myPerson = myTMA.TMAPeople(myTMA.browser, client)
+    myPerson = myTMA.TMAPeople(myTMA, client)
     myTMA.browser.implicitly_wait(10)
     myPerson.readAllInformation()
 
-    myService = myTMA.TMAService(myTMA.browser, client)
+    myService = myTMA.TMAService(myTMA, client)
 
     myService.info_UserName = (myPerson.info_FirstName + " " + myPerson.info_LastName)
     myService.info_ServiceNumber = serviceNumber
@@ -68,41 +70,30 @@ for order in orderList:
     myService.info_ContractEndDate = expirationDate
     myService.info_UpgradeEligibilityDate = expirationDate
     myService.info_Carrier = "Verizon Wireless"
-    # TODO add support for other carriers
-    if (simplifiedServiceType == "1"):
-        myService.info_ServiceType = "iPhone"
-        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("iPhone 11")
-        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
-    elif (simplifiedServiceType == "2"):
-        myService.info_ServiceType = "iPhone"
-        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("iPhone 12")
-        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
-    elif (simplifiedServiceType == "3"):
-        myService.info_ServiceType = "Android"
-        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("Galaxy S20")
-        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
-    elif (simplifiedServiceType == "4"):
-        myService.info_ServiceType = "Mifi"
-        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("Jetpack")
-        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Mifi"))
-    elif (simplifiedServiceType == "5"):
-        myService.info_ServiceType = "iPhone"
-        myService.info_LinkedEquipment = pb.prebuiltTMAEquipment.get("iPhone SE")
-        myService.generateFromPrebuiltCost(pb.prebuiltTMAPlans.get("Sysco Verizon Smartphone"))
-    else:
-        input("YOU FUCKING MORON GOD FUCKING DAMMIT WHAT THE FUCK")
+    myService.generateEquipment("Mifi",IMEINumber)
 
-    myService.info_LinkedEquipment.info_IMEI = IMEINumber
 
-    myAssignment = myTMA.TMAAssignment(client, "Verizon Wireless")
+    myService.info_ServiceType = "Jetpack"
+#    if("iPhone" in equipmentType):
+#        myService.info_ServiceType = "iPhone"
+#    else:
+#        myService.info_ServiceType = "Android"
+
+
+    myAssignment = myTMA.TMAAssignment(myTMA,client, "Verizon Wireless")
     myAssignment.info_Client = "Sysco"
     myAssignment.info_SiteCode = myPerson.scrapeSyscoOpCo()
 
     myService.info_Assignment = myAssignment
 
     myService.writeNewFullServiceFromUser(myPerson)
+'''
 
+ff = webdriver.Firefox()
 
+while True:
+    print(ff.window_handles)
+    time.sleep(1)
 
 
 

@@ -1,268 +1,200 @@
 from selenium import webdriver
 import selenium.common.exceptions
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.firefox.options import Options
 import time
+from urllib.parse import urlparse
 
 
-URL_TEST_DICT = {"tma4.icomm.co" : "TMA",
-            "apps.cimpl.com" : "Cimpl"}
-URL_LINKS = {"TMA" : "https://tma4.icomm.co/tma/",
-             "Cimpl" : "https://apps.cimpl.com/Cimpl/Authentication#/logon",
-             "VEC" : "https://b2b.verizonwireless.com/sms/#/overview",
-             "Premier" : "https://www.wireless.att.com/businesscare/index.jsp?_requestid=11237",
-             "Baka" : "https://www.baka.ca/signin?from=%2F",
-             "RogersOrdering" : "https://portal.imaginewireless.net/syscocorp#Home"}
+
+
 DOWNLOADS_PATH = "S:\\Coding\\TheShaman\\Shaman\\Download"
 
-# This is a wrapper class for a Selenium browser, meant to make working with specific pages much easier.
+
+
 class Browser:
 
-    # Init method initializes our important variables.
+    # Init method initializes members of class, and opensBrowser if true.
     def __init__(self,openBrowser = True):
-        self.browser = None
-        self.tabs = {"HomeWindow": [],
-                     "TMA": [],
-                     "Outlook": [],
-                     "Cimpl": [],
-                     "VEC": [],
-                     "Premier": [],
-                     "Baka": [],
-                     "RogersOrdering": [],
-                     "UNKNOWN": []}
+        self.driver = None
 
+        self.tabs = {}
+        self.popupTabs = {}
+        self.currentTab = None
+        self.currentTabIsPopup = False
 
         if(openBrowser):
             self.openBrowser()
 
+    # This method opens a new firefox webdriver, with the configured settings. If
+    # restartBrowser is true, it closes the existing browser and opens a new one.
+    def openBrowser(self,restartBrowser = False):
+        # Create a Firefox profile and set preferences
+        firefox_profile = webdriver.FirefoxOptions()
+        firefox_profile.set_preference("browser.download.folderList", 2)
+        firefox_profile.set_preference("browser.download.manager.showWhenStarting", False)
+        firefox_profile.set_preference("browser.download.dir", DOWNLOADS_PATH)
+        firefox_profile.set_preference("browser.helperApps.neverAsk.saveToDisk", "application/octet-stream")
 
-
-    # This method simply opens the browser, and initializes necessary members.
-    def openBrowser(self,):
-        options = webdriver.ChromeOptions()
-        prefs = {"profile.default_content_settings.popups": 0,
-                 "download.default_directory": DOWNLOADS_PATH,  ### Set the path accordingly
-                 "download.prompt_for_download": False}  ## change the downpath accordingly
-        options.add_experimental_option("prefs", prefs)
-
-        if(self.browser != None):
-            raise BrowserAlreadyOpen
-        else:
-            self.browser = webdriver.Chrome(options=options)
-
-        self.updateOpenTabs()
-
-
-    # This method updates the dictionary of open tabs with current, accurate information.
-    def updateOpenTabs(self):
-        # First, we find the list of all windows the program THINKS are open. We call these
-        # previousWindows.
-        newWindows = []
-        closedWindows = []
-        previousWindows = []
-        for tabValues in self.tabs.values():
-            for window in tabValues:
-                previousWindows.append(window)
-
-
-        # Now, we compare this to our list of currentWindows.
-        currentWindows = self.browser.window_handles
-        for previousWindow in previousWindows:
-            if(previousWindow not in currentWindows):
-                closedWindows.append(previousWindow)
-        for currentWindow in currentWindows:
-            if(currentWindow not in previousWindows):
-                newWindows.append(currentWindow)
-
-
-        # We set all tabs to none that were closed.
-        for closedWindow in closedWindows:
-            for key in self.tabs.keys():
-                if(closedWindow in self.tabs.get(key)):
-                    self.tabs.get(key).remove(closedWindow)
-        # Now, we check any new windows that weren't stored for any issues or outliers. We
-        # assume that, when a tab was opened, it should have already been stored in self.tabs.
-        # This is our safeguard against anomalies and TMA-isms.
-        for newWindow in newWindows:
-            foundWindow = False
-            for tabWindows in self.tabs.keys():
-                if(newWindow in tabWindows):
-                    foundWindow = True
-                    break
-            if(not foundWindow):
-                activeWindow = self.browser.current_window_handle
-                self.browser.switch_to.window(newWindow)
-                currentUrl = self.browser.current_url
-                self.browser.switch_to.window(activeWindow)
-
-                if(currentUrl == "data:,"):
-                    self.tabs["HomeWindow"] += [newWindow]
-                    break
-
-                foundTabName = False
-                for urlSnippet in URL_TEST_DICT:
-                    if(urlSnippet in currentUrl):
-                        foundTabName = True
-                        self.tabs[URL_TEST_DICT.get(urlSnippet)] += [newWindow]
-                        print("WARNING: Just added a new tab to " + str(URL_TEST_DICT.get(urlSnippet)) + ", as it was NOT previously added!")
-                        break
-
-                if(not foundTabName):
-                    self.tabs["UNKNOWN"] += [newWindow]
-                    print("WARNING: Just added an UNKNOWN TAB to tab dictionary. Ensure program is running as normal.")
-
-    # This method simply opens a new tab, and returns the window handle. If a url is given,
-    # the new tab will open to that url.
-    def openNewTab(self,url = ""):
-        previousTabs = self.browser.window_handles
-        self.browser.execute_script("window.open('" + str(url) + "');")
-        newTabs = self.browser.window_handles
-        for newTab in newTabs:
-            if(newTab not in previousTabs):
-                return newTab
-
-        print("YOU SHOULD NEVER, EVER SEE THIS!")
-        return None
-
-    # This method uses our defined tab strings to switch to the given tab, if it is open.
-    # If value openTab = True, then the program will open a new tab for the given tabName
-    # if it is not already open. Index is a special value used only for specific sites,
-    # such as TMA - since multiple TMA tabs may be open at any time, the index can be
-    # used to specify which TMA tab to switch to.
-    def switchToTab(self,tabName,openTab = True,index=0):
-        # If tab is TMA, we open TMA.
-        if(tabName == "TMA"):
-            if(len(self.tabs.get(tabName)) == 0):
-                if(openTab):
-                    newTab = self.openNewTab(URL_LINKS.get(tabName))
-                    self.browser.switch_to.window(newTab)
-                    self.tabs[tabName] += [newTab]
-                else:
-                    self.updateOpenTabs()
-                    raise UnopenedTab(tabName)
+        # Check if the browser is already open
+        if self.driver is not None:
+            if(restartBrowser):
+                self.driver.close()
             else:
-                # We use the special index value here, since multiple TMA tabs may be open.
-                try:
-                    if (self.browser.current_window_handle != self.tabs.get(tabName)[index]):
-                        self.browser.switch_to.window(self.tabs.get(tabName)[index])
-                        self.updateOpenTabs()
-                except:
-                    self.browser.switch_to.window(self.tabs.get(tabName)[index])
-                    self.updateOpenTabs()
-        # If tab is any of the below, we switch to them.
-        elif (tabName == "Cimpl" or tabName == "VEC" or tabName == "Premier" or tabName == "RogersOrdering" or tabName == "Baka"):
-            if (len(self.tabs.get(tabName)) == 0):
-                if (openTab):
-                    newTab = self.openNewTab(URL_LINKS.get(tabName))
-                    self.browser.switch_to.window(newTab)
-                    self.tabs[tabName] += [newTab]
-                else:
-                    self.updateOpenTabs()
-                    raise UnopenedTab(tabName)
-            else:
-                # Only one of these tabs should EVER be open.
-                try:
-                    if(self.browser.current_window_handle != self.tabs.get(tabName)[0]):
-                        self.browser.switch_to.window(self.tabs.get(tabName)[0])
-                        self.updateOpenTabs()
-                except:
-                    self.browser.switch_to.window(self.tabs.get(tabName)[0])
-                    self.updateOpenTabs()
+                raise BrowserAlreadyOpen()
+        # Initialize the Firefox browser with the profile
+        self.driver = webdriver.Firefox(options=firefox_profile)
+        self.tabs["Base"] = self.driver.window_handles[0]
+        self.currentTab = "Base"
+
+    # This method simply opens a new tab to the given URL, and returns the window
+    # handle. It also adds the tab to self.tabs, storing it under the "name" name.
+    # If no URL is given, it simply opens a blank tab.
+    def openNewTab(self,tabName,url = ""):
+        previousWindowList = set(self.driver.window_handles)
+        self.driver.execute_script(f"window.open('{url}');")
+        newWindowList = set(self.driver.window_handles)
+        newHandle = (newWindowList - previousWindowList).pop()
+        self.tabs[tabName] = newHandle
+        self.currentTab = tabName
+
+    # This method handles switching to the given tabName. If the tabName does not
+    # exist, it throws an error.
+    def switchToTab(self,tabName,popup=False):
+        if(tabName in self.tabs.keys() and popup is False):
+            self.driver.switch_to.window(self.tabs[tabName])
+            self.currentTab = tabName
+            self.currentTabIsPopup = False
+        elif(tabName in self.popupTabs.keys() and popup is True):
+            self.driver.switch_to.window(self.popupTabs[tabName])
+            self.currentTab = tabName
+            self.currentTabIsPopup = True
         else:
-            self.updateOpenTabs()
-            raise InvalidTabName(tabName)
+            raise TabDoesNotExist(tabName,self.tabs.keys())
 
-        self.browser.maximize_window()
+    # This method handles closing the given tabName. If the tabName does not exist,
+    # it throws an error.
+    def closeTab(self,tabName,popup=False):
+        if(tabName in self.tabs.keys() and popup is False):
+            self.switchToTab(tabName,popup=False)
+            self.driver.close()
+            self.switchToTab("Base",popup=False)
+        elif(tabName in self.popupTabs.keys() and popup is True):
+            self.switchToTab(tabName,popup=True)
+            self.driver.close()
+            self.switchToTab("Base",popup=False)
+        else:
+            raise TabDoesNotExist(tabName,self.tabs.keys())
 
-    # This method simply returns true if the element exists on the current window, false if
-    # it does not.
-    def elementExists(self,xpathString,timeout = 30):
-        self.browser.implicitly_wait(timeout)
+    # This method tests whether the given element value (according to the By
+    # specification) exists.
+    def elementExists(self,by,value):
         try:
-            if ("WebElement" in str(type(xpathString))):
-                if (xpathString.is_displayed()):
-                    return True
-                else:
-                    return False
+            if(type(value) is str):
+                self.driver.find_element(by=by,value=value)
             else:
-                test1 = self.find_elements_by_xpath(xpathString)
-                testLength = len(test1)
-                if (testLength == 0):
-                    return False
-                else:
-                    return True
-        except (selenium.common.exceptions.InvalidSelectorException, selenium.common.exceptions.StaleElementReferenceException, selenium.common.exceptions.NoSuchWindowException) as e:
+                test = value.text
+            return True
+        except (selenium.common.exceptions.InvalidSelectorException, selenium.common.exceptions.StaleElementReferenceException, selenium.common.exceptions.NoSuchWindowException,selenium.common.exceptions.NoSuchElementException):
             return False
 
+    # This method checks to find, and then store, any 'popupTabs' that might have
+    # appeared. These are tabs that were NOT opened using the "openNewTab" method
+    # and are usually the result of automation from a different tab. It returns a
+    # list of newly found popup tabs and remove popup tabs by their popupTabName.
+    def checkForPopupTabs(self):
+        changedTabs = {"newPopupTabs" : [], "removedPopupTabs" : []}
+
+        # First, we check for new popup tabs.
+        for windowHandle in self.driver.window_handles:
+            if(windowHandle not in self.tabs.values()):
+                if(windowHandle not in self.popupTabs.values()):
+                    self.driver.switch_to.window(windowHandle)
+                    parsedURL = urlparse(self.driver.current_url)
+                    domain = parsedURL.netloc
+                    if("www." in domain):
+                        domain = domain.split("www.")[1]
+                    while(domain in self.popupTabs.keys()):
+                        domain += "_new"
+                    changedTabs["newPopupTabs"].append(domain)
+                    self.popupTabs[domain] = windowHandle
+                    self.switchToTab(self.currentTab,popup=False)
+
+        # Next, we check for stale popup tabs.
+        tabsToRemove = []
+        for popupTabName, windowHandle in self.popupTabs.items():
+            if(windowHandle not in self.driver.window_handles):
+                changedTabs["removedPopupTabs"].append(popupTabName)
+                tabsToRemove.append(popupTabName)
+
+        for tabToRemove in tabsToRemove:
+            self.popupTabs.pop(tabToRemove)
+
+        return changedTabs
+
     # This wrapper method helps prevent some pains of timeouts and bullshit. If repeat is true,
-    # method will continuously click the element until all repeat conditions are met.
-    def click(self,element,timeout=30,repeat=False,repeatUntilElementGone=False,repeatUntilNewElementExists=None):
-        if(repeat):
-            for i in range(timeout * 2):
-                try:
-                    if (str(type(element)) == "<class 'str'>"):
-                        self.find_element_by_xpath(element).click()
-                    else:
-                        element.click()
-                except:
-                    time.sleep(0.5)
-
-                if (repeatUntilNewElementExists != None):
-                    if(self.elementExists(repeatUntilNewElementExists)):
-                        return True
-
-
-                if(repeatUntilElementGone):
-                    if(not self.elementExists(element)):
-                        return True
-
-        else:
-            for i in range(timeout*2):
-                try:
-                    if(str(type(element)) == "<class 'str'>"):
-                        self.find_element_by_xpath(element).click()
-                        return True
-                    else:
-                        element.click()
-                        return True
-                except:
-                    time.sleep(0.5)
-
-
-    # Here, we wrap all normal webdriver methods.
-    def switch_to_window(self,windowName):
-        self.browser.switch_to.window(windowName)
-    def get_current_url(self):
-        return self.browser.current_url
-    def get_current_window_handle(self):
-        return self.browser.current_window_handle
-    def get_window_handles(self):
-        return self.browser.window_handles
-    def find_element_by_xpath(self,xpathString,timeout=3):
-        for i in range(timeout):
+    # method will continuously click the element until all repeat conditions are met. Element
+    # can be either a string representing an XPATH or CSS_SELECTOR, or an already found element.
+    def safeClick(self,by=None,element=None,timeout=30,repeat=False,repeatUntilElementDoesNotExist=None,repeatUntilNewElementExists=None):
+        for i in range(timeout * 2):
+            print(f"we clickin '{str(element)}' by '{str(by)}'")
+            # First, we try to click the element.
             try:
-                return self.browser.find_element_by_xpath(xpathString)
+                if(type(element) is str):
+                    self.find_element(by=by, value=element).click()
+                else:
+                    element.click()
             except:
-                time.sleep(1)
-    def find_elements_by_xpath(self,xpathString):
-        return self.browser.find_elements_by_xpath(xpathString)
-    def implicitly_wait(self,waitTime):
-        self.browser.implicitly_wait(waitTime)
+                pass
+
+            if(repeatUntilElementDoesNotExist is not None):
+                if (not self.elementExists(by=by, value=repeatUntilElementDoesNotExist)):
+                    return True
+
+            if(repeatUntilNewElementExists is not None):
+                if (self.elementExists(by=by, value=repeatUntilNewElementExists)):
+                    return True
+
+            if(repeat):
+                time.sleep(0.5)
+                continue
+            else:
+                break
+
+
+    # Simple wrapping of a bunch of selenium.webdriver functions.
+    def get_current_url(self):
+        return self.driver.current_url
+    def get_current_window_handle(self):
+        return self.driver.current_window_handle
+    def get_window_handles(self):
+        return self.driver.window_handles
+    def find_element(self,by,value,timeout=5):
+        try:
+            WebDriverWait(self.driver,timeout).until(EC.presence_of_element_located((by,value)))
+            return self.driver.find_element(by=by,value=value)
+        except TimeoutError:
+            return None
+    def find_elements(self,by,value,timeout=5):
+        try:
+            WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, value)))
+            return self.driver.find_elements(by=by, value=value)
+        except TimeoutError:
+            return None
     def refresh(self):
-        self.browser.refresh()
+        self.driver.refresh()
     def get(self,url):
-        self.browser.get(url)
-    def close(self):
-        self.browser.close()
+        self.driver.get(url)
+    def implicitly_wait(self,waitTime):
+        self.driver.implicitly_wait(waitTime)
 
 
-class BrowserError(TypeError):
-    pass
-class BrowserAlreadyOpen(BrowserError):
+
+class BrowserAlreadyOpen(Exception):
     def __init__(self):
         super().__init__("Tried to open browser, but a browser is already open!")
-class UnopenedTab(BrowserError):
-    def __init__(self,tabName):
-        super().__init__("Tried to switch to tab " + tabName + ", but tab is not open and openTab is set to False!")
-class InvalidTabName(BrowserError):
-    def __init__(self,tabName):
-        super().__init__("Invalid tab name to switch to: " + str(tabName))
-
+class TabDoesNotExist(Exception):
+    def __init__(self,tabName,tabsList):
+        super().__init__(f"The tab '{tabName}' does not appear to exist in the tabs list:\n{str(tabsList)}")
