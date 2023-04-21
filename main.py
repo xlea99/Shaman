@@ -4,21 +4,26 @@ import Prebuilt_TMA_Objects as pb
 import Browser
 import TMADriver
 from selenium import webdriver
+import Helpers as h
 
-# (NetID)
-# (Service)
-# (Device Type)
-# (Order Date)
-# (IMEI)
-#
-# OPTIONS FOR DEVICE:
-# 1. iPhone 11
-# 2. iPhone 12
-# 3. Galaxy S20
-# 4. Mifi
-# 5. iPhone SE
+b = Browser.Browser()
+#t = TMADriver.TMADriver(browserObject=b)
+#t.logInToTMA()
 
-orderList = [["jbed1010","361-254-4975","iPhone 11","9/9/2022","351010397552583"]]
+
+'''
+h.syscoNewInstall(  existingTMADriver = t,
+                    browser   = b,
+                    netID     = "dray0821",
+                    serviceNum= "838-217-3278",
+                    installDate="4/17/2023",
+                    device    = "iPhone 12",
+                    imei      = "350765873805612")
+
+'''
+
+
+
 
 '''
 b = Browser.Browser()
@@ -88,15 +93,6 @@ for order in orderList:
 
     myService.writeNewFullServiceFromUser(myPerson)
 '''
-
-ff = webdriver.Firefox()
-
-while True:
-    print(ff.window_handles)
-    time.sleep(1)
-
-
-
 '''
 print("===========================================")
 print("=======WELCOME TO SERVICE FUN TIME=========")

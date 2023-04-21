@@ -137,7 +137,7 @@ class Browser:
     # This wrapper method helps prevent some pains of timeouts and bullshit. If repeat is true,
     # method will continuously click the element until all repeat conditions are met. Element
     # can be either a string representing an XPATH or CSS_SELECTOR, or an already found element.
-    def safeClick(self,by=None,element=None,timeout=30,repeat=False,repeatUntilElementDoesNotExist=None,repeatUntilNewElementExists=None):
+    def safeClick(self,by=None,element=None,timeout=30,repeat=False,repeatUntilElementDoesNotExist=None,repeatUntilNewElementExists=None,clickDelay=0):
         for i in range(timeout * 2):
             print(f"we clickin '{str(element)}' by '{str(by)}'")
             # First, we try to click the element.
@@ -158,7 +158,7 @@ class Browser:
                     return True
 
             if(repeat):
-                time.sleep(0.5)
+                time.sleep(0.5 + clickDelay)
                 continue
             else:
                 break
