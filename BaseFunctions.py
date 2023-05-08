@@ -39,9 +39,10 @@ class Paths:
         # Path to database directory
         self.databases = f"{self.data}/db"
         createAndCheckAccess(self.databases)
-
-
 paths = Paths()
+
+with open(f"{paths.data}/clients.toml", "rb") as f:
+    clients = tomli.load(f)
 
 # endregion === Config and Pathing Setup ===
 

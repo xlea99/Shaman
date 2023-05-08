@@ -265,11 +265,6 @@ class Equipment:
 
         return returnString
 class Assignment:
-
-    # Account dict is used for locating an account number from a vendor.
-    ASSIGNMENT_ACCOUNT_DICT = {"LYB" : {"AT&T Mobility": "990942540", "Verizon Wireless": "421789526-00001"},
-                               "Sysco" : {"AT&T Mobility": "824013589", "Verizon Wireless": "910259426-00007"}}
-
     # Initializing a TMAAssignment requires the client (LYB, Sysco, etc.) and vendor
     # (AT&T Mobility, Verizon Wireless, etc) to be specified.
     def __init__(self, client = None, vendor = None,siteCode = None,assignmentType = "Wireless"):
@@ -280,7 +275,7 @@ class Assignment:
             self.info_Vendor = "Verizon Wireless"
         elif("at&t" in vendor.lower()):
             self.info_Vendor = "AT&T Mobility"
-        self.info_Account = self.ASSIGNMENT_ACCOUNT_DICT[client][self.info_Vendor]
+        self.info_Account = b.clients["Accounts"][client][self.info_Vendor]
 
         self.info_SiteCode = siteCode
         self.info_Address = None
@@ -1956,7 +1951,7 @@ class TMADriver():
         vendorDropdownSelection = self.browser.find_element(by=By.XPATH, value="//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlVendor')]/option[text()='" + vendorString + "']")
         self.browser.safeClick(by=By.XPATH, element=vendorDropdownSelection)
 
-        accountNumber = Assignment.ASSIGNMENT_ACCOUNT_DICT[client][vendorString]
+        accountNumber = b.clients["Assignments"][client][vendorString]
 
         # Now select the appropriate account as found based on the vendor.
         accountNumberDropdownSelectionString = f"//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlAccount')]/option[text()='{accountNumber}']"
