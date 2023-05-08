@@ -10,7 +10,8 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.options import Options
 from selenium.webdriver.support.ui import Select
 
-
+# Class serving as a structure for organizing and storing locational information about where the program
+# is on a TMA page.
 class TMALocation:
 
     # Basic init method initializes a few used variables.
@@ -98,7 +99,6 @@ class TMALocation:
         returnString += "\nIs Inactive: " + str(self.isInactive)
 
         return returnString
-
 
 # These classes serve as simple structs for representing singular object in TMA such as a people object, service object,
 # or equipment object.
@@ -294,7 +294,6 @@ class Assignment:
         self.info_GLCode = None
         self.info_ProfitCenter = None
         self.info_BatchGroup = None
-
 
 # How many TMA Location Datas will be stored at maximum, to conserve the TMA object from endlessly inflating.
 MAXIMUM_STORED_HISTORY = 20

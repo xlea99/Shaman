@@ -32,9 +32,15 @@ class Paths:
         self.logs = f"{self.base}/{config['paths']['logs']}"
         createAndCheckAccess(self.logs)
 
-        # Path directly to the database
-        self.databases = f"{self.base}/{config['paths']['databases']}"
+        # Path to data directory
+        self.data = f"{self.base}/{config['paths']['data']}"
+        createAndCheckAccess(self.data)
+
+        # Path to database directory
+        self.databases = f"{self.data}/db"
         createAndCheckAccess(self.databases)
+
+
 paths = Paths()
 
 # endregion === Config and Pathing Setup ===

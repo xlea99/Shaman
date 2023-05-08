@@ -5,7 +5,7 @@ title = "Shaman Config"
 base = "S:/Coding/TheShaman/Shaman/Base"    # Folder for runtime program files.
 downloads = "/downloads"                    # Where runtime downloads are stored and accessed
 logs = "/logs"                              # Where log files are stored
-databases = "/db"                           # Where dbs are stored
+data = "/data"                              # Where program data is stored
 
 [authentication]
 tmaUser = "asomheil@icomm.co"                   # TMA Username
