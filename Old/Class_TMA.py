@@ -108,8 +108,6 @@ class TMA:
 
             return returnString
 
-
-
         # Get's a fancier, sexier version of the __str__ method.
         def getFancyString(self):
             returnString = ""
