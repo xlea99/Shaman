@@ -326,7 +326,6 @@ class CimplDriver:
 
     #endregion === Filtering ===
 
-
     # This method assumes Cimpl is currently on the Workorder Center page. It will download the flat
     # workorder report as an Excel spreadsheet file, and put it in the downloads folder to be used later.
     # It will also delete any existing downloads in the folder. It will return the date given by the report.

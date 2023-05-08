@@ -15,7 +15,7 @@ t.logInToTMA()
 
 
 # New Install
-
+'''
 h.syscoNewInstall(  existingTMADriver = t,
                     browser   = b,
                     netID     = "ljim2454",
@@ -24,7 +24,7 @@ h.syscoNewInstall(  existingTMADriver = t,
                     device    = "iPhone 12",
                     imei      = "357716580383461")
 
-
+'''
 # Upgrade
 '''
 h.syscoUpgrade(existingTMADriver = t,

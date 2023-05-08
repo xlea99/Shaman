@@ -4,7 +4,6 @@ import selenium.common.exceptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.firefox.options import Options
 import time
 from urllib.parse import urlparse
 
@@ -227,22 +226,32 @@ class Browser:
     def get_window_handles(self):
         return self.driver.window_handles
     # TODO integrate this with elementExists, so there's no duplicate logging and confusion.
-    def find_element(self,by,value,timeout=5):
-        try:
-            WebDriverWait(self.driver,timeout).until(EC.presence_of_element_located((by,value)))
+    def find_element(self,by,value,timeout=2,ignoreErrors=False):
+        if(ignoreErrors):
+            try:
+                WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
+                b.log.debug(f"findElement successfully found value '{value}' by '{by}'.")
+                return self.driver.find_element(by=by, value=value)
+            except (TimeoutError):
+                b.log.warning(f"findElements could not find value '{value}' by '{by}', but errors were suppressed.")
+                return None
+        else:
+            WebDriverWait(self.driver,timeout).until(EC.element_to_be_clickable((by,value)))
             b.log.debug(f"findElement successfully found value '{value}' by '{by}'.")
             return self.driver.find_element(by=by,value=value)
-        except (TimeoutError,selenium.common.exceptions.TimeoutException,selenium.common.exceptions.StaleElementReferenceException):
-            b.log.warning(f"findElement could not find value '{value}' by '{by}'.")
-            return None
-    def find_elements(self,by,value,timeout=5):
-        try:
-            WebDriverWait(self.driver, timeout).until(EC.presence_of_element_located((by, value)))
+    def find_elements(self,by,value,timeout=2,ignoreErrors=False):
+        if(ignoreErrors):
+            try:
+                WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
+                b.log.debug(f"findElements successfully found value '{value}' by '{by}'.")
+                return self.driver.find_elements(by=by, value=value)
+            except TimeoutError:
+                b.log.debug(f"findElements could not find value '{value}' by '{by}'.")
+                return None
+        else:
+            WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
             b.log.debug(f"findElements successfully found value '{value}' by '{by}'.")
             return self.driver.find_elements(by=by, value=value)
-        except TimeoutError:
-            b.log.debug(f"findElements could not find value '{value}' by '{by}'.")
-            return None
     def refresh(self):
         self.driver.refresh()
     def get(self,url):
