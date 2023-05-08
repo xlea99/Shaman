@@ -1,0 +1,22 @@
+title = "Shaman Config"
+
+
+[paths]
+base = "S:/Coding/TheShaman/Shaman/Base"    # Folder for runtime program files.
+downloads = "/downloads"                    # Where runtime downloads are stored and accessed
+logs = "/logs"                              # Where log files are stored
+databases = "/db"                           # Where dbs are stored
+
+[authentication]
+tmaUser = "asomheil@icomm.co"                   # TMA Username
+tmaPass = "P@ssw0rd"                            # TMA Password
+cimplUser = "Alex.somheil@uplandsoftware.com"   # Cimpl Username
+cimplPass = "Make!tCimpl"                       # Cimpl Password
+
+[logging]
+level = "DEBUG"     # Valid levels are: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", with DEBUG showing the most info
+maxSize = 10240     # Maximum log file size in kilobytes
+backupCount = 10    # Number of old log files to keep
+
+[database]
+name = "Shaman.db"  # Default database name
