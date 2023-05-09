@@ -6,12 +6,12 @@ import Helpers as h
 
 b = Browser.Browser()
 
-t = TMA.TMADriver(browserObject=b)
-t.logInToTMA()
+#t = TMA.TMADriver(browserObject=b)
+#t.logInToTMA()
 
-#c = Cimpl.CimplDriver(browserObject=b)
-#c.logInToCimpl()
-#c.navToWorkorderCenter()
+c = Cimpl.CimplDriver(browserObject=b)
+c.logInToCimpl()
+c.navToWorkorderCenter()
 
 
 # New Install

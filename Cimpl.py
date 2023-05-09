@@ -349,7 +349,110 @@ class CimplDriver:
 
         self.browser.setDownloadPath(b.paths.downloads)
 
+    # Simply attempts to open the given workorder number. Assumes that the workorder number is on the screen,
+    # but if it isn't, it simply returns false (no erroring out)
+    def openWorkorder(self,workorderNumber):
+        workorderRowString = f"//table/tbody/tr/td/span[contains(@class,'workorder__workorder-number')][text()='{str(workorderNumber).strip()}']"
+        workorderCardString = f"//workorder-card/div/div/div/span[contains(@class,'cimpl-card__clickable')][text()='{str(workorderNumber).strip()}']"
+
+        if(self.browser.elementExists(by=By.XPATH,value=workorderRowString)):
+            workorderElement = self.browser.find_element(by=By.XPATH,value=workorderRowString)
+            workorderElement.click()
+            self.waitForLoadingScreen()
+            return True
+        elif(self.browser.elementExists(by=By.XPATH,value=workorderCardString)):
+            workorderElement = self.browser.find_element(by=By.XPATH,value=workorderCardString)
+            workorderElement.click()
+            self.waitForLoadingScreen()
+            return True
+        else:
+            return False
 
 
+    #region === Interior Workorders ===
+
+    # Header read methods
+    def Workorders_ReadCarrier(self):
+        carrierString = "//ng-transclude/div/div/div[@ng-bind='item.provider']"
+        carrierElement = self.browser.find_element(by=By.XPATH,value= carrierString)
+        return carrierElement.text
+    def Workorders_ReadDueDate(self):
+        dueDateString = "//ng-transclude/div/div/div[@ng-bind='item.dueDate']"
+        dueDateElement = self.browser.find_element(by=By.XPATH,value=dueDateString)
+        return dueDateElement.text
+    def Workorders_ReadOperationType(self):
+        operationTypeString = "//ng-transclude/div/div/div[@ng-bind='service.actionType']"
+        operationTypeElement = self.browser.find_element(by=By.XPATH,value=operationTypeString)
+        return operationTypeElement.text
+    def Workorders_ReadStatus(self):
+        statusString = "//ng-transclude/div/div/div[@ng-bind='vm.statusLabel']"
+        statusElement = self.browser.find_element(by=By.XPATH, value=statusString)
+        return statusElement.text
+    def Workorders_ReadWONumber(self):
+        workorderString = "//div/div/div/div/div/div[contains(@class,'workorder-details__woNumber')]"
+        workorderElement = self.browser.find_element(by=By.XPATH,value=workorderString)
+        return workorderElement.text
+    # Front (Summary) page read methods
+    def Workorders_ReadComment(self):
+        self.browser.switchToTab("Cimpl")
+        commentString = "//div[contains(@class,'control-label cimpl-form')][text()='Comment']/following-sibling::div[contains(@ng-class,'cimpl-form__default')]/ng-transclude/div/cimpl-textarea"
+        commentElement = self.browser.find_element(by=By.XPATH,value=commentString)
+        return commentElement.get_attribute("text")
+    def Workorders_ReadReferenceNo(self):
+        self.browser.switchToTab("Cimpl")
+        referenceNoString = "//div[contains(@class,'control-label cimpl-form')][text()='Reference No.']/following-sibling::div[contains(@class,'cimpl-form__default')]/div"
+        referenceNoElement = self.browser.find_element(by=By.XPATH,value=referenceNoString)
+        return referenceNoElement.get_attribute("text")
+    def Workorders_ReadSubject(self):
+        self.browser.switchToTab("Cimpl")
+        subjectString = "//div[contains(@class,'control-label cimpl-form')][text()='Subject']/following-sibling::div[contains(@class,'cimpl-form__default')]/div"
+        subjectElement = self.browser.find_element(by=By.XPATH,value=subjectString)
+        return subjectElement.get_attribute("text")
+    # Back (Details) page read methods
+    def Workorders_ReadServiceID(self):
+        self.browser.switchToTab("Cimpl")
+        serviceIDString = "//div[contains(@class,'control-label cimpl-form')][text()='Service ID']/following-sibling::div[contains(@class,'cimpl-form__default')]/div"
+        serviceIDElement = self.browser.find_element(by=By.XPATH,value=serviceIDString)
+        return serviceIDElement.get_attribute("text")
+
+    # Front (Summary) page write methods
+    def Workorders_WriteComment(self,comment):
+        self.browser.switchToTab("Cimpl")
+        commentString = "//div[contains(@class,'control-label cimpl-form')][text()='Comment']/following-sibling::div[contains(@ng-class,'cimpl-form__default')]/ng-transclude/div/cimpl-textarea/div/textarea"
+        commentElement = self.browser.find_element(by=By.XPATH,value=commentString)
+        commentElement.clear()
+        commentElement.send_keys(str(comment))
+    def Workorders_WriteReferenceNo(self,referenceNo):
+        self.browser.switchToTab("Cimpl")
+        referenceNoString = "//div[contains(@class,'control-label cimpl-form')][text()='Reference No.']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
+        referenceNoElement = self.browser.find_element(by=By.XPATH,value=referenceNoString)
+        referenceNoElement.clear()
+        referenceNoElement.send_keys(str(referenceNo))
+    def Workorders_WriteSubject(self,subject):
+        self.browser.switchToTab("Cimpl")
+        subjectString = "//div[contains(@class,'control-label cimpl-form')][text()='Subject']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
+        subjectElement = self.browser.find_element(by=By.XPATH, value=subjectString)
+        subjectElement.clear()
+        subjectElement.send_keys(str(subject))
+    # Back (Details) page write methods
+    def Workorders_WriteServiceID(self,serviceID):
+        self.browser.switchToTab("Cimpl")
+        serviceIDString = "//div[contains(@class,'control-label cimpl-form')][text()='Service ID']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
+        serviceIDElement = self.browser.find_element(by=By.XPATH, value=serviceIDString)
+        serviceIDElement.clear()
+        serviceIDElement.send_keys(str(serviceID))
+
+    # Methods for navigating the workorder
+    def Workorders_NavToDetailsTab(self):
+        self.browser.switchToTab("Cimpl")
+        detailsTabString = "//cimpl-tabs-panel/div/div/div/div/span[contains(@class,'cimpl-tabs-panel__tabLink')][text()='Details']"
+        detailsTabElement = self.browser.find_element(by=By.XPATH,value=detailsTabString)
+        detailsTabElement.click()
+    def Workorders_NavToSummaryTab(self):
+        self.browser.switchToTab("Cimpl")
+        summaryTabString = "//cimpl-tabs-panel/div/div/div/div/span[contains(@class,'cimpl-tabs-panel__tabLink')][text()='Summary']"
+        summaryTabElement = self.browser.find_element(by=By.XPATH,value=summaryTabString)
+        summaryTabElement.click()
 
 
+    #endregion === Interior Workorders ===

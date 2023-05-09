@@ -3,6 +3,7 @@ from logging.handlers import RotatingFileHandler
 import tomli
 import os
 import sqlite3
+import datetime
 
 # region === Config and Pathing Setup ===
 
@@ -51,7 +52,7 @@ with open(f"{paths.data}/clients.toml", "rb") as f:
 # Set up basic log format
 logFormat = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(message)s {{%(filename)s:%(funcName)s:%(lineno)d}}"
 dateFormat = "%Y-%m-%d %H:%M:%S"
-logFile = f"{paths.logs}/shaman.log"
+logFile = f"{paths.logs}/log.log"
 
 # Get log configuration for program
 log = logging.getLogger("Shaman")
