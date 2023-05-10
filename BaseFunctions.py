@@ -3,6 +3,7 @@ from logging.handlers import RotatingFileHandler
 import tomli
 import os
 import sqlite3
+import datetime
 
 # region === Config and Pathing Setup ===
 
@@ -32,10 +33,17 @@ class Paths:
         self.logs = f"{self.base}/{config['paths']['logs']}"
         createAndCheckAccess(self.logs)
 
-        # Path directly to the database
-        self.databases = f"{self.base}/{config['paths']['databases']}"
+        # Path to data directory
+        self.data = f"{self.base}/{config['paths']['data']}"
+        createAndCheckAccess(self.data)
+
+        # Path to database directory
+        self.databases = f"{self.data}/db"
         createAndCheckAccess(self.databases)
 paths = Paths()
+
+with open(f"{paths.data}/clients.toml", "rb") as f:
+    clients = tomli.load(f)
 
 # endregion === Config and Pathing Setup ===
 
@@ -44,7 +52,7 @@ paths = Paths()
 # Set up basic log format
 logFormat = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(message)s {{%(filename)s:%(funcName)s:%(lineno)d}}"
 dateFormat = "%Y-%m-%d %H:%M:%S"
-logFile = f"{paths.logs}/shaman.log"
+logFile = f"{paths.logs}/log.log"
 
 # Get log configuration for program
 log = logging.getLogger("Shaman")

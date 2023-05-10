@@ -6,16 +6,16 @@ import Helpers as h
 
 b = Browser.Browser()
 
-t = TMA.TMADriver(browserObject=b)
-t.logInToTMA()
+#t = TMA.TMADriver(browserObject=b)
+#t.logInToTMA()
 
-#c = Cimpl.CimplDriver(browserObject=b)
-#c.logInToCimpl()
-#c.navToWorkorderCenter()
+c = Cimpl.CimplDriver(browserObject=b)
+c.logInToCimpl()
+c.navToWorkorderCenter()
 
 
 # New Install
-
+'''
 h.syscoNewInstall(  existingTMADriver = t,
                     browser   = b,
                     netID     = "ljim2454",
@@ -24,7 +24,7 @@ h.syscoNewInstall(  existingTMADriver = t,
                     device    = "iPhone 12",
                     imei      = "357716580383461")
 
-
+'''
 # Upgrade
 '''
 h.syscoUpgrade(existingTMADriver = t,

@@ -1,17 +1,10 @@
-import Browser
 import BaseFunctions as b
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 import time
-import pandas
-import sqlite3
 import os
-
-
-
-
 
 class CimplDriver:
 
@@ -34,14 +27,17 @@ class CimplDriver:
         b.log.debug(logMessage)
 
     # A simple helper method that will cause the program to wait until it can not find the loading screen
-    # element present on the screen.
+    # element present on the screen. Also checks for any "error messages" that pop up.
     def waitForLoadingScreen(self,timeout=120):
         self.browser.switchToTab("Cimpl")
 
         loaderMessageString = "//div/div[contains(@class,'loader__message')]"
-        wait = WebDriverWait(self.browser.driver, timeout)
-        wait.until(expected_conditions.invisibility_of_element((By.XPATH, loaderMessageString)))
+        WebDriverWait(self.browser.driver, timeout).until(expected_conditions.invisibility_of_element((By.XPATH, loaderMessageString)))
         time.sleep(0.2)
+        errorMessageString = "//div[contains(@class,'message-box')][contains(text(),'An error occurred')]/following-sibling:div[contains(@class,'message-box__buttons-group')]/button[@id='btn-ok']"
+        if(self.browser.elementExists(by=By.XPATH,value=errorMessageString)):
+            self.browser.find_element(by=By.XPATH,value=errorMessageString).click()
+            self.waitForLoadingScreen(timeout)
 
     # This helper method streamlines the process of selecting choices from a Cimpl dropdown menu (which is
     # anything but Cimpl).
@@ -101,6 +97,8 @@ class CimplDriver:
         self.browser.find_element(by=By.XPATH,value=continueButtonString).click()
         self.waitForLoadingScreen()
 
+    #region === WOCenter ===
+
     # This method simply returns us to the workorder center, and throws an error if it can not.
     def navToWorkorderCenter(self):
         self.browser.switchToTab("Cimpl")
@@ -113,6 +111,7 @@ class CimplDriver:
             menuString = "//i[@class='material-icons'][text()='menu']/parent::div"
             # First, we test to ensure that the menu is in the "super icon view" so that we can select
             # the inventory section.
+            self.waitForLoadingScreen()
 
             # In case the menu was already open when we got here, we click it again to close it.
             if(not self.browser.elementExists(by=By.XPATH,value=f"{menuString}[contains(@class,'cimpl-header__icon-transform')]")):
@@ -143,6 +142,48 @@ class CimplDriver:
                 return True
             else:
                 return False
+
+    # This method assumes Cimpl is currently on the Workorder Center page. It will download the flat
+    # workorder report as an Excel spreadsheet file, and put it in the downloads folder to be used later.
+    # It will also delete any existing downloads in the folder. It will return the date given by the report.
+    def downloadWorkorderReport(self):
+        self.browser.switchToTab("Cimpl")
+        self.browser.setDownloadPath(b.paths.workorderReports)
+
+        for oldReport in os.listdir(b.paths.workorderReports):
+            if("workorder center" in os.path.basename(oldReport)):
+                os.remove(oldReport)
+
+        downloadDropdownString = "//action-dropdown-list/div/div/div/div/i[@class='fa fa-file-excel-o action-dropdown-list__customIcon___Dscaa']"
+        downloadDropdown = self.browser.find_element(by=By.XPATH,value=downloadDropdownString)
+        downloadDropdown.click()
+        self.waitForLoadingScreen()
+
+        flatDownloadString = "//cimpl-action-list/div/div/div[@class='cimpl-action-list__listItem___W3yKm ng-scope cimpl-action-list__marginBottomSmall___3ngGU']/div[@class='cimpl-action-list__actionLabel___3X5Yf ng-binding'][text()='Flat']/parent::div"
+        flatDownload = self.browser.find_element(by=By.XPATH,value=flatDownloadString)
+        flatDownload.click()
+        self.waitForLoadingScreen()
+
+        self.browser.setDownloadPath(b.paths.downloads)
+
+    # Simply attempts to open the given workorder number. Assumes that the workorder number is on the screen,
+    # but if it isn't, it simply returns false (no erroring out)
+    def openWorkorder(self,workorderNumber):
+        workorderRowString = f"//table/tbody/tr/td/span[contains(@class,'workorder__workorder-number')][text()='{str(workorderNumber).strip()}']"
+        workorderCardString = f"//workorder-card/div/div/div/span[contains(@class,'cimpl-card__clickable')][text()='{str(workorderNumber).strip()}']"
+
+        if(self.browser.elementExists(by=By.XPATH,value=workorderRowString)):
+            workorderElement = self.browser.find_element(by=By.XPATH,value=workorderRowString)
+            workorderElement.click()
+            self.waitForLoadingScreen()
+            return True
+        elif(self.browser.elementExists(by=By.XPATH,value=workorderCardString)):
+            workorderElement = self.browser.find_element(by=By.XPATH,value=workorderCardString)
+            workorderElement.click()
+            self.waitForLoadingScreen()
+            return True
+        else:
+            return False
 
     #region === Filtering ===
 
@@ -326,31 +367,276 @@ class CimplDriver:
 
     #endregion === Filtering ===
 
+    #endregion === WOCenter ===
 
-    # This method assumes Cimpl is currently on the Workorder Center page. It will download the flat
-    # workorder report as an Excel spreadsheet file, and put it in the downloads folder to be used later.
-    # It will also delete any existing downloads in the folder. It will return the date given by the report.
-    def downloadWorkorderReport(self):
+    #region === Interior Workorders ===
+
+    # TODO error reporting, of course
+
+    # Header read methods
+    def Workorders_ReadCarrier(self):
+        carrierString = "//ng-transclude/div/div/div[@ng-bind='item.provider']"
+        carrierElement = self.browser.find_element(by=By.XPATH,value= carrierString)
+        return carrierElement.text
+    def Workorders_ReadDueDate(self):
+        dueDateString = "//ng-transclude/div/div/div[@ng-bind='item.dueDate']"
+        dueDateElement = self.browser.find_element(by=By.XPATH,value=dueDateString)
+        return dueDateElement.text
+    def Workorders_ReadOperationType(self):
+        operationTypeString = "//ng-transclude/div/div/div[@ng-bind='service.actionType']"
+        operationTypeElement = self.browser.find_element(by=By.XPATH,value=operationTypeString)
+        return operationTypeElement.text
+    def Workorders_ReadStatus(self):
+        statusString = "//ng-transclude/div/div/div[@ng-bind='vm.statusLabel']"
+        statusElement = self.browser.find_element(by=By.XPATH, value=statusString)
+        return statusElement.text
+    def Workorders_ReadWONumber(self):
+        workorderString = "//div/div/div/div/div/div[contains(@class,'workorder-details__woNumber')]"
+        workorderElement = self.browser.find_element(by=By.XPATH,value=workorderString)
+        return workorderElement.text
+    # Front (Summary) page read methods
+    def Workorders_ReadComment(self):
         self.browser.switchToTab("Cimpl")
-        self.browser.setDownloadPath(b.paths.workorderReports)
+        commentString = "//div[contains(@class,'control-label cimpl-form')][text()='Comment']/following-sibling::div[contains(@ng-class,'cimpl-form__default')]/ng-transclude/div/cimpl-textarea"
+        commentElement = self.browser.find_element(by=By.XPATH,value=commentString)
+        return commentElement.get_attribute("text")
+    def Workorders_ReadReferenceNo(self):
+        self.browser.switchToTab("Cimpl")
+        referenceNoString = "//div[contains(@class,'control-label cimpl-form')][text()='Reference No.']/following-sibling::div[contains(@class,'cimpl-form__default')]/div"
+        referenceNoElement = self.browser.find_element(by=By.XPATH,value=referenceNoString)
+        return referenceNoElement.get_attribute("text")
+    def Workorders_ReadSubject(self):
+        self.browser.switchToTab("Cimpl")
+        subjectString = "//div[contains(@class,'control-label cimpl-form')][text()='Subject']/following-sibling::div[contains(@class,'cimpl-form__default')]/div"
+        subjectElement = self.browser.find_element(by=By.XPATH,value=subjectString)
+        return subjectElement.get_attribute("text")
+    def Workorders_ReadWorkorderOwner(self):
+        self.browser.switchToTab("Cimpl")
+        workorderOwnerString = "//ng-transclude/div/div[@ng-bind='vm.label'][text()='Workorder Owner']/following-sibling::div[contains(@class,'cimpl-form')]"
+        workorderOwnerElement = self.browser.find_element(by=By.XPATH,value=workorderOwnerString)
+        return workorderOwnerElement.text
+    def Workorders_ReadRequester(self):
+        self.browser.switchToTab("Cimpl")
+        requesterString = "//ng-transclude/div/div[contains(@class,'cimpl-form__defaultFormLabel')][text()='Requester']/following-sibling::div[contains(@ng-class,'cimpl-form')]/ng-transclude/employee-modal-popup-selector/div/div/div/div[contains(@class,'cimpl-modal-popup-selector__flexLabel')][@ng-bind='vm.labelToShow']"
+        requesterElement = self.browser.find_element(by=By.XPATH,value=requesterString)
+        return requesterElement.text
+    def Workorders_ReadNotes(self):
+        self.browser.switchToTab("Cimpl")
 
-        for oldReport in os.listdir(b.paths.workorderReports):
-            if("workorder center" in os.path.basename(oldReport)):
-                os.remove(oldReport)
+        # First, we check to see if we need to expand the notes section.
+        expandNotesButtonString = "//cimpl-collapsible-box[@header='Notes']/div/div/div/div/i[contains(@class,'cimpl-collapsible-box__headerArrow')]"
+        expandNotesButton = self.browser.find_element(by=By.XPATH,value=expandNotesButtonString)
+        if("headerArrowClose" in expandNotesButton.get_attribute("class")):
+            expandNotesButton.click()
+            self.waitForLoadingScreen()
 
-        downloadDropdownString = "//action-dropdown-list/div/div/div/div/i[@class='fa fa-file-excel-o action-dropdown-list__customIcon___Dscaa']"
-        downloadDropdown = self.browser.find_element(by=By.XPATH,value=downloadDropdownString)
-        downloadDropdown.click()
+        allNotesOnPageString = "//entity-notes/div/div/div/div[contains(@class,'entity-notes')]/div[contains(@class,'entity-notes__noteContainer')]"
+        nextArrowButtonString = "//entity-notes/div/div/div/div/cimpl-pager/div/div/div/cimpl-material-icon[@on-click='vm.getNextPage()']/button"
+
+        # Now, we reach all notes on each page.
+        allNotes = []
+        nextArrowButton = self.browser.find_element(by=By.XPATH,value=nextArrowButtonString)
+        while(True):
+            allNotesOnPage = self.browser.find_elements(by=By.XPATH,value=allNotesOnPageString)
+            for noteOnPage in allNotesOnPage:
+                thisNoteDict = {"User": noteOnPage.find_element(by=By.XPATH, value=".//div/div[@ng-bind='note.user']").text,
+                                "CreatedDate": noteOnPage.find_element(by=By.XPATH, value=".//div/div/div[@ng-bind='note.createdDate']").text,
+                                "Subject": noteOnPage.find_element(by=By.XPATH, value=".//div/div[@ng-bind='note.subject']").text,
+                                "Type": noteOnPage.find_element(by=By.XPATH, value=".//div/div[@ng-bind='note.type']").text,
+                                "Status": noteOnPage.find_element(by=By.XPATH, value=".//div/div[@ng-bind='note.status']").text,
+                                "Content": noteOnPage.find_element(by=By.XPATH, value=".//div/div[@ng-bind-html='note.description']").text}
+                allNotes.append(thisNoteDict)
+
+            # Check for final page, if so, end read loop
+            if("disabled" in nextArrowButton.get_attribute("class")):
+                break
+            # Otherwise, flip to next page and continue read loop
+            else:
+                nextArrowButton.click()
+                self.waitForLoadingScreen()
+                nextArrowButton = self.browser.find_element(by=By.XPATH, value=nextArrowButtonString)
+
+        return allNotes
+    # Back (Details) page read methods
+    def Workorders_ReadServiceID(self):
+        self.browser.switchToTab("Cimpl")
+        serviceIDString = "//div[contains(@class,'control-label cimpl-form')][text()='Service ID']/following-sibling::div[contains(@class,'cimpl-form__default')]/div"
+        serviceIDElement = self.browser.find_element(by=By.XPATH,value=serviceIDString)
+        return serviceIDElement.get_attribute("text")
+    def Workorders_ReadAccount(self):
+        self.browser.switchToTab("Cimpl")
+        accountString = "//div[contains(@class,'control-label cimpl-form')][text()='Account']/following-sibling::div[contains(@class,'cimpl-form__default')]/ng-transclude/account-modal-popup-selector/div/div[contains(@class,'cimpl-modal-popup-selector__attributePopupContainer')]"
+        accountElement = self.browser.find_element(by=By.XPATH,value=accountString)
+        return accountElement.get_attribute("label-to-show")
+    def Workorders_ReadStartDate(self):
+        self.browser.switchToTab("Cimpl")
+        startDateString = "//div[contains(@class,'control-label cimpl-form')][text()='Start Date *']/following-sibling::div[contains(@class,'cimpl-form__default')]/cimpl-datepicker/div/div/label[contains(@class,'control-label cimpl-datepicker')]"
+        startDateElement = self.browser.find_element(by=By.XPATH,value=startDateString)
+        startDate = startDateElement.get_attribute("innerHTML").strip()
+        return startDate
+    # TODO actually implement header error detection
+    def Workorders_ReadHardwareInfo(self):
+        self.browser.switchToTab("Cimpl")
+
+        templateDict = {"Name" : None, "Type" : None, "Serial Number" : None, "Cost" : None, "Date of Purchase" : None, "Primary" : None}
+
+        # First, we build template dict to avoid and help with error detection for cimpl updates.
+        hardwareInfoHeadersString = "//wd-hardware-info/div/cimpl-grid/div/div/div[contains(@class,'k-grid-header')]/div/table/thead/tr/th"
+        allHardwareInfoHeaderElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoHeadersString)
+        compareDict = {}
+        for header in allHardwareInfoHeaderElements:
+            compareDict[header.get_attribute("data-title")] = None
+
+        # Detect if, for some reason, cimpl changed its config and error out if so.
+        if(templateDict != compareDict):
+            b.log.error("Cimpl template dict does NOT MATCH the compareDict! Will likely require code rewrites!")
+            raise ValueError
+
+
+        hardwareInfoRowsString = "//wd-hardware-info/div/cimpl-grid/div/div/div/table/tbody/tr"
+        allHardwareInfoRowElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoRowsString)
+
+        returnList = []
+        for hardwareRow in allHardwareInfoRowElements:
+            tdElements = hardwareRow.find_elements(by=By.TAG_NAME, value='td')
+            row_data = templateDict.copy()
+
+            for i, key in enumerate(templateDict.keys()):
+                if(key == "Primary"):
+                    primaryInnerHTML = tdElements[i].get_attribute("innerHTML")
+                    if("fa-star" in primaryInnerHTML):
+                        # noinspection PyTypeChecker
+                        row_data[key] = True
+                    else:
+                        # noinspection PyTypeChecker
+                        row_data[key] = False
+                else:
+                    row_data[key] = tdElements[i].text
+
+            returnList.append(row_data)
+
+        return returnList
+    def Workorders_ReadActions(self):
+        self.browser.switchToTab("Cimpl")
+
+        actionRowsString = "//div/div[contains(@class,'sectionHeader')][text()='Actions']/following-sibling::div[contains(@class,'ng-isolate-scope')]/div[contains(@class,'ng-scope')]/div[contains(@class,'detailItem')]/div[@ng-bind='item.description']"
+        actionRows = self.browser.find_elements(by=By.XPATH,value=actionRowsString)
+
+        returnList = []
+        for actionRow in actionRows:
+            returnList.append(actionRow.text)
+
+        return returnList
+
+    # Front (Summary) page write methods
+    def Workorders_WriteComment(self,comment):
+        self.browser.switchToTab("Cimpl")
+        commentString = "//div[contains(@class,'control-label cimpl-form')][text()='Comment']/following-sibling::div[contains(@ng-class,'cimpl-form__default')]/ng-transclude/div/cimpl-textarea/div/textarea"
+        commentElement = self.browser.find_element(by=By.XPATH,value=commentString)
+        commentElement.clear()
+        commentElement.send_keys(str(comment))
+    def Workorders_WriteReferenceNo(self,referenceNo):
+        self.browser.switchToTab("Cimpl")
+        referenceNoString = "//div[contains(@class,'control-label cimpl-form')][text()='Reference No.']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
+        referenceNoElement = self.browser.find_element(by=By.XPATH,value=referenceNoString)
+        referenceNoElement.clear()
+        referenceNoElement.send_keys(str(referenceNo))
+    def Workorders_WriteSubject(self,subject):
+        self.browser.switchToTab("Cimpl")
+        subjectString = "//div[contains(@class,'control-label cimpl-form')][text()='Subject']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
+        subjectElement = self.browser.find_element(by=By.XPATH, value=subjectString)
+        subjectElement.clear()
+        subjectElement.send_keys(str(subject))
+    def Workorders_WriteNote(self,subject,noteType,status,content):
+        self.browser.switchToTab("Cimpl")
+
+        # First, we check to see if we need to expand the notes section.
+        expandNotesButtonString = "//cimpl-collapsible-box[@header='Notes']/div/div/div/div/i[contains(@class,'cimpl-collapsible-box__headerArrow')]"
+        expandNotesButton = self.browser.find_element(by=By.XPATH,value=expandNotesButtonString)
+        if("headerArrowClose" in expandNotesButton.get_attribute("class")):
+            expandNotesButton.click()
+            self.waitForLoadingScreen()
+
+        addNoteButtonString = "//entity-notes/div/div/cimpl-icon-button[@type='add']/div/div[contains(@class,'cimpl-icon-button__mainContainer')]/i[contains(@class,'cimpl-icon-button')]"
+        addNoteButtonElement = self.browser.find_element(by=By.XPATH,value=addNoteButtonString)
+        addNoteButtonElement.click()
         self.waitForLoadingScreen()
 
-        flatDownloadString = "//cimpl-action-list/div/div/div[@class='cimpl-action-list__listItem___W3yKm ng-scope cimpl-action-list__marginBottomSmall___3ngGU']/div[@class='cimpl-action-list__actionLabel___3X5Yf ng-binding'][text()='Flat']/parent::div"
-        flatDownload = self.browser.find_element(by=By.XPATH,value=flatDownloadString)
-        flatDownload.click()
+        subjectString = "//div[contains(@class,'cimpl-form__defaultFormLabel')][text()='Subject *']/following-sibling::div/div/input[contains(@class,'cimpl-text-box')]"
+        subjectElement = self.browser.find_element(by=By.XPATH,value=subjectString)
+        subjectElement.clear()
+        subjectElement.send_keys(subject)
+
+        typeString = "//div[contains(@class,'cimpl-form__defaultFormLabel')][text()='Type *']/following-sibling::div/cimpl-dropdown/div/div/span/span[contains(@class,'k-dropdown')]/span"
+        self.selectFromDropdown(by=By.XPATH,dropdownString=typeString,selectionString=noteType)
+
+        statusString = "//div[contains(@class,'cimpl-form__defaultFormLabel')][text()='Status *']/following-sibling::div/cimpl-dropdown/div/div/span/span[contains(@class,'k-dropdown')]/span"
+        self.selectFromDropdown(by=By.XPATH,dropdownString=statusString,selectionString=status)
+
+        contentString = "//div[contains(@class,'cimpl-form__defaultFormLabel')][text()='Note *']/following-sibling::div/cimpl-textarea/div/textarea"
+        contentElement = self.browser.find_element(by=By.XPATH,value=contentString)
+        contentElement.clear()
+        contentElement.send_keys(content)
+
+        #//entity-notes/div[2]/div[2]/div/div[2]/ng-transclude/div/div/
+        applyButtonString = "//entity-notes/div/div/div/div[contains(@class,'cimpl-floating-box__content')]/ng-transclude/div/div/cimpl-form/div/div[@ng-show='vm.isShowButtons']/div/span/cimpl-button[@on-click='vm.onApplyClick()']/button/div/span[text()='Apply']"
+        applyButtonElement = self.browser.find_element(by=By.XPATH,value=applyButtonString)
+        applyButtonElement.click()
+        self.waitForLoadingScreen()
+    # Back (Details) page write methods
+    def Workorders_WriteServiceID(self,serviceID):
+        self.browser.switchToTab("Cimpl")
+        serviceIDString = "//div[contains(@class,'control-label cimpl-form')][text()='Service ID']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
+        serviceIDElement = self.browser.find_element(by=By.XPATH, value=serviceIDString)
+        serviceIDElement.clear()
+        serviceIDElement.send_keys(str(serviceID))
+    def Workorders_WriteAccount(self,accountNum):
+        self.browser.switchToTab("Cimpl")
+
+        addAccountButtonString = "//account-modal-popup-selector/div/div/div/div/div/cimpl-icon-button/div/div/i[contains(@class,'fa-plus cimpl-icon-button')]"
+        editAccountButtonString = "//account-modal-popup-selector/div/div/div/div/div/cimpl-icon-button/div/div/i[contains(@class,'fa-pencil cimpl-icon-button')]"
+
+        # This means an account currently exists, and we need to remove it first.
+        if(self.browser.elementExists(by=By.XPATH,value=editAccountButtonString)):
+            removeAccountButtonString = "//account-modal-popup-selector/div/div/div/div/div/cimpl-icon-button/div/div/i[contains(@class,'fa-times-circle cimpl-icon-button')]"
+            removeAccountButton = self.browser.find_element(by=By.XPATH,value=removeAccountButtonString)
+            removeAccountButton.click()
+            self.waitForLoadingScreen()
+
+        addAccountButton = self.browser.find_element(by=By.XPATH,value=addAccountButtonString)
+        addAccountButton.click()
+
+        # Now we search for the account to narrow list.
+        accountSearchBarString = "//ng-transclude/account-list/div/div/div/div/div/input[contains(@class,'cimpl-text-box__typeSearch')]"
+        accountSearchBar = self.browser.find_element(by=By.XPATH,value=accountSearchBarString)
+        accountSearchBar.clear()
+        accountSearchBar.send_keys(str(accountNum))
         self.waitForLoadingScreen()
 
-        self.browser.setDownloadPath(b.paths.downloads)
+        # Our account should now be visible - click on it.
+        targetAccountString = f"//account-list/div/div/cimpl-grid/div/div/div/table/tbody/tr/td[text()='{accountNum}']"
+        targetAccount = self.browser.find_element(by=By.XPATH,value=targetAccountString)
+        targetAccount.click()
+    def Workorders_WriteStartDate(self,startDate):
+        self.browser.switchToTab("Cimpl")
+
+        startDateString = "//div[contains(@class,'control-label cimpl-form')][text()='Start Date *']/following-sibling::div[contains(@class,'cimpl-form__default')]/cimpl-datepicker/div/div/span/span/input[contains(@class,'cimpl-datepicker k-input')]"
+        startDateElement = self.browser.find_element(by=By.XPATH,value=startDateString)
+        startDateElement.clear()
+        startDateElement.send_keys(startDate)
+
+    # Methods for navigating the workorder
+    def Workorders_NavToDetailsTab(self):
+        self.browser.switchToTab("Cimpl")
+        detailsTabString = "//cimpl-tabs-panel/div/div/div/div/span[contains(@class,'cimpl-tabs-panel__tabLink')][text()='Details']"
+        detailsTabElement = self.browser.find_element(by=By.XPATH,value=detailsTabString)
+        detailsTabElement.click()
+    def Workorders_NavToSummaryTab(self):
+        self.browser.switchToTab("Cimpl")
+        summaryTabString = "//cimpl-tabs-panel/div/div/div/div/span[contains(@class,'cimpl-tabs-panel__tabLink')][text()='Summary']"
+        summaryTabElement = self.browser.find_element(by=By.XPATH,value=summaryTabString)
+        summaryTabElement.click()
 
 
-
-
+    #endregion === Interior Workorders ===
 
