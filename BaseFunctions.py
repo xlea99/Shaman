@@ -54,6 +54,10 @@ logFormat = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(message)s {{%(filenam
 dateFormat = "%Y-%m-%d %H:%M:%S"
 logFile = f"{paths.logs}/log.log"
 
+# Clear old log file
+with open(logFile, 'w') as file:
+    pass
+
 # Get log configuration for program
 log = logging.getLogger("Shaman")
 maxBytes = config["logging"]["maxSize"] * 1024

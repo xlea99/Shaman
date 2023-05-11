@@ -8,23 +8,26 @@ b = Browser.Browser()
 
 #t = TMA.TMADriver(browserObject=b)
 #t.logInToTMA()
+#t.navToLocation(client="Sysco",entryType="Service",entryID="619-509-2891")
 
 c = Cimpl.CimplDriver(browserObject=b)
 c.logInToCimpl()
 c.navToWorkorderCenter()
 
+#t.Assignment_BuildAssignmentFromAccount(client="Sysco",vendor="Verizon Wireless",siteCode="204")
 
 # New Install
 '''
 h.syscoNewInstall(  existingTMADriver = t,
                     browser   = b,
-                    netID     = "ljim2454",
-                    serviceNum= "469-251-3729",
-                    installDate="5/5/2023",
+                    netID     = "gang3218",
+                    serviceNum= "623-349-3158",
+                    installDate="5/9/2023",
                     device    = "iPhone 12",
-                    imei      = "357716580383461")
+                    imei      = "357716582521464")
 
 '''
+
 # Upgrade
 '''
 h.syscoUpgrade(existingTMADriver = t,
@@ -35,4 +38,3 @@ h.syscoUpgrade(existingTMADriver = t,
                imei = "357716582310785")
 '''
 
-#t.Assignment_BuildAssignmentFromAccount(client="Sysco",vendor="Verizon Wireless",siteCode="204")
