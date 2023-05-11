@@ -45,8 +45,6 @@ paths = Paths()
 with open(f"{paths.data}/clients.toml", "rb") as f:
     clients = tomli.load(f)
 
-print(clients)
-
 # endregion === Config and Pathing Setup ===
 
 # region === Log File Setup ===
@@ -55,6 +53,10 @@ print(clients)
 logFormat = "%(asctime)s.%(msecs)03d | %(levelname)-8s | %(message)s {{%(filename)s:%(funcName)s:%(lineno)d}}"
 dateFormat = "%Y-%m-%d %H:%M:%S"
 logFile = f"{paths.logs}/log.log"
+
+# Clear old log file
+with open(logFile, 'w') as file:
+    pass
 
 # Get log configuration for program
 log = logging.getLogger("Shaman")

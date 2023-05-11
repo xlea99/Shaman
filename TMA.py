@@ -2097,7 +2097,7 @@ class TMADriver():
                     b.log.error(f"Found strange value for assignment wizard tab: {currentTab}")
 
         yesMakeAssignmentButton = "//table/tbody/tr/td/div/ol/li/a[contains(@id,'wizFindExistingAssigment_lnkLinkAssignment')][text()='Yes, make the assignment.']"
-        #self.browser.safeClick(by=By.XPATH, element=yesMakeAssignmentButton, repeat=True, repeatUntilElementDoesNotExist=yesMakeAssignmentButton)
+        self.browser.safeClick(by=By.XPATH, element=yesMakeAssignmentButton, repeat=True, repeatUntilElementDoesNotExist=yesMakeAssignmentButton)
         b.log.debug("Successfully created assignment.")
 
         # Since the account-assignment method can take wildly different paths, ESPECIALLY for
