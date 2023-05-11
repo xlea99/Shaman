@@ -45,6 +45,8 @@ paths = Paths()
 with open(f"{paths.data}/clients.toml", "rb") as f:
     clients = tomli.load(f)
 
+print(clients)
+
 # endregion === Config and Pathing Setup ===
 
 # region === Log File Setup ===

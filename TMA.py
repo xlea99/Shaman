@@ -1951,7 +1951,7 @@ class TMADriver():
         vendorDropdownSelection = self.browser.find_element(by=By.XPATH, value="//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlVendor')]/option[text()='" + vendorString + "']")
         self.browser.safeClick(by=By.XPATH, element=vendorDropdownSelection)
 
-        accountNumber = b.clients["Assignments"][client][vendorString]
+        accountNumber = b.clients["Accounts"][client][vendorString]
 
         # Now select the appropriate account as found based on the vendor.
         accountNumberDropdownSelectionString = f"//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlAccount')]/option[text()='{accountNumber}']"
@@ -1978,6 +1978,7 @@ class TMADriver():
         # Here we loop through each site, looking for our specified site code.
         foundTargetCode = False
         currentPageNumber = 0
+        targetSiteElement = None
         while True:
             previousPageNumber = currentPageNumber
             # Here we test to make sure we've actually flipped the page, if necessary.
@@ -1988,8 +1989,8 @@ class TMADriver():
             allSitesOnPage = self.browser.find_elements(by=By.XPATH,value=allSitesOnPageString)
             for foundSiteElement in allSitesOnPage:
                 foundSiteCode = foundSiteElement.text.split("-")[0]
-                print(f"Comparing '{foundSiteCode}' to '{siteCode}'")
                 if(foundSiteCode == siteCode):
+                    targetSiteElement = foundSiteElement
                     print("WIGGLES!")
                     foundTargetCode = True
                     break
@@ -2004,9 +2005,10 @@ class TMADriver():
                 # Flip to the next page.
                 self.browser.find_element(by=By.CSS_SELECTOR,value=nextButtonString).click()
 
+        print("now you know whats up")
         # If we got here, that means we've now found our element, so we can click on it.
-        self.browser.safeClick(by=By.XPATH, element=targetSiteString)
-
+        self.browser.safeClick(by=By.XPATH, element=targetSiteElement,repeat=True,repeatUntilElementDoesNotExist=targetSiteElement)
+        print("--.--")
 
         # At this point, what will pop up next is completely and utterly unpredictable. To remedy this,
         # we use a while loop to continuously react to each screen that pops up next, until we find the
