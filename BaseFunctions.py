@@ -3,7 +3,6 @@ from logging.handlers import RotatingFileHandler
 import tomli
 import os
 import sqlite3
-import datetime
 
 # region === Config and Pathing Setup ===
 
@@ -36,10 +35,10 @@ class Paths:
         # Path to data directory
         self.data = f"{self.base}/{config['paths']['data']}"
         createAndCheckAccess(self.data)
-
-        # Path to database directory
         self.databases = f"{self.data}/db"
         createAndCheckAccess(self.databases)
+        self.emailTemplates = f"{self.data}/email_templates"
+        createAndCheckAccess(self.emailTemplates)
 paths = Paths()
 
 with open(f"{paths.data}/clients.toml", "rb") as f:

@@ -636,6 +636,101 @@ class CimplDriver:
         summaryTabString = "//cimpl-tabs-panel/div/div/div/div/span[contains(@class,'cimpl-tabs-panel__tabLink')][text()='Summary']"
         summaryTabElement = self.browser.find_element(by=By.XPATH,value=summaryTabString)
         summaryTabElement.click()
+    # Methods for setting the status (confirmed, completed, cancelled) of the workorders. If an
+    # email recipient is specified, it will also send an email specified. emailContent can by a
+    # simple string, or a file object, and will copy those contents into the email.
+    # TODO error reporting for invalid status
+    def Workorders_SetStatus(self,status : str,emailRecipients = None,emailContent = None,emailCCs = None):
+        self.browser.switchToTab("Cimpl")
+
+        if(emailRecipients is None):
+            sendEmail = False
+        else:
+            sendEmail = True
+            if(type(emailRecipients) is not list):
+                if(emailRecipients is None):
+                    emailRecipients = []
+                else:
+                    emailRecipients = [emailRecipients]
+            if(type(emailCCs) is not list):
+                if(emailCCs is None):
+                    emailCCs = []
+                else:
+                    emailCCs = [emailCCs]
+
+
+        # First, we click to open the actions dropdown menu.
+        actionsDropdownString = "//action-dropdown-list/div/div/div/cimpl-button[@text='Actions']/button[@id='action-button']/div/span[contains(@class,'button-label')][text()='Actions']"
+        actionsDropdownElement = self.browser.find_element(by=By.XPATH,value=actionsDropdownString)
+        actionsDropdownElement.click()
+
+        # Now, we click on our desired status to set.
+        statusSetWorkorderSelectionString = f"//ng-transclude/div/cimpl-action-list/div/div/div[contains(@class,'cimpl-action-list__listItem')]/div[contains(@class,'cimpl-action-list__actionLabel')][text()='{status.capitalize()} Workorder']"
+        statusSetWorkorderSelectionElement = self.browser.find_element(by=By.XPATH,value=statusSetWorkorderSelectionString)
+        statusSetWorkorderSelectionElement.click()
+        self.waitForLoadingScreen()
+
+        # We make sure the "carrier confirmation" checkbox is selected (if we're not cancelling this order)
+        if(status.lower() != "cancel"):
+            carrierCheckboxString = "//workorder-action-confirm-complete/div/div/div/div[contains(@class,'workorder-action-confirm-complete__header')]/cimpl-checkbox/div/div/label[@class='checkbox-container']/span[contains(@class,'checkbox-input')]/input[@type='checkbox']"
+            carrierCheckboxElement = self.browser.find_element(by=By.XPATH,value=carrierCheckboxString)
+            if("ng-empty" in carrierCheckboxElement.get_attribute("class")):
+                carrierCheckboxElement.click()
+
+        # We make sure that if we're sending an email, the email checkbox is selected, otherwise it's not.
+        emailCheckboxString = "//workorder-action-confirm-complete/div/div/div/div/div/div/cimpl-checkbox/div/div/label[@class='checkbox-container']/span[contains(@class,'checkbox-input')]/input[@type='checkbox']"
+        emailCheckboxElement = self.browser.find_element(by=By.XPATH,value=emailCheckboxString)
+        if("ng-empty" in emailCheckboxElement.get_attribute("class")):
+            if(sendEmail):
+                emailCheckboxElement.click()
+        else:
+            if(not sendEmail):
+                emailCheckboxElement.click()
+
+        # Only send an email if we... sendEmail
+        if(sendEmail):
+            # Add email recipients
+            emailToFieldString = "//emailer-list[@label='To']/div/div/cimpl-textarea/div/textarea[contains(@class,'cimpl-textarea')]"
+            emailToFieldElement = self.browser.find_element(by=By.XPATH,value=emailToFieldString)
+            emailToFieldElement.clear()
+            emailToSendString = ""
+            for toEmailAddress in emailRecipients:
+                emailToSendString += toEmailAddress
+                if(toEmailAddress != emailRecipients[-1]):
+                    emailToSendString += ","
+            emailToFieldElement.send_keys(emailToSendString)
+
+            # Add email CCs
+            emailCCFieldString = "//emailer-list[@label='Cc']/div/div/cimpl-textarea/div/textarea[contains(@class,'cimpl-textarea')]"
+            emailCCFieldElement = self.browser.find_element(by=By.XPATH,value=emailCCFieldString)
+            emailCCFieldElement.clear()
+            emailCCSendString = ""
+            for ccEmailAddress in emailCCs:
+                emailCCSendString += ccEmailAddress
+                if(ccEmailAddress != emailCCs[-1]):
+                    emailCCSendString += ","
+            emailCCFieldElement.send_keys(emailCCSendString)
+
+            # Now, switch to the iframe of the embedded rich html email entry.
+
+            # First, find the iframe
+            iframe = WebDriverWait(self.browser.driver,10).until(EC.presence_of_element_located((By.CSS_SELECTOR,"iframe.k-content")))
+            # Switch scope to this iframe
+            self.browser.driver.switch_to.frame(iframe)
+            # Find "html body" of this iframe; ie, where we send our formatted html to
+            interiorBody = self.browser.driver.find_element(by=By.TAG_NAME,value="body")
+            interiorBody.clear()
+            self.browser.driver.execute_script(f"document.body.innerHTML = '{emailContent}';")
+            # Switch back to default scope.
+            self.browser.driver.switch_to.default_content()
+
+        # Finally, click apply.
+        applyButtonString = "/html/body/div[@class='application-content']/div/div/cimpl-landing/div/div[contains(@class,'pageMain')]/div[contains(@class,'mainContent')]/ng-transclude/div/workorder-details-page/cimpl-modal-popup/div/div/div/div[contains(@class,'d-modal-popup-content')]/div[contains(@class,'cimpl-modal-popup__footer')]/div/cimpl-button/button[contains(@id,'apply-action-button')]/div/span[contains(@class,'button-label')][text()='Apply']"
+        applyButtonElement = self.browser.find_element(by=By.XPATH,value=applyButtonString)
+        applyButtonElement.click()
+        self.waitForLoadingScreen()
+
+
 
 
     #endregion === Interior Workorders ===

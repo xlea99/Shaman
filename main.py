@@ -1,18 +1,25 @@
 import time
+import BaseFunctions as b
+from selenium.webdriver.common.by import By
 import Browser
 import TMA
 import Cimpl
 import Helpers as h
 
-b = Browser.Browser()
+br = Browser.Browser()
 
 #t = TMA.TMADriver(browserObject=b)
 #t.logInToTMA()
 #t.navToLocation(client="Sysco",entryType="Service",entryID="619-509-2891")
 
-c = Cimpl.CimplDriver(browserObject=b)
+c = Cimpl.CimplDriver(browserObject=br)
 c.logInToCimpl()
 c.navToWorkorderCenter()
+
+
+testyFilePath = f"{b.paths.emailTemplates}/S20NewInstall.html"
+with open(testyFilePath, 'r', encoding='utf-8') as file:
+    test = file.read()
 
 #t.Assignment_BuildAssignmentFromAccount(client="Sysco",vendor="Verizon Wireless",siteCode="204")
 
