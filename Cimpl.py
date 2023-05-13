@@ -636,10 +636,32 @@ class CimplDriver:
         summaryTabString = "//cimpl-tabs-panel/div/div/div/div/span[contains(@class,'cimpl-tabs-panel__tabLink')][text()='Summary']"
         summaryTabElement = self.browser.find_element(by=By.XPATH,value=summaryTabString)
         summaryTabElement.click()
+    def Workorders_ApplyChanges(self):
+        summaryApplyButtonString = "//cimpl-tab/div/ng-transclude/wd-summary-tab/div/div/div/cimpl-button[@text='Apply'][@on-click='vm.update()']/button/div/span[contains(@class,'button-label')][text()='Apply']"
+        detailsApplyButtonString = "//cimpl-tab/div/ng-transclude/wd-details-tab/div/div/cimpl-collapsible-box/div/div/ng-transclude/div/cimpl-form/div/div/div/span/cimpl-button[@text='Apply'][@on-click='vm.update()']/button/div/span[contains(@class,'button-label')][text()='Apply']"
+        # This means we're on the summary tab.
+        if(self.browser.elementIsClickable(by=By.XPATH,value=summaryApplyButtonString)):
+            summaryApplyButtonElement = self.browser.find_element(by=By.XPATH, value=summaryApplyButtonString)
+            summaryApplyButtonElement.click()
+            self.waitForLoadingScreen()
+        # This means we're on the details tab.
+        elif(self.browser.elementIsClickable(by=By.XPATH,value=detailsApplyButtonString)):
+            detailsApplyButtonElement = self.browser.find_element(by=By.XPATH, value=summaryApplyButtonString)
+            detailsApplyButtonElement.click()
+            self.waitForLoadingScreen()\
+        # Bad news.
+        else:
+            #TODO yep, error reporting indeed
+            input("BAD NEWs")
+
+
+
+
+
     # Methods for setting the status (confirmed, completed, cancelled) of the workorders. If an
     # email recipient is specified, it will also send an email specified. emailContent can by a
     # simple string, or a file object, and will copy those contents into the email.
-    # TODO error reporting for invalid status
+    # TODO error reporting for invalid statuses
     def Workorders_SetStatus(self,status : str,emailRecipients = None,emailContent = None,emailCCs = None):
         self.browser.switchToTab("Cimpl")
 
