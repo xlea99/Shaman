@@ -653,11 +653,6 @@ class CimplDriver:
         else:
             #TODO yep, error reporting indeed
             input("BAD NEWs")
-
-
-
-
-
     # Methods for setting the status (confirmed, completed, cancelled) of the workorders. If an
     # email recipient is specified, it will also send an email specified. emailContent can by a
     # simple string, or a file object, and will copy those contents into the email.

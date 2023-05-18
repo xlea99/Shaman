@@ -1921,6 +1921,9 @@ class TMADriver():
     def Assignment_BuildAssignmentFromAccount(self,client,vendor,siteCode):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
+        # Temporarily increase implicit wait, since assignment wizard is highly unstable.
+        self.browser.implicitly_wait(5)
+
         siteCode = str(siteCode).zfill(3)
 
         b.log.info(f"Attempting to build assignment off of this site code: {siteCode}")
@@ -1983,7 +1986,9 @@ class TMADriver():
             previousPageNumber = currentPageNumber
             # Here we test to make sure we've actually flipped the page, if necessary.
             while (currentPageNumber == previousPageNumber):
-                pageCountText = self.browser.find_element(by=By.XPATH, value="//table/tbody/tr/td/span[contains(@id,'wizFindExistingAssigment')][contains(@id,'lblPages')]").text
+                pageCountTextString = "//table/tbody/tr/td/span[contains(@id,'wizFindExistingAssigment')][contains(@id,'lblPages')]"
+                pageCountTextElement = WebDriverWait(self.browser.driver,10).until(Browser.wait_for_non_stale_element((By.XPATH,pageCountTextString)))
+                pageCountText = pageCountTextElement.text
                 currentPageNumber = int(pageCountText.split(" of ")[0].split("(Page ")[1])
                 time.sleep(0.2)
             allSitesOnPage = self.browser.find_elements(by=By.XPATH,value=allSitesOnPageString)
@@ -2099,6 +2104,9 @@ class TMADriver():
         yesMakeAssignmentButton = "//table/tbody/tr/td/div/ol/li/a[contains(@id,'wizFindExistingAssigment_lnkLinkAssignment')][text()='Yes, make the assignment.']"
         self.browser.safeClick(by=By.XPATH, element=yesMakeAssignmentButton, repeat=True, repeatUntilElementDoesNotExist=yesMakeAssignmentButton)
         b.log.debug("Successfully created assignment.")
+
+        # Revert implicit wait back.
+        self.browser.implicitly_wait(1)
 
         # Since the account-assignment method can take wildly different paths, ESPECIALLY for
         # Sysco, we use a while loop to organically respond to whatever options is presents

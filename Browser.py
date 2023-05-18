@@ -228,7 +228,7 @@ class Browser:
         return self.driver.window_handles
     # TODO integrate this with elementExists, so there's no duplicate logging and confusion.
     # TODO honestly just take a good long look at this. I'm undoing selenium's work here for... what reason?
-    def find_element(self,by,value,timeout=2,ignoreErrors=False):
+    def find_element(self,by,value,timeout=2,ignoreErrors=False,waitForNotStale=False):
         if(ignoreErrors):
             try:
                 WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
@@ -266,6 +266,19 @@ class Browser:
         self.driver.implicitly_wait(waitTime)
 
 
+
+# A few custom expected condition classes.
+class wait_for_non_stale_element(object):
+    def __init__(self, locator):
+        self.locator = locator
+
+    def __call__(self, driver):
+        try:
+            element = EC.presence_of_element_located(self.locator)(driver)
+            test = element.text  # Here we ensure the element is not stale by invoking a property on it.
+            return element
+        except selenium.common.exceptions.StaleElementReferenceException:
+            return False
 
 class BrowserAlreadyOpen(Exception):
     def __init__(self):
