@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 syscoDeviceDict = {"iPhone 12" : {"ServiceType" : "iPhone", "BaseCost" : TMA.Cost(isBaseCost=True, featureName="Unl Min&Msg+Email&Data", gross=32),"Equipment" : TMA.Equipment(mainType="Wireless", subType="Smart Phone", make="Apple", model="iPhone 12 64GB")},
                    "Galaxy S21" : {"ServiceType" : "Android", "BaseCost" : TMA.Cost(isBaseCost=True, featureName="Unl Min&Msg+Email&Data", gross=32),"Equipment" : TMA.Equipment(mainType="Wireless", subType="Smart Phone", make="Samsung", model="Galaxy S21 FE 5G 128GB")},
-                   "Jetpack 8800L" : {"ServiceType" : "Mifi", "BaseCost" : TMA.Cost(isBaseCost=True, featureName="Mobile Broadband 2gb Share", gross=20),"Equipment" : TMA.Equipment(mainType="Wireless",subType="Aircard",make="Verizon",model="JETPACK 4G 8800L")}}
+                   "Jetpack 8800L" : {"ServiceType" : "Mifi", "BaseCost" : TMA.Cost(isBaseCost=True, featureName="Mobile Broadband 2gb Share", gross=15),"Equipment" : TMA.Equipment(mainType="Wireless",subType="Aircard",make="Verizon",model="JETPACK 4G 8800L")}}
 
 # Valid devices are currently - iPhone 12, Samsung S21, Jetpack 8800L
 def syscoNewInstall(netID,serviceNum,installDate,device,imei,browser=None,existingTMADriver=None):
