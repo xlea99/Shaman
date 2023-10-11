@@ -42,7 +42,7 @@ h.syscoNewInstall(  existingTMADriver = t,
                     netID     = "shay3727",
                     serviceNum= "368-887-8992",
                     installDate="10/5/2023",
-                    device    = iphone11,
+                    device    = "iPhone11_64GB",
                     carrier   = rogers,
                     imei      = "352563745466921")
 
