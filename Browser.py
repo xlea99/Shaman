@@ -142,9 +142,14 @@ class Browser:
                     print(f"FOUND YA BITCH!: {windowHandle}")
                     self.driver.switch_to.window(windowHandle)
                     #TODO figure out why this is sometimes needed, and try to use an implicit wait instead.
-                    time.sleep(1)
-                    parsedURL = urlparse(self.driver.current_url)
-                    print(f"here the parse... {parsedURL}")
+                    for i in range(5):
+                        parsedURL = urlparse(self.driver.current_url)
+                        print(f"here the parse... {parsedURL}")
+                        if(str(parsedURL.netloc) == ''):
+                            time.sleep(1)
+                            continue
+                        else:
+                            break
                     domain = parsedURL.netloc
                     while(domain in self.popupTabs.keys()):
                         domain += "_new"
@@ -168,7 +173,7 @@ class Browser:
     # This wrapper method helps prevent some pains of timeouts and bullshit. If repeat is true,
     # method will continuously click the element until all repeat conditions are met. Element
     # can be either a string representing an XPATH or CSS_SELECTOR, or an already found element.
-    def safeClick(self,by=None,element=None,timeout=30,repeat=False,repeatUntilElementDoesNotExist=None,repeatUntilNewElementExists=None,clickDelay=0):
+    def safeClick(self,by=None,element=None,timeout=30,repeat=False,repeatUntilElementDoesNotExist=None,repeatUntilNewElementExists=None,clickDelay=0,jsClick=False):
         logMessage = f"safeClicking element '{element}' by '{by}': "
         clickCounter = 0
         for i in range(timeout * 2):
@@ -176,9 +181,16 @@ class Browser:
             # First, we try to click the element.
             try:
                 if(type(element) is str):
-                    self.find_element(by=by, value=element,timeout=1).click()
+                    thisElement = self.find_element(by=by, value=element,timeout=1)
+                    if (jsClick):
+                        self.driver.execute_script("arguments[0].click();", thisElement)
+                    else:
+                        thisElement.click()
                 else:
-                    element.click()
+                    if(jsClick):
+                        self.driver.execute_script("arguments[0].click();",element)
+                    else:
+                        element.click()
                 logMessage += f"({clickCounter}-S)"
             except:
                 logMessage += f"({clickCounter}-F)"

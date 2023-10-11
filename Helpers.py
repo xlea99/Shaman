@@ -1,15 +1,12 @@
+import BaseFunctions as b
 import Browser
 import TMA
-from datetime import datetime, timedelta
+from datetime import datetime
 
-
-syscoDeviceDict = {"iPhone 12" : {"ServiceType" : "iPhone", "BaseCost" : TMA.Cost(isBaseCost=True, featureName="Unl Min&Msg+Email&Data", gross=32),"Equipment" : TMA.Equipment(mainType="Wireless", subType="Smart Phone", make="Apple", model="iPhone 12 64GB")},
-                   "Galaxy S21" : {"ServiceType" : "Android", "BaseCost" : TMA.Cost(isBaseCost=True, featureName="Unl Min&Msg+Email&Data", gross=32),"Equipment" : TMA.Equipment(mainType="Wireless", subType="Smart Phone", make="Samsung", model="Galaxy S21 FE 5G 128GB")},
-                   "Jetpack 8800L" : {"ServiceType" : "Mifi", "BaseCost" : TMA.Cost(isBaseCost=True, featureName="Mobile Broadband 2gb Share", gross=15),"Equipment" : TMA.Equipment(mainType="Wireless",subType="Aircard",make="Verizon",model="JETPACK 4G 8800L")}}
 
 # Valid devices are currently - iPhone 12, Samsung S21, Jetpack 8800L
-def syscoNewInstall(netID,serviceNum,installDate,device,imei,browser=None,existingTMADriver=None):
-    if(device not in syscoDeviceDict.keys()):
+def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=None,existingTMADriver=None):
+    if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
         return False
     if(browser is None):
@@ -20,6 +17,10 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,browser=None,existi
         t = TMA.TMADriver(browser)
         t.logInToTMA()
 
+    netID = netID.strip()
+    serviceNum = serviceNum.strip()
+    serviceNum = serviceNum.replace('.', '-')
+
 
     t.navToLocation(client="Sysco", entryType="People", entryID=netID.strip())
     targetUser = TMA.People(locationData=t.currentLocation)
@@ -29,10 +30,10 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,browser=None,existi
     # First, we need to build the service as a TMA.Service struct before we actually build it in TMA.
     newService = TMA.Service()
     newService.info_Client = "Sysco"
-    newService.info_Carrier = "Verizon Wireless"
+    newService.info_Carrier = carrier
     newService.info_UserName = f"{targetUser.info_FirstName} {targetUser.info_LastName}"
     newService.info_ServiceNumber = serviceNum.strip()
-    newService.info_ServiceType = syscoDeviceDict[device]["ServiceType"]
+    newService.info_ServiceType = b.equipment[device]["serviceType"]
 
     newService.info_InstalledDate = installDate
     expDateObj = datetime.strptime(installDate,"%m/%d/%Y")
@@ -40,10 +41,40 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,browser=None,existi
     newService.info_ContractEndDate = expDateObj.strftime("%m/%d/%Y")
     newService.info_UpgradeEligibilityDate = expDateObj.strftime("%m/%d/%Y")
 
-    newService.info_BaseCost = syscoDeviceDict[device]["BaseCost"]
-
-    newService.info_LinkedEquipment = syscoDeviceDict[device]["Equipment"]
+    # TODO support for multiple clients other than sysco
+    thisEquipment = TMA.Equipment(linkedService=newService,
+                                  mainType=b.equipment[device]["mainType"],
+                                  subType=b.equipment[device]["subType"],
+                                  make=b.equipment[device]["make"],
+                                  model=b.equipment[device]["model"])
+    newService.info_LinkedEquipment = thisEquipment
     newService.info_LinkedEquipment.info_IMEI = imei
+
+    if(newService.info_ServiceType == "iPhone" or newService.info_ServiceType == "Android"):
+        costType = "Smartphone"
+    elif(newService.info_ServiceType == "Cell Phone"):
+        costType = "CellPhone"
+    elif(newService.info_ServiceType == "Tablet"):
+        costType = "Table"
+    elif(newService.info_ServiceType == "Mifi"):
+        costType = "Mifi"
+    else:
+        raise ValueError(f"Invalid service type: {newService.info_ServiceType}")
+    allCosts = b.clients["Sysco"]["Plans"][costType][carrier]
+
+    baseCost = None
+    featureCosts = []
+    for cost in allCosts:
+        newCost = TMA.Cost(isBaseCost=cost["isBaseCost"],featureName=cost["featureName"],gross=cost["gross"],discountFlat=cost["discountFlat"],discountPercentage=cost["discountPercentage"])
+        if(cost["isBaseCost"] is True):
+            if(baseCost is not None):
+                raise ValueError(f"Multiple base costs for a single equipment entry in equipment.toml: {costType}|{carrier}")
+            else:
+                baseCost = newCost
+        else:
+            featureCosts.append(newCost)
+    newService.info_BaseCost = baseCost
+    newService.info_FeatureCosts = featureCosts
 
     # Creates a new linked service, which also opens a new pop up window.
     t.People_CreateNewLinkedService()
@@ -60,7 +91,7 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,browser=None,existi
     t.Service_InsertUpdate()
 
     # The screen now changes over to the Accounts wizard, but stays on the same tab.
-    t.Assignment_BuildAssignmentFromAccount("Sysco","Verizon Wireless",targetUser.info_OpCo)
+    t.Assignment_BuildAssignmentFromAccount("Sysco",carrier,targetUser.info_OpCo)
 
     # Now that we've processed the assignment, the popup window has closed and we need to
     # switch back to base TMA window. We also need to force TMA to update and display the new service
@@ -98,9 +129,9 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,browser=None,existi
 
     print("DONE BITCH!")
 
-
+# TODO
 def syscoUpgrade(serviceNum,upgradeEligibilityDate,device,imei,browser=None,existingTMADriver=None):
-    if(device not in syscoDeviceDict.keys()):
+    if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
         return False
     if(browser is None):
@@ -121,14 +152,19 @@ def syscoUpgrade(serviceNum,upgradeEligibilityDate,device,imei,browser=None,exis
     t.Service_InsertUpdate()
 
     # Now we check to make sure that the Service Type hasn't changed.
-    newServiceType = syscoDeviceDict[device]["ServiceType"]
+    newServiceType = b.equipment[device]["ServiceType"]
     if(newServiceType != t.Service_ReadMainInfo().info_ServiceType):
         t.Service_WriteServiceType(rawValue=newServiceType)
         t.Service_InsertUpdate()
 
     # Now, we navigate to the equipment and update the IMEI and device info.
     t.Service_NavToEquipmentFromService()
-    deviceToBuild = syscoDeviceDict[device]["Equipment"]
+
+    thisEquipment = TMA.Equipment(mainType=b.equipment[device]["mainType"],
+                                  subType=b.equipment[device]["subType"],
+                                  make=b.equipment[device]["make"],
+                                  model=b.equipment[device]["model"])
+    deviceToBuild = thisEquipment
     deviceToBuild.info_IMEI = imei
     t.Equipment_WriteAll(equipmentObject=deviceToBuild)
     t.Equipment_InsertUpdate()
