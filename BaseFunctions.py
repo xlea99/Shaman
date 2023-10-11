@@ -43,6 +43,8 @@ paths = Paths()
 
 with open(f"{paths.data}/clients.toml", "rb") as f:
     clients = tomli.load(f)
+with open(f"{paths.data}/equipment.toml","rb") as f:
+    equipment = tomli.load(f)
 
 # endregion === Config and Pathing Setup ===
 

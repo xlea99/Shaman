@@ -25,13 +25,27 @@ t.logInToTMA()
 
 # New Install
 
+iphone11 = "iPhone 11"
+iphone12 = "iPhone 12"
+iphone13 = "iPhone 13"
+s21 = "Galaxy S21"
+mifi = "Jetpack 8800L"
+
+verizon = "Verizon Wireless"
+att = "AT&T Mobility"
+tmobile = "T Mobile"
+bell = "Bell Mobility"
+rogers = "Rogers"
+
 h.syscoNewInstall(  existingTMADriver = t,
                     browser   = br,
-                    netID     = "pumaj217",
-                    serviceNum= "662-403-3165",
-                    installDate="5/16/2023",
-                    device    = "iPhone 12",
-                    imei      = "356606640181123")
+                    netID     = "shay3727",
+                    serviceNum= "368-887-8992",
+                    installDate="10/5/2023",
+                    device    = iphone11,
+                    carrier   = rogers,
+                    imei      = "352563745466921")
+
 
 
 

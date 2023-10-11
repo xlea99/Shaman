@@ -1,0 +1,99 @@
+title = "Equipment Information Data"
+
+# iPhones
+[iPhoneSE_64GB]
+serviceType = "iPhone"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Apple"
+model = "iPhone SE"
+[iPhoneSE_128GB]
+serviceType = "iPhone"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Apple"
+model = "iPhone SE 128GB"
+[iPhoneXR_64GB]
+serviceType = "iPhone"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Apple"
+model = "iPhone XR 64GB"
+[iPhone11_64GB]
+serviceType = "iPhone"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Apple"
+model = "iPhone 11 64GB"
+[iPhone12_64GB]
+serviceType = "iPhone"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Apple"
+model = "iPhone 12 64GB"
+[iPhone13_128GB]
+serviceType = "iPhone"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Apple"
+model = "iPhone 13 128GB"
+
+# Androids
+[GalaxyS20_64GB]
+serviceType = "Android"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Samsung"
+model = "Galaxy S20 FE 5G"
+[GalaxyS20_128GB]
+serviceType = "Android"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Samsung"
+model = "Galaxy S20 FE 5G 128GB"
+[GalaxyS21_128GB]
+serviceType = "Android"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Samsung"
+model = "Galaxy S21 FE 5G 128GB"
+[GalaxyA54_128GB]
+serviceType = "Android"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Samsung"
+model = "Galaxy A54"
+
+# Mifis
+[Jetpack8800L]
+serviceType = "Mifi"
+mainType = "Wireless"
+subType = "Aircard"
+make = "Verizon"
+model = "JETPACK 4G 8800L"
+[Orbic] #UPDATE WHEN UPDATED
+serviceType = "Mifi"
+mainType = "Wireless"
+subType = "Aircard"
+make = "Verizon"
+model = "JETPACK 4G 8800L"
+[FranklinA10] #UPDATE WHEN UPDATED
+serviceType = "Mifi"
+mainType = "Wireless"
+subType = "Aircard"
+make = "Franklin"
+model = "A50"
+[Inseego]
+serviceType = "Mifi"
+mainType = "Wireless"
+subType = "Aircard"
+make = "Inseego"
+model = "MiFi 8000"
+
+# Tablets
+[iPad11_128GB]
+serviceType = "Tablet"
+mainType = "Wireless"
+subType = "Tablet"
+make = "Apple"
+model = "IPAD PRO 11 128GB"

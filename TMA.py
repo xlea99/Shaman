@@ -242,7 +242,7 @@ class Cost:
 class Equipment:
 
     # Simple constructor with option to specify linkedService, and to initialize instance variables.
-    def __init__(self, linkedService=None, mainType=None, subType=None, make=None, model=None):
+    def __init__(self, linkedService=None,mainType=None, subType=None, make=None, model=None):
         self.info_MainType = mainType
         self.info_SubType = subType
         self.info_Make = make
@@ -270,11 +270,8 @@ class Assignment:
     def __init__(self, client = None, vendor = None,siteCode = None,assignmentType = "Wireless"):
         self.info_Client = client
         self.info_Type = assignmentType
+        self.info_Vendor = vendor
 
-        if("verizon" in vendor.lower()):
-            self.info_Vendor = "Verizon Wireless"
-        elif("at&t" in vendor.lower()):
-            self.info_Vendor = "AT&T Mobility"
         self.info_Account = b.clients["Accounts"][client][self.info_Vendor]
 
         self.info_SiteCode = siteCode
@@ -390,7 +387,6 @@ class TMADriver():
         self.currentTMATab = ["TMA",False]
         b.log.info(f"Switched back to default TMA tab with handle {self.browser.tabs['TMA']}")
 
-
     # This method reads the current open page in TMA, and generates a new (or overrides a provided)
     # TMALocation to be returned for navigational use. Default behavior is to store this new location
     # data as the current location.
@@ -442,6 +438,9 @@ class TMADriver():
                         else:
                             locationData.isInactive = True
                     elif ("Client/Services/" in locationData.rawURL):
+                        #self.Service_NavToServiceTab("Line Info")
+                        #TODO GRRRR
+                        #time.sleep(3)
                         locationData.entryType = "Service"
                         # We pull the service number as our EntryID for Service.
                         serviceNumber = self.browser.find_element(by=By.CSS_SELECTOR, value="#ctl00_MainPanel_Detail_txtServiceId").get_attribute("value")
@@ -1330,7 +1329,13 @@ class TMADriver():
         createNewButton = '//a[contains(@id, "_lnkNewFeature")][text()="Create New"]'
         commentBoxTestFor = prefix + '/div/div/textarea[contains(@name, "$txtComments")]'
 
+
         for costToWrite in costsToWrite:
+            createNewButtonElement = self.browser.find_element(by=By.XPATH,value=createNewButton)
+            time.sleep(1)
+            self.browser.driver.execute_script("arguments[0].click();",createNewButtonElement)
+            time.sleep(3)
+            # TODO THIS is glue, fix it for real
             self.browser.safeClick(by=By.XPATH, element=createNewButton, repeat=True, repeatUntilNewElementExists=commentBoxTestFor)
             featureNameForm = self.browser.find_element(by=By.XPATH, value=f"{prefix}/div/div/select[contains(@name,'$ddlFeature$ddlFeature_ddl')]/option[text()='{costToWrite.info_FeatureString}']")
             featureNameForm.click()
@@ -1346,7 +1351,11 @@ class TMADriver():
                 discountFlatForm.send_keys(costToWrite.info_DiscountFlat)
 
             insertButton = self.browser.find_element(by=By.XPATH, value=f'{prefix}/span[contains(@id,"btnsSingle")]/div/input[contains(@name, "$btnsSingle$ctl01")][contains(@value, "Insert")]')
-            self.browser.safeClick(by=None, element=insertButton)
+            self.browser.safeClick(by=None, element=insertButton,jsClick=True)
+            finishedCost = f"//table[contains(@id,'sgvFeatures')]/tbody/tr[contains(@class,'sgvitems')]/td[text()='{costToWrite.info_FeatureString}']"
+            if(not self.browser.elementExists(by=By.XPATH,value=finishedCost,timeout=20)):
+                raise ValueError("Bitch no you didn't")
+
 
         # TODO add visualization of costs?
         b.log.debug(f"Successfully wrote costs.")
@@ -1938,23 +1947,14 @@ class TMADriver():
         wirelessTypeDropdownSelection = self.browser.find_element(by=By.XPATH, value="//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlAccountType')]/option[text()='Wireless']")
         self.browser.safeClick(by=By.XPATH, element=wirelessTypeDropdownSelection)
 
-        vendorString = ""
-        if ("Verizon" in vendor):
-            vendorString = "Verizon Wireless"
-        elif ("AT&T" in vendor):
-            vendorString = "AT&T Mobility"
-        elif ("Bell" in vendor):
-            vendorString = "Bell Mobility"
-        elif ("Rogers" in vendor):
-            vendorString = "Rogers"
-        else:
-            b.log.error(f"Incorrect vendor selected to make assignment: {vendor}")
-
         # Select the vendor from the dropdown.
-        vendorDropdownSelection = self.browser.find_element(by=By.XPATH, value="//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlVendor')]/option[text()='" + vendorString + "']")
+        vendorDropdownSelectionString = f"//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlVendor')]/option[text()='{vendor}']"
+        if(not self.browser.elementExists(by=By.XPATH,value=vendorDropdownSelectionString)):
+            b.log.error(f"Incorrect vendor selected to make assignment: {vendor}")
+        vendorDropdownSelection = self.browser.find_element(by=By.XPATH, value=vendorDropdownSelectionString)
         self.browser.safeClick(by=By.XPATH, element=vendorDropdownSelection)
 
-        accountNumber = b.clients["Accounts"][client][vendorString]
+        accountNumber = b.clients["Accounts"][client][vendor]
 
         # Now select the appropriate account as found based on the vendor.
         accountNumberDropdownSelectionString = f"//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlAccount')]/option[text()='{accountNumber}']"
@@ -1978,7 +1978,7 @@ class TMADriver():
         # Next button CSS_SELECTOR string.
         nextButtonString = "#wizLinkAssignments_wizFindExistingAssigment_gvpSites_btnNext"
 
-        # Here we loop through each site, looking for our specified site code.
+        # Here we loop through each site, looking for our specified site code. b
         foundTargetCode = False
         currentPageNumber = 0
         targetSiteElement = None
@@ -1987,8 +1987,15 @@ class TMADriver():
             # Here we test to make sure we've actually flipped the page, if necessary.
             while (currentPageNumber == previousPageNumber):
                 pageCountTextString = "//table/tbody/tr/td/span[contains(@id,'wizFindExistingAssigment')][contains(@id,'lblPages')]"
-                pageCountTextElement = WebDriverWait(self.browser.driver,10).until(Browser.wait_for_non_stale_element((By.XPATH,pageCountTextString)))
-                pageCountText = pageCountTextElement.text
+                # TODO We GOTTA find a better way to do this shit!
+                for i in range(5):
+                    try:
+                        pageCountTextElement = WebDriverWait(self.browser.driver,10).until(Browser.wait_for_non_stale_element((By.XPATH,pageCountTextString)))
+                        pageCountText = pageCountTextElement.text
+                        break
+                    except selenium.common.exceptions.StaleElementReferenceException:
+                        time.sleep(0.2)
+                        continue
                 currentPageNumber = int(pageCountText.split(" of ")[0].split("(Page ")[1])
                 time.sleep(0.2)
             allSitesOnPage = self.browser.find_elements(by=By.XPATH,value=allSitesOnPageString)
