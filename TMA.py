@@ -272,7 +272,8 @@ class Assignment:
         self.info_Type = assignmentType
         self.info_Vendor = vendor
 
-        self.info_Account = b.clients["Accounts"][client][self.info_Vendor]
+
+        self.info_Account = b.clients[client]["Accounts"][vendor][self.info_Vendor]
 
         self.info_SiteCode = siteCode
         self.info_Address = None
@@ -1954,7 +1955,7 @@ class TMADriver():
         vendorDropdownSelection = self.browser.find_element(by=By.XPATH, value=vendorDropdownSelectionString)
         self.browser.safeClick(by=By.XPATH, element=vendorDropdownSelection)
 
-        accountNumber = b.clients["Accounts"][client][vendor]
+        accountNumber = b.clients[client]["Accounts"][vendor]
 
         # Now select the appropriate account as found based on the vendor.
         accountNumberDropdownSelectionString = f"//tr/td/div/fieldset/ol/li/select[contains(@id,'wizFindExistingAssigment_ddlAccount')]/option[text()='{accountNumber}']"
