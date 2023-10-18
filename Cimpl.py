@@ -78,23 +78,26 @@ class CimplDriver:
         self.browser.get("https://apps.cimpl.com/Cimpl/Authentication#/logon")
 
         self.browser.implicitly_wait(10)
-        usernameInputString = "//log-on-page/div/div/div/div/div/input[@automation-id='log-on-page__userName__input']"
-        passwordInputString = "//log-on-page/div/div/div/div/div/input[@automation-id='log-on-page__password__input']"
-        usernameInput = self.browser.find_element(by=By.XPATH,value=usernameInputString)
-        passwordInput = self.browser.find_element(by=By.XPATH,value=passwordInputString)
+        self.waitForLoadingScreen()
+
+        usernameInput = self.browser.find_element(by=By.XPATH, value="//input[@id='username']")
         usernameInput.send_keys(b.config["authentication"]["cimplUser"])
+
+        continueButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+        continueButton.click()
+        self.waitForLoadingScreen()
+
+        selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
+        selectionDropdown.send_keys("Sysco")
+        syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
+        syscoSelection.click()
+        self.waitForLoadingScreen()
+
+        passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
         passwordInput.send_keys(b.config["authentication"]["cimplPass"])
 
-        signInButton = self.browser.find_element(by=By.XPATH,value="//log-on-page/div/div/div/div/cimpl-button/button[@automation-id='log-on-page__signIn__button']")
+        signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
         signInButton.click()
-
-        selectionDropdownString = "//div[text()='Company Name']/following-sibling::div/cimpl-dropdown/div/div/span[contains(@class,'cimpl-dropdown')]/span/span/span[contains(@class,'k-i-arrow-s')]"
-        self.selectFromDropdown(by=By.XPATH,dropdownString=selectionDropdownString,selectionString="Sysco")
-
-        self.waitForLoadingScreen()
-        continueButtonString = "//cimpl-button/button/div/span[@class='button-label ng-binding uppercase'][text()='Continue']"
-        WebDriverWait(self.browser.driver,30).until(expected_conditions.element_to_be_clickable((By.XPATH, continueButtonString)))
-        self.browser.find_element(by=By.XPATH,value=continueButtonString).click()
         self.waitForLoadingScreen()
 
     #region === WOCenter ===
@@ -108,7 +111,7 @@ class CimplDriver:
         if(onWorkorderPage):
             return True
         else:
-            menuString = "//i[@class='material-icons'][text()='menu']/parent::div"
+            menuString = "//i[text()='menu']/parent::div"
             # First, we test to ensure that the menu is in the "super icon view" so that we can select
             # the inventory section.
             self.waitForLoadingScreen()
@@ -124,14 +127,13 @@ class CimplDriver:
             # inventory section.
             inventoryButtonString = "//div/nav/div/ul[@id='mainSideBar']/li[2]/span/i[contains(@class,'menu-list__menuIcon')]"
             inventoryButton = WebDriverWait(self.browser.driver, 5).until(
-                EC.element_to_be_clickable((By.XPATH, inventoryButtonString))
+                EC.element_to_be_clickable((By.XPATH, "//i[contains(text(),'store')]"))
             )
-            #inventoryButton = self.browser.find_element(by=By.XPATH,value=inventoryButtonString)
             inventoryButton.click()
             self.waitForLoadingScreen()
 
             # Now, the inventory selection submenu should be open, and we can select the workorder tab.
-            workorderCenterButtonString = "//div/ul/li/ul/li/span[contains(@class,'menu-list__spaceLeft')][text()='Workorder Center']"
+            workorderCenterButtonString = "//span[contains(@class,'menu-list__spaceLeft')][text()='Workorder Center']"
             workorderCenterButton = self.browser.find_element(by=By.XPATH,value=workorderCenterButtonString)
             workorderCenterButton.click()
             self.waitForLoadingScreen()
@@ -387,7 +389,7 @@ class CimplDriver:
         operationTypeElement = self.browser.find_element(by=By.XPATH,value=operationTypeString)
         return operationTypeElement.text
     def Workorders_ReadStatus(self):
-        statusString = "//ng-transclude/div/div/div[@ng-bind='vm.statusLabel']"
+        statusString = "//div[@ng-bind='vm.statusLabel']"
         statusElement = self.browser.find_element(by=By.XPATH, value=statusString)
         return statusElement.text
     def Workorders_ReadWONumber(self):
@@ -527,6 +529,39 @@ class CimplDriver:
             returnList.append(actionRow.text)
 
         return returnList
+    # Combined method for reading a full workorder into a neat dictionary. Assumes
+    # that we're currently open on a workorder.
+    def Workorders_ReadFullWorkorder(self):
+        returnDict = {}
+        # Read all header info
+        returnDict["WONumber"] = self.Workorders_ReadWONumber()
+        returnDict["Status"] = self.Workorders_ReadStatus()
+        returnDict["Carrier"] = self.Workorders_ReadCarrier()
+        returnDict["DueDate"] = self.Workorders_ReadDueDate()
+        returnDict["OperationType"] = self.Workorders_ReadOperationType()
+
+        # Read summary info
+        self.Workorders_NavToSummaryTab()
+        returnDict["Comment"] = self.Workorders_ReadComment()
+        returnDict["ReferenceNumber"] = self.Workorders_ReadReferenceNo()
+        returnDict["Subject"] = self.Workorders_ReadSubject()
+        returnDict["WorkorderOwner"] = self.Workorders_ReadWorkorderOwner()
+        returnDict["Requestor"] = self.Workorders_ReadRequester()
+        returnDict["Notes"] = self.Workorders_ReadNotes()
+
+        # Read detail info
+        self.Workorders_NavToDetailsTab()
+        returnDict["ServiceID"] = self.Workorders_ReadServiceID()
+        returnDict["Account"] = self.Workorders_ReadAccount()
+        returnDict["StartDate"] = self.Workorders_ReadStartDate()
+        returnDict["HardwareInfo"] = self.Workorders_ReadHardwareInfo()
+        returnDict["Actions"] = self.Workorders_ReadActions()
+
+        return returnDict
+
+
+
+
 
     # Front (Summary) page write methods
     def Workorders_WriteComment(self,comment):

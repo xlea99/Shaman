@@ -439,15 +439,14 @@ class TMADriver():
                         else:
                             locationData.isInactive = True
                     elif ("Client/Services/" in locationData.rawURL):
-                        #self.Service_NavToServiceTab("Line Info")
-                        #TODO GRRRR
-                        #time.sleep(3)
                         locationData.entryType = "Service"
                         # We pull the service number as our EntryID for Service.
                         serviceNumber = self.browser.find_element(by=By.CSS_SELECTOR, value="#ctl00_MainPanel_Detail_txtServiceId").get_attribute("value")
                         locationData.entryID = serviceNumber.strip()
                         # We also have to check whether this service is considered "Inactive"
-                        # TODO implement navigation to correct linked tab.
+                        currentTab = self.Service_GetCurrentServiceTab()
+                        if(currentTab != "Line Info"):
+                            self.Service_NavToServiceTab("Line Info")
                         inactiveBoxString = "//div/div/div/div/ol/li/input[contains(@id,'Detail_chkInactive_ctl01')][@type='checkbox']"
                         inactiveBox = self.browser.find_element(by=By.XPATH, value=inactiveBoxString)
                         isInactiveString = str(inactiveBox.get_attribute("CHECKED"))
@@ -455,6 +454,8 @@ class TMADriver():
                             locationData.isInactive = True
                         else:
                             locationData.isInactive = False
+                        if(currentTab != "Line Info"):
+                            self.Service_NavToServiceTab(currentTab)
                     elif ("Client/Interactions/" in locationData.rawURL):
                         locationData.entryType = "Interaction"
                         # Here, we pull the Interaction Number as our EntryID.
@@ -573,7 +574,7 @@ class TMADriver():
         b.log.error("Could not navigate to DomainPage for an unknown reason!")
     # This method intelligently searches for and opens an entry as specified by a locationData. Method is able to be called from anywhere as long as TMA is
     # currently logged in, and locationData is valid.
-    # TODO This function sure is convoluted. Fix it.
+    # TODO This function has some reliability issues. Sometimes, the result is clicked too quickly OR the page is read too quickly before the result page can load.
     def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData : TMALocation = None, timeout=20):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
@@ -663,10 +664,11 @@ class TMADriver():
             searchBar.send_keys(str(locationData.entryID))
             time.sleep(2)
             searchBar.send_keys(u'\ue007')
+            targetServiceIDField = f"//input[contains(@id,'txtServiceId')][@value='{b.convertServiceIDFormat(locationData.entryID,'dashed')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'dotted')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'raw')}']"
             resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(text(),'" + locationData.entryID + " (')]"
             resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
-            self.browser.safeClick(by=None,element=resultItem,repeat=True,repeatUntilElementDoesNotExist=resultItem)
-            #resultItem.click()
+            self.browser.safeClick(by=None,element=resultItem,repeat=True,repeatUntilElementDoesNotExist=targetServiceIDField)
+            time.sleep(3)
         elif(locationData.entryType == "People"):
             peopleOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='people']")
             peopleOption.click()
@@ -1393,29 +1395,22 @@ class TMADriver():
     # if that is the currently active service tab. Dictionaries are also defined
     # for the various tab XPATHs, as well as XPATHs to various elements
     # used to verify that the nav was successful.
-    serviceTabDictionary = {"line info": "btnLineInfoExtended",
-                            "assignments": "btnAssignments",
-                            "used for": "btnUsedFor",
-                            "base costs": "btnBaseCosts",
-                            "features": "btnFeatures",
-                            "fees": "btnFees",
-                            "links": "btnLinks",
-                            "history": "btnHistory"}
-    serviceTabCheckFor = {
-        "line info": "//div/ol/li/input[contains(@name,'Detail$txtDateInstalled')][contains(@id,'Detail_txtDateInstalled')]",
-        "assignments": "//div[contains(@id,'Accounts_sites_link1_updAssociationsLink')]/a[contains(@id,'Accounts_sites_link1_lnkNewAssignment')]",
-        "used for": "//div/fieldset/a[contains(@id,'Detail_ucUsedFor_lnkNewUse')]",
-        "base costs": "//div/fieldset/a[contains(@id,'Detail_sfBaseCosts_lnkNewFeature')]",
-        "features": "//div/fieldset/a[contains(@id,'Detail_sfStandardFeatures_lnkNewFeature')]",
-        "fees": "//div/fieldset/a[contains(@id,'Detail_sfFees_lnkNewFeature')]",
-        "links": "//tr[@class='gridviewbuttons']/td/span[contains(@class,'propercase')]",
-        "history": "//tr[@class='headeritem']/td/b[text()='Message']"}
+
+    # Method to navigate between all service tabs, and one for getting the current service tab.
     def Service_NavToServiceTab(self, serviceTab):
+        serviceTabDictionary = {"line info": "btnLineInfoExtended",
+                                "assignments": "btnAssignments",
+                                "used for": "btnUsedFor",
+                                "base costs": "btnBaseCosts",
+                                "features": "btnFeatures",
+                                "fees": "btnFees",
+                                "links": "btnLinks",
+                                "history": "btnHistory"}
+
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
-        nameXPATH = self.serviceTabDictionary[serviceTab.lower()]
-        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[contains(@name,'{nameXPATH}')][translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='{serviceTab.lower()}']"
-        serviceTabTestFor = self.serviceTabCheckFor[serviceTab.lower()]
+        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[contains(@name,'{serviceTabDictionary[serviceTab.lower()]}')][translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='{serviceTab.lower()}']"
+        serviceTabTestFor = f"{targetTab}[@class='selected']"
 
         if (self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=serviceTabTestFor)):
             b.log.info(f"Successfully navigated to serviceTab '{serviceTab}'.")
@@ -1423,6 +1418,9 @@ class TMADriver():
         else:
             b.log.error(f"Failed to navigate to serviceTab '{serviceTab}'.")
             return False
+    def Service_GetCurrentServiceTab(self):
+        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[@class='selected']"
+        return self.browser.find_element(by=By.XPATH,value=targetTab).get_attribute("value")
     # Helper method to easily navigate to linked tabs.
     # TODO add error handling here
     def Service_NavToLinkedTab(self, linkedTabName):
