@@ -1330,7 +1330,7 @@ class TMADriver():
 
         prefix = '//div[@class="newitem"][contains(@id,"divFeature")]'
         createNewButton = '//a[contains(@id, "_lnkNewFeature")][text()="Create New"]'
-        commentBoxTestFor = prefix + '/div/div/textarea[contains(@name, "$txtComments")]'
+        newItemTestFor = '//div[contains(@id,"divFeature")][@class="newitem"]'
 
 
         for costToWrite in costsToWrite:
@@ -1338,10 +1338,11 @@ class TMADriver():
             time.sleep(1)
             self.browser.driver.execute_script("arguments[0].click();",createNewButtonElement)
             time.sleep(3)
-            # TODO THIS is glue, fix it for real
-            self.browser.safeClick(by=By.XPATH, element=createNewButton, repeat=True, repeatUntilNewElementExists=commentBoxTestFor)
-            featureNameForm = self.browser.find_element(by=By.XPATH, value=f"{prefix}/div/div/select[contains(@name,'$ddlFeature$ddlFeature_ddl')]/option[text()='{costToWrite.info_FeatureString}']")
-            featureNameForm.click()
+            # TODO TMA is ass, and this section just proves it. The thing is, cost names are selected from dropdown, but clicking it doesn't actually update the "selected='selected'" attribute, so there's literally no way to tell. only solution is try, then test. implement this later (try adding it, test if the right feature was added and if not, try again.)
+            self.browser.safeClick(by=By.XPATH, element=createNewButton, repeat=True, repeatUntilNewElementExists=newItemTestFor)
+            print(f"Hello Mr. Testicles: {costToWrite.info_FeatureString}")
+            featureNameSelectionString = f"{prefix}/div/div/select[contains(@name,'$ddlFeature$ddlFeature_ddl')]/option[text()='{costToWrite.info_FeatureString}']"
+            self.browser.safeClick(by=By.XPATH, element=featureNameSelectionString,repeat=True,timeout=5)
 
             if(costToWrite.info_Gross is not None):
                 grossForm = self.browser.find_element(by=By.XPATH, value=f'{prefix}/div/div/ol/li/input[contains(@name,"$txtCost_gross")][contains(@id,"_txtCost_gross")]')

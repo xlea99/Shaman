@@ -37,16 +37,16 @@ tmobile = "T Mobile"
 bell = "Bell Mobility"
 rogers = "Rogers"
 
-'''
+
 h.syscoNewInstall(existingTMADriver = t,
                   browser   = br,
-                  netID     = "shog3398",
-                  serviceNum= "615-339-2473",
-                  installDate="10/12/2023",
+                  netID     = "bpic9459",
+                  serviceNum= "504-487-3922",
+                  installDate="10/16/2023",
                   device    = iphone13,
                   carrier   = verizon,
-                  imei      = "358743276679126")
-'''
+                  imei      = "358743276791418")
+
 
 
 
