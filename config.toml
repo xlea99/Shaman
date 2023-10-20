@@ -12,6 +12,8 @@ tmaUser = "asomheil@icomm.co"                   # TMA Username
 tmaPass = "P@ssw0rd"                            # TMA Password
 cimplUser = "Alex.somheil@uplandsoftware.com"   # Cimpl Username
 cimplPass = "Make!tCimpl"                       # Cimpl Password
+verizonUser = "syscovzw2"                       # Verizon MyBiz Username
+verizonPass = "Sysco2022!"                      # Verizon MyBiz Password
 
 [logging]
 level = "DEBUG"     # Valid levels are: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", with DEBUG showing the most info

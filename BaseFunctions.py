@@ -112,9 +112,9 @@ class DBConn:
 
 # This function accepts a phone number in ANY format (assuming it contains an actual phone number an
 # no extra numbers), and converts it to one of three forms:
-# -Dashed (512-819-2010)
-# -Dotted (512.819.2010)
-# -Raw    (5128192010)
+# -dashed (512-819-2010)
+# -dotted (512.819.2010)
+# -raw    (5128192010)
 def convertServiceIDFormat(serviceID, targetFormat):
     # First, strip all non-numeric characters to get the raw format
     rawNumber = re.sub(r'\D', '', serviceID)  # \D matches any non-digit

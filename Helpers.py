@@ -18,8 +18,7 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=Non
         t.logInToTMA()
 
     netID = netID.strip()
-    serviceNum = serviceNum.strip()
-    serviceNum = serviceNum.replace('.', '-')
+    serviceNum = b.convertServiceIDFormat(serviceID=serviceNum,targetFormat="dashed")
 
 
     t.navToLocation(client="Sysco", entryType="People", entryID=netID.strip())
@@ -55,7 +54,7 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=Non
     elif(newService.info_ServiceType == "Cell Phone"):
         costType = "CellPhone"
     elif(newService.info_ServiceType == "Tablet"):
-        costType = "Table"
+        costType = "Tablet"
     elif(newService.info_ServiceType == "Mifi"):
         costType = "Mifi"
     else:

@@ -30,6 +30,7 @@ iphone12 = "iPhone12_64GB"
 iphone13 = "iPhone13_128GB"
 s21 = "GalaxyS21_128GB"
 mifi = "Jetpack8800L"
+ipad = "iPad11_128GB"
 
 verizon = "Verizon Wireless"
 att = "AT&T Mobility"
@@ -40,12 +41,12 @@ rogers = "Rogers"
 
 h.syscoNewInstall(existingTMADriver = t,
                   browser   = br,
-                  netID     = "bpic9459",
-                  serviceNum= "504-487-3922",
-                  installDate="10/16/2023",
-                  device    = iphone13,
+                  netID     = "pfab1853",
+                  serviceNum= "772-529-8946",
+                  installDate="10/18/2023",
+                  device    = ipad,
                   carrier   = verizon,
-                  imei      = "358743276791418")
+                  imei      = "355427903052807")
 
 
 
