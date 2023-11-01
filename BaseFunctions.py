@@ -153,6 +153,52 @@ def fuzzyStringToNumber(string : str):
     else:
         raise ValueError(f"Unable to convert '{string}' to number")
 
+# This method assumes that a given string s may contain delimiter variables. This method uses the
+# specified delimiter (by default $) to match all these variables. For example,
+# ```$flounderMan.getWalrus() + 2 * $hippo + "$duck``` would specifically match only $flounderMan and $hippo.
+# Also supports fstring type strings for delimiter variables.
+def findDelimiterVariables(s, delimiter='$'):
+    # Adjust the regex pattern to incorporate the delimiter
+    generalPattern = rf'{re.escape(delimiter)}[a-zA-Z][a-zA-Z0-9_]*'
+
+    # Extract potential matches
+    potentialMatches = re.findall(generalPattern, s)
+
+    validMatches = []
+
+    # Significant characters
+    significantChars = ['"', "'", '{', '}']
+
+    for match in potentialMatches:
+        startIdx = s.index(match)
+
+        # Determine the firstSignificantPrefix
+        prefix = s[:startIdx][::-1]  # reverse the prefix for easy search
+        firstSignificantPrefix = None
+        for char in prefix:
+            if char in significantChars:
+                firstSignificantPrefix = char
+                break
+
+        # Determine the firstSignificantSuffix
+        suffix = s[startIdx + len(match):]
+        firstSignificantSuffix = None
+        for char in suffix:
+            if char in significantChars:
+                firstSignificantSuffix = char
+                break
+
+        # Determine the firstSignificantPair
+        if firstSignificantPrefix in ['"', "'"]:
+            if firstSignificantSuffix == firstSignificantPrefix:
+                continue
+            else:
+                validMatches.append(match)
+        elif firstSignificantPrefix == '{' and firstSignificantSuffix == '}':
+            validMatches.append(match)
+        elif firstSignificantPrefix not in significantChars:
+            validMatches.append(match)
+
+    return validMatches
 
 #endregion === Misc Functions ===
-

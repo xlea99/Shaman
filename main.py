@@ -4,7 +4,8 @@ from selenium.webdriver.common.by import By
 import Browser
 import TMA
 import Cimpl
-import Controller as h
+import Helpers as h
+#import Controller
 
 br = Browser.Browser()
 

@@ -19,21 +19,20 @@ class Task:
 
     # Simple init methods to store the aspects of this Task. Higher priority means more important.
     # Contexts are indirectly referenced using a string contextID.
-    def __init__(self,name, func, args = None, kwargs : dict = None, contextID : str = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None):
+    def __init__(self,name, func, args = (), kwargs : dict = (), contextID : str = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None):
         self.name = name
-        varReplacerPattern = re.compile(r'''(?<![\'"/])\$(\w+)(?:(?![\w'"]*(?:[^'"]*['"][^'"]*['"][^'"]*)*$)|$)''')
-        configReplacerPattern = re.compile(r'''(?<![\'"/])%(\w+)(?:(?![\w'"]*(?:[^'"]*['"][^'"]*['"][^'"]*)*$)|$)''')
-        def varReplacer(match):
-            argName = match.group(1)
-            return f"context['{argName}']"
-        def configReplacer(match):
-            argName = match.group(1)
-            return f"globalData['{argName}']"
 
         # Determine function type
         if(type(func) is str):
-            finalFunc = varReplacerPattern.sub(varReplacer,func)
-            finalFunc = configReplacerPattern.sub(configReplacer,finalFunc)
+            foundContextVariables = b.findDelimiterVariables(func,"$")
+            foundGlobalVariables = b.findDelimiterVariables(func,"&")
+            finalFunc = func
+            for var in foundContextVariables:
+                replacement = f"context['{var[1:]}']"
+                finalFunc = finalFunc.replace(var,replacement)
+            for var in foundGlobalVariables:
+                replacement = f"globalData['{var[1:]}']"
+                finalFunc = finalFunc.replace(var,replacement)
             self.func = finalFunc
             self.isLiteralFunc = True
         else:
@@ -42,31 +41,39 @@ class Task:
 
         # Process arguments
         self.args = []
-        if (args is None):
-            self.args = None
-        else:
-            if (type(args) is str):
-                args = [args]
-            for arg in args:
-                if (type(arg) is str):
-                    finalArg = varReplacerPattern.sub(varReplacer, arg)
-                    finalArg = configReplacerPattern.sub(configReplacer, finalArg)
-                    self.args.append(finalArg)
-                else:
-                    self.args.append(arg)
-            self.args = self.args
+        if(type(args) is str):
+            args = [args]
+        for arg in args:
+            if(type(arg) is str):
+                foundContextVariables = b.findDelimiterVariables(arg,"$")
+                foundGlobalVariables = b.findDelimiterVariables(arg,"%")
+                finalArg = arg
+                for var in foundContextVariables:
+                    replacement = f"context['{var[1:]}']"
+                    finalArg = finalArg.replace(var,replacement)
+                for var in foundGlobalVariables:
+                    replacement = f"globalData['{var[1:]}']"
+                    finalArg = finalArg.replace(var,replacement)
+                self.args.append(finalArg)
+            else:
+                self.args.append(arg)
 
         self.kwargs = {}
-        if (kwargs is None):
-            self.kwargs = None
-        else:
-            for key, value in kwargs.items():
-                if (type(value) is str):
-                    finalValue = varReplacerPattern.sub(varReplacer, value)
-                    finalValue = configReplacerPattern.sub(configReplacer, finalValue)
-                    self.kwargs[key] = finalValue
-                else:
-                    self.kwargs[key] = value
+        kwargs = dict(kwargs)
+        for key,value in kwargs.items():
+            if(type(value) is str):
+                foundContextVariables = b.findDelimiterVariables(value,"$")
+                foundGlobalVariables = b.findDelimiterVariables(value,"%")
+                finalKwarg = value
+                for var in foundContextVariables:
+                    replacement = f"context['{var[1:]}']"
+                    finalKwarg = finalKwarg.replace(var,replacement)
+                for var in foundGlobalVariables:
+                    replacement = f"globalData['{var[1:]}']"
+                    finalKwarg = finalKwarg.replace(var,replacement)
+                self.kwargs[key] = finalKwarg
+            else:
+                self.kwargs[key] = value
 
 
         # Complete misc initialization
@@ -85,7 +92,7 @@ class Task:
         self.status = "InProgress"
         try:
             allDrivers = {"CONTROL_TMA": tmaDriver, "CONTROL_CIMPL": cimplDriver,"CONTROL_VERIZON": verizonDriver}
-            namespace = {"RESULT": None}
+            namespace = {"RESULT": None, "datetime" : datetime}
             namespace.update(allDrivers)
             namespace["context"] = context
             namespace["context"].update(allDrivers)
@@ -269,12 +276,12 @@ newInstall.addTask(Task(name="setNewServiceClient",func="$newService.info_Client
 newInstall.addTask(Task(name="setNewServiceCarrier",func="$newService.info_Carrier = $carrier"))
 newInstall.addTask(Task(name="setNewServiceUserName",func="$newService.info_UserName = f\"{$targetUser.info_FirstName} {$targetUser.info_LastName}\""))
 newInstall.addTask(Task(name="setNewServiceServiceNumber",func="$newService.info_ServiceNumber = $serviceNum.strip()"))
-newInstall.addTask(Task(name="setNewServiceServiceType",func="$newService.info_ServiceType = %equipment[$device]['serviceType']"))
+newInstall.addTask(Task(name="setNewServiceServiceType",func="$newService.info_ServiceType = &equipment[$device]['serviceType']"))
 newInstall.addTask(Task(name="setNewServiceInstalledDate",func="$newService.info_InstalledDate = $installDate"))
-newInstall.addTask(Task(name="formatExpDateObj1",func="$expDateObj = datetime.strptime($installDate,'%m/%d/%Y'"))
+newInstall.addTask(Task(name="formatExpDateObj1",func="$expDateObj = datetime.strptime($installDate,'%m/%d/%Y')"))
 newInstall.addTask(Task(name="formatExpDateObj2",func="$expDateObj = $expDateObj.replace(year=$expDateObj.year + 2)"))
-newInstall.addTask(Task(name="setNewServiceContractEndDate",func="%newService.info_ContractEndDate = $expDateObj.strftime('%m/%d/%Y')"))
-newInstall.addTask(Task(name="setNewServiceUpgradeEligibilityDate",func="%newService.info_UpgradeEligibilityDate = $expDateObj.strftime('%m/%d/%Y')"))
+newInstall.addTask(Task(name="setNewServiceContractEndDate",func="$newService.info_ContractEndDate = $expDateObj.strftime('%m/%d/%Y')"))
+newInstall.addTask(Task(name="setNewServiceUpgradeEligibilityDate",func="$newService.info_UpgradeEligibilityDate = $expDateObj.strftime('%m/%d/%Y')"))
 
 
 c.addRecipe(newInstall,{"netID" : "asup5134","serviceNum" : "510-251-2511","installDate" : "5/17/2023","device" : "iPhone11_64GB","imei" : "35135123613461","carrier" : "Verizon Wireless"})
