@@ -6,36 +6,65 @@ import Verizon
 import re
 from datetime import datetime
 
+execErrorReporting = False
+if(execErrorReporting):
+    allExceptions = Exception
+else:
+    allExceptions = ()
+
+
 # This class allows us to abstract a method or function as a "Task", to be understandable by the
 # controller.
 class Task:
 
     # Simple init methods to store the aspects of this Task. Higher priority means more important.
     # Contexts are indirectly referenced using a string contextID.
-    def __init__(self,name, func, kwargs : dict = None, contextID : str = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None):
+    def __init__(self,name, func, args = None, kwargs : dict = None, contextID : str = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None):
         self.name = name
-        varReplacerPattern = re.compile(r'(?<!["\'])\$([a-zA-Z_]\w*)(?!["\'])')
+        varReplacerPattern = re.compile(r'''(?<![\'"/])\$(\w+)(?:(?![\w'"]*(?:[^'"]*['"][^'"]*['"][^'"]*)*$)|$)''')
+        configReplacerPattern = re.compile(r'''(?<![\'"/])%(\w+)(?:(?![\w'"]*(?:[^'"]*['"][^'"]*['"][^'"]*)*$)|$)''')
         def varReplacer(match):
             argName = match.group(1)
             return f"context['{argName}']"
+        def configReplacer(match):
+            argName = match.group(1)
+            return f"globalData['{argName}']"
 
         # Determine function type
         if(type(func) is str):
-
-            self.func = varReplacerPattern.sub(varReplacer,func)
+            finalFunc = varReplacerPattern.sub(varReplacer,func)
+            finalFunc = configReplacerPattern.sub(configReplacer,finalFunc)
+            self.func = finalFunc
             self.isLiteralFunc = True
         else:
             self.func = func
             self.isLiteralFunc = False
 
         # Process arguments
+        self.args = []
+        if (args is None):
+            self.args = None
+        else:
+            if (type(args) is str):
+                args = [args]
+            for arg in args:
+                if (type(arg) is str):
+                    finalArg = varReplacerPattern.sub(varReplacer, arg)
+                    finalArg = configReplacerPattern.sub(configReplacer, finalArg)
+                    self.args.append(finalArg)
+                else:
+                    self.args.append(arg)
+            self.args = self.args
+
         self.kwargs = {}
         if (kwargs is None):
             self.kwargs = None
         else:
             for key, value in kwargs.items():
                 if (type(value) is str):
-                    self.kwargs[key] = varReplacerPattern.sub(varReplacer, value)
+                    finalValue = varReplacerPattern.sub(varReplacer, value)
+                    finalValue = configReplacerPattern.sub(configReplacer, finalValue)
+                    self.kwargs[key] = finalValue
                 else:
                     self.kwargs[key] = value
 
@@ -55,7 +84,16 @@ class Task:
     def execute(self,context,tmaDriver : TMA.TMADriver = None,cimplDriver : Cimpl.CimplDriver = None,verizonDriver : Verizon.VerizonDriver = None):
         self.status = "InProgress"
         try:
-            namespace = {"context": context,"result": None,"tmaDriver": tmaDriver, "cimplDriver": cimplDriver, "verizonDriver": verizonDriver}
+            allDrivers = {"CONTROL_TMA": tmaDriver, "CONTROL_CIMPL": cimplDriver,"CONTROL_VERIZON": verizonDriver}
+            namespace = {"RESULT": None}
+            namespace.update(allDrivers)
+            namespace["context"] = context
+            namespace["context"].update(allDrivers)
+            namespace["globalData"] = b.globalData
+            if(self.args is None):
+                evaluatedArgs = []
+            else:
+                evaluatedArgs = [eval(arg, namespace) for arg in self.args]
             if(self.kwargs is None):
                 evaluatedKwargs = {}
             else:
@@ -66,21 +104,21 @@ class Task:
                 if (self.resultDest is not None):
                     context[self.resultDest] = namespace["result"]
             else:
-                self.result = self.func(**evaluatedKwargs)
+                self.result = self.func(*evaluatedArgs,**evaluatedKwargs)
                 if (self.resultDest is not None):
                     context[self.resultDest] = self.result
             self.status = "Completed"
             self.retries = 0
 
             return self.status
-        except Exception as e:
+        except allExceptions as e:
             self.status = "Failed"
             self.error = e
             return self.status
 
     # Helper __str__ method for displaying and debugging individual tasks.
     def __str__(self):
-        return f"Task: {self.name} ({self.func}), {self.priority}| Result -> {self.resultDest}, Kwargs: {self.kwargs} | ContextID: {self.contextID} | Retries: {self.retries} | Recovery: {self.recoveryTask}"
+        return f"Task: {self.name} ({self.func}), {self.priority}| Result -> {self.resultDest}, Args: {self.args}, Kwargs: {self.kwargs} | ContextID: {self.contextID} | Retries: {self.retries} | Recovery: {self.recoveryTask}"
 
 # This class controls the entire program by implementing a Task queue, priority execution, and context management.
 class Controller:
@@ -222,26 +260,30 @@ c = Controller(browser=browser,TMADriver=tma,CimplDriver=cimpl,VerizonDriver=ver
 newInstall = Recipe(name="newInstall",contextID="newInstall",requiredKwargs=["netID","serviceNum","installDate","device","imei","carrier"],deleteContextAfterExecution=False)
 newInstall.addTask(Task(name="stripNetID",func="$netID = $netID.strip()"))
 newInstall.addTask(Task(name="getServiceNum",func=b.convertServiceIDFormat,kwargs={"serviceID" : "$serviceNum","targetFormat" : "'dashed'"},resultDest="serviceNum"))
-newInstall.addTask(Task(name="lookupPerson",func="tmaDriver.navToLocation(client='Sysco',entryType='People',entryID=$netID)"))
-newInstall.addTask(Task(name="getTargetUser",func=TMA.People,kwargs={"locationData" : "tmaDriver.currentLocation"}))
+newInstall.addTask(Task(name="lookupPerson",func=TMA.TMADriver.navToLocation,args=("$CONTROL_TMA"),kwargs={"client":"'Sysco'","entryType":"'People'","entryID":"$netID"}))
+newInstall.addTask(Task(name="getTargetUser",func=TMA.People,kwargs={"locationData" : "CONTROL_TMA.currentLocation"},resultDest="targetUser"))
+newInstall.addTask(Task(name="setTargetUserClient",func="$targetUser.info_Client = 'Sysco'"))
+newInstall.addTask(Task(name="readTargetUser",func=TMA.TMADriver.People_ReadBasicInfo,args=("$CONTROL_TMA","$targetUser")))
+newInstall.addTask(Task(name="instantiateNewService",func=TMA.Service,resultDest="newService"))
+newInstall.addTask(Task(name="setNewServiceClient",func="$newService.info_Client = 'Sysco'"))
+newInstall.addTask(Task(name="setNewServiceCarrier",func="$newService.info_Carrier = $carrier"))
+newInstall.addTask(Task(name="setNewServiceUserName",func="$newService.info_UserName = f\"{$targetUser.info_FirstName} {$targetUser.info_LastName}\""))
+newInstall.addTask(Task(name="setNewServiceServiceNumber",func="$newService.info_ServiceNumber = $serviceNum.strip()"))
+newInstall.addTask(Task(name="setNewServiceServiceType",func="$newService.info_ServiceType = %equipment[$device]['serviceType']"))
+newInstall.addTask(Task(name="setNewServiceInstalledDate",func="$newService.info_InstalledDate = $installDate"))
+newInstall.addTask(Task(name="formatExpDateObj1",func="$expDateObj = datetime.strptime($installDate,'%m/%d/%Y'"))
+newInstall.addTask(Task(name="formatExpDateObj2",func="$expDateObj = $expDateObj.replace(year=$expDateObj.year + 2)"))
+newInstall.addTask(Task(name="setNewServiceContractEndDate",func="%newService.info_ContractEndDate = $expDateObj.strftime('%m/%d/%Y')"))
+newInstall.addTask(Task(name="setNewServiceUpgradeEligibilityDate",func="%newService.info_UpgradeEligibilityDate = $expDateObj.strftime('%m/%d/%Y')"))
 
-c.addRecipe(newInstall,{"netID" : "'asup5134'","serviceNum" : "'510-251-2511'","installDate" : "'beans'","device" : "'iPhone13'","imei" : "'35135123613461'","carrier" : "'Verizon Wireless'"})
+
+c.addRecipe(newInstall,{"netID" : "asup5134","serviceNum" : "510-251-2511","installDate" : "5/17/2023","device" : "iPhone11_64GB","imei" : "35135123613461","carrier" : "Verizon Wireless"})
 print(c)
 c.run()
 
 # Valid devices are currently - iPhone 12, Samsung S21, Jetpack 8800L
 def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=None,existingTMADriver=None):
-    targetUser = TMA.People(locationData=t.currentLocation)
-    targetUser.info_Client = "Sysco"
-    t.People_ReadBasicInfo(targetUser)
 
-    # First, we need to build the service as a TMA.Service struct before we actually build it in TMA.
-    newService = TMA.Service()
-    newService.info_Client = "Sysco"
-    newService.info_Carrier = carrier
-    newService.info_UserName = f"{targetUser.info_FirstName} {targetUser.info_LastName}"
-    newService.info_ServiceNumber = serviceNum.strip()
-    newService.info_ServiceType = b.equipment[device]["serviceType"]
 
     newService.info_InstalledDate = installDate
     expDateObj = datetime.strptime(installDate,"%m/%d/%Y")

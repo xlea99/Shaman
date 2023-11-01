@@ -47,6 +47,10 @@ with open(f"{paths.data}/clients.toml", "rb") as f:
 with open(f"{paths.data}/equipment.toml","rb") as f:
     equipment = tomli.load(f)
 
+globalData = {"config": config,
+              "clients": clients,
+              "equipment": equipment}
+
 # endregion === Config and Pathing Setup ===
 
 # region === Log File Setup ===
@@ -151,3 +155,4 @@ def fuzzyStringToNumber(string : str):
 
 
 #endregion === Misc Functions ===
+
