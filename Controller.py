@@ -46,7 +46,7 @@ class Task:
         for arg in args:
             if(type(arg) is str):
                 foundContextVariables = b.findDelimiterVariables(arg,"$")
-                foundGlobalVariables = b.findDelimiterVariables(arg,"%")
+                foundGlobalVariables = b.findDelimiterVariables(arg,"&")
                 finalArg = arg
                 for var in foundContextVariables:
                     replacement = f"context['{var[1:]}']"
@@ -63,7 +63,7 @@ class Task:
         for key,value in kwargs.items():
             if(type(value) is str):
                 foundContextVariables = b.findDelimiterVariables(value,"$")
-                foundGlobalVariables = b.findDelimiterVariables(value,"%")
+                foundGlobalVariables = b.findDelimiterVariables(value,"&")
                 finalKwarg = value
                 for var in foundContextVariables:
                     replacement = f"context['{var[1:]}']"
@@ -282,6 +282,15 @@ newInstall.addTask(Task(name="formatExpDateObj1",func="$expDateObj = datetime.st
 newInstall.addTask(Task(name="formatExpDateObj2",func="$expDateObj = $expDateObj.replace(year=$expDateObj.year + 2)"))
 newInstall.addTask(Task(name="setNewServiceContractEndDate",func="$newService.info_ContractEndDate = $expDateObj.strftime('%m/%d/%Y')"))
 newInstall.addTask(Task(name="setNewServiceUpgradeEligibilityDate",func="$newService.info_UpgradeEligibilityDate = $expDateObj.strftime('%m/%d/%Y')"))
+#TODO Support for multiple clients other than Sysco
+newInstall.addTask(Task(name="buildNewEquipment",func=TMA.Equipment,
+                        kwargs={"linkedService" : "$newService",
+                                "mainType" : "&equipment[$device]['mainType']",
+                                "subType" :  "&equipment[$device]['subType']",
+                                "make" : "&equipment[$device]['make']",
+                                "model" : "&equipment[$device]['model']"},resultDest="thisEquipment"))
+newInstall.addTask(Task(name="setNewServiceEquipment",func="$newService.info_LinkedEquipment = $thisEquipment"))
+newInstall.addTask(Task(name="setNewServiceEquipmentIMEI",func="$newService.info_LinkedEquipment.info_IMEI = $imei"))
 
 
 c.addRecipe(newInstall,{"netID" : "asup5134","serviceNum" : "510-251-2511","installDate" : "5/17/2023","device" : "iPhone11_64GB","imei" : "35135123613461","carrier" : "Verizon Wireless"})
@@ -290,22 +299,6 @@ c.run()
 
 # Valid devices are currently - iPhone 12, Samsung S21, Jetpack 8800L
 def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=None,existingTMADriver=None):
-
-
-    newService.info_InstalledDate = installDate
-    expDateObj = datetime.strptime(installDate,"%m/%d/%Y")
-    expDateObj = expDateObj.replace(year=expDateObj.year + 2)
-    newService.info_ContractEndDate = expDateObj.strftime("%m/%d/%Y")
-    newService.info_UpgradeEligibilityDate = expDateObj.strftime("%m/%d/%Y")
-
-    # TODO support for multiple clients other than sysco
-    thisEquipment = TMA.Equipment(linkedService=newService,
-                                  mainType=b.equipment[device]["mainType"],
-                                  subType=b.equipment[device]["subType"],
-                                  make=b.equipment[device]["make"],
-                                  model=b.equipment[device]["model"])
-    newService.info_LinkedEquipment = thisEquipment
-    newService.info_LinkedEquipment.info_IMEI = imei
 
     if(newService.info_ServiceType == "iPhone" or newService.info_ServiceType == "Android"):
         costType = "Smartphone"
