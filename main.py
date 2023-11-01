@@ -4,7 +4,7 @@ from selenium.webdriver.common.by import By
 import Browser
 import TMA
 import Cimpl
-import Helpers as h
+import Controller as h
 
 br = Browser.Browser()
 
@@ -41,13 +41,12 @@ rogers = "Rogers"
 
 h.syscoNewInstall(existingTMADriver = t,
                   browser   = br,
-                  netID     = "pfab1853",
-                  serviceNum= "772-529-8946",
-                  installDate="10/18/2023",
-                  device    = ipad,
+                  netID     = "kjoh3810",
+                  serviceNum= "346-689-5331",
+                  installDate="10/20/2023",
+                  device    = iphone13,
                   carrier   = verizon,
-                  imei      = "355427903052807")
-
+                  imei      = "351415631968679")
 
 
 

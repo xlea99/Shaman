@@ -129,4 +129,25 @@ def convertServiceIDFormat(serviceID, targetFormat):
     else:
         raise ValueError("Invalid target format. Use 'dashed', 'dotted', or 'raw'.")
 
+# This function accepts a string that contains some sort of number, and tries to convert it into
+# the actual number it represents.
+def fuzzyStringToNumber(string : str):
+    string = string.strip()
+
+    if(string == ""):
+        return 0
+    elif(string.startswith("%") or string.endswith("%")):
+        string = string.strip("%")
+        return float(string) / 100
+    elif(string.startswith("$") or string.endswith("$")):
+        return float(re.sub(r'[^\d.]', '', string))
+    elif("x10^" in string):
+        base, exponent = string.split('×10^')
+        return float(base) * (10 ** int(exponent))
+    elif re.match(r'^\d+(\.\d+)?$', string):
+        return float(string)
+    else:
+        raise ValueError(f"Unable to convert '{string}' to number")
+
+
 #endregion === Misc Functions ===

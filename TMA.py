@@ -595,6 +595,7 @@ class TMADriver():
     def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData : TMALocation = None, timeout=20):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
+        entryID = entryID.strip("'")
         # First, if the function wasn't already provided with built locationData, we need to build it
         # off of the variables that WERE provided for future use.
         if(locationData is None):
