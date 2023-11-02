@@ -4,7 +4,6 @@ import TMA
 import Cimpl
 import Verizon
 import time
-import re
 from datetime import datetime
 
 #TODO FIX THE STUPID ORBIC
@@ -22,8 +21,9 @@ else:
 class Task:
 
     # Simple init methods to store the aspects of this Task. Higher priority means more important.
-    # Contexts are indirectly referenced using a string contextID.
-    def __init__(self,name, func, args = None, kwargs : dict = None, contextID : str = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None):
+    # Contexts are indirectly referenced using a string contextID. If conditionCheck is set, it evaluates the
+    # given condition based on the context - if True, the task executes. Otherwise, it doesn't.
+    def __init__(self,name, func, args = None, kwargs : dict = None, contextID : str = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None,conditionCheck = None):
         self.name = name
 
         # Determine function type
@@ -91,6 +91,7 @@ class Task:
         self.recoveryTask = recoveryTask
         self.priority = priority
         self.resultDest = resultDest
+        self.conditionCheck = conditionCheck
 
         self.status = "Pending"
         self.result = None
@@ -99,6 +100,10 @@ class Task:
     # Method for actually executing the task, and setting the result and error codes.
     def execute(self,context,controller = None, tmaDriver : TMA.TMADriver = None,cimplDriver : Cimpl.CimplDriver = None,verizonDriver : Verizon.VerizonDriver = None):
         self.status = "InProgress"
+        if(self.conditionCheck is not None):
+            if(context[self.conditionCheck]):
+                self.status = "Skipped"
+                return self.status
         try:
             allDrivers = {"CONTROL_CONTROLLER" : controller,"CONTROL_TMA": tmaDriver, "CONTROL_CIMPL": cimplDriver,"CONTROL_VERIZON": verizonDriver}
             namespace = {"RESULT": None, "datetime" : datetime, "TMA" : TMA, "time" : time}
@@ -140,8 +145,8 @@ class Task:
 class Controller:
 
     # Simple init method to link all necessary parts of the controller
-    def __init__(self,browser : Browser.Browser = None, TMADriver : TMA.TMADriver = None, CimplDriver : Cimpl.CimplDriver = None, VerizonDriver : Verizon.VerizonDriver = None):
-        self.browser = browser
+    def __init__(self,_browser : Browser.Browser = None, TMADriver : TMA.TMADriver = None, CimplDriver : Cimpl.CimplDriver = None, VerizonDriver : Verizon.VerizonDriver = None):
+        self.browser = _browser
         self.tma = TMADriver
         self.cimpl = CimplDriver
         self.verizon = VerizonDriver
@@ -211,12 +216,14 @@ class Controller:
             else:
                 if(currentTask.retries > 0):
                     currentTask.retries -= 1
-                    self.status = "Pending"
+                    currentTask.status = "Pending"
                     self.queue.insert(0,currentTask)
                     return ("Retrying",currentTask.error)
                 elif(currentTask.recoveryTask is not None):
                     self.queue.insert(0,currentTask.recoveryTask)
                     return ("Recovery",currentTask.error)
+                elif(currentTask.status == "Skipped"):
+                    return ("Skipped",None)
                 else:
                     return ("Failed",currentTask.error)
 
@@ -247,12 +254,9 @@ class Controller:
 
     # These methods copy a key from/to the given contextID.
     def copyFromContext(self,contextID : str,key):
-        print(f"Well hey there partner! Looks like ur tryin to copy 'self.contexts[{contextID}]', which'd be '{self.contexts.get(contextID)}'")
         # TODO proper error reporting/recoverability
         targetContext = self.contexts.get(contextID)
-        print(f"Fine and dandy! Found the targetContext: {targetContext}")
         if(targetContext is not None):
-            print(f"Its that time! Here's the return value from key ({key}): '{targetContext.get(key)}'")
             return targetContext.get(key)
         else:
             return None
@@ -282,7 +286,7 @@ class Recipe:
         task.priority = self.basePriority + task.priority
         self.tasks.append(task)
 
-
+#region === Controller Initialization
 browser = Browser.Browser()
 cimpl = Cimpl.CimplDriver(browser)
 tma = TMA.TMADriver(browser)
@@ -294,26 +298,24 @@ cimpl.logInToCimpl()
 cimpl.navToWorkorderCenter()
 verizon.logInToVerizon()
 
-c = Controller(browser=browser,TMADriver=tma,CimplDriver=cimpl,VerizonDriver=verizon)
+c = Controller(_browser=browser,TMADriver=tma,CimplDriver=cimpl,VerizonDriver=verizon)
+#endregion === Controller Initialization
 
-
-#region === Recipe - Gather ServiceToBuild Args === # TODO only currently supports Verizon :(
-gatherServiceToBuildArgs = Recipe(name="gatherServiceToBuildArgs",contextID="gatherServiceToBuildArgs",requiredKwargs=["inputContext","outputContext"],deleteContextAfterExecution=True)
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'cimplWO'"},resultDest="cimplWO"))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs3",func=Cimpl.getUserID,kwargs={"actionsList" : "$cimplWO['Actions']"},resultDest="userID"))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs4",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_netID'","newValue" : "$userID"}))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs5",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_serviceNum'","newValue" : "$verizonOrderInfo['WirelessNumber']"}))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs6",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_installDate'","newValue" : "$verizonOrderInfo['OrderDate']"}))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs7",func=Cimpl.getDeviceModelID,kwargs={"hardwareInfo" : "$cimplWO['HardwareInfo']"},resultDest="deviceModelID"))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs8",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_device'","newValue" : "$deviceModelID"}))
-gatherServiceToBuildArgs.addTask(Task(name="serviceToBuildGatherArgs9",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_imei'","newValue" : "$verizonOrderInfo['IMEI']"}))
+#region === Recipe - Gather New Install Service Args === # TODO only currently supports Verizon :(
+gatherNewInstallServiceArgs = Recipe(name="gatherNewInstallServiceArgs",contextID="gatherServiceToBuildArgs",requiredKwargs=["inputContext","outputContext"],deleteContextAfterExecution=True)
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'cimplWO'"},resultDest="cimplWO"))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs3",func=Cimpl.getUserID,kwargs={"actionsList" : "$cimplWO['Actions']"},resultDest="userID"))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs4",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_netID'","newValue" : "$userID"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs5",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_serviceNum'","newValue" : "$verizonOrderInfo['WirelessNumber']"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs6",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_installDate'","newValue" : "$verizonOrderInfo['OrderDate']"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs7",func=Cimpl.getDeviceModelID,kwargs={"hardwareInfo" : "$cimplWO['HardwareInfo']"},resultDest="deviceModelID"))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs8",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_device'","newValue" : "$deviceModelID"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs9",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_imei'","newValue" : "$verizonOrderInfo['IMEI']"}))
 #TODO VERIZON SUPPORT ONLY :( :( :(
-gatherServiceToBuildArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_carrier'","newValue" : "'Verizon Wireless'"}))
+gatherNewInstallServiceArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_carrier'","newValue" : "'Verizon Wireless'"}))
 #endregion === Recipe - Gather ServiceToBuild Args ===
-#c.addRecipe(gatherServiceToBuildArgs,{"inputContext" : "Default", "OutputContext" : "Default"})
-
-
+#c.addRecipe(gatherNewInstallServiceArgs,{"inputContext" : "Default", "OutputContext" : "Default"})
 #region === Recipe - New Install ===
 newInstall = Recipe(name="newInstall",contextID="newInstall",requiredKwargs=["inputContext"],deleteContextAfterExecution=False)
 newInstall.addTask(Task(name="gatherArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_netID'"},resultDest="netID"))
@@ -385,36 +387,6 @@ newInstall.addTask(Task(name="verifyFinishedServiceBuild2",func=TMA.TMADriver.Se
 newInstall.addTask(Task(name="finalServiceInsertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("$CONTROL_TMA")))
 #endregion === Recipe - New Install ===
 #c.addRecipe(newInstall,{"inputContext" : "Default"})
-
-#region === Recipe - Open/Read Workorder ===
-openReadWorkorder = Recipe(name="openWorkorder",contextID="openReadWorkorder",requiredKwargs=["cimplWONumber"],deleteContextAfterExecution=True)
-openReadWorkorder.addTask(Task(name="navToWOCenter",func=Cimpl.CimplDriver.navToWorkorderCenter,args="$CONTROL_CIMPL"))
-openReadWorkorder.addTask(Task(name="clearFilters",func=Cimpl.CimplDriver.Filters_Clear,args="$CONTROL_CIMPL"))
-openReadWorkorder.addTask(Task(name="addWONumFilter",func=Cimpl.CimplDriver.Filters_AddWorkorderNumber,args="$CONTROL_CIMPL",kwargs={"status" : "'Contains'","workorderNumber" : "$cimplWONumber"}))
-openReadWorkorder.addTask(Task(name="applyFilters",func=Cimpl.CimplDriver.Filters_Apply,args="$CONTROL_CIMPL"))
-openReadWorkorder.addTask(Task(name="openWorkorder",func=Cimpl.CimplDriver.openWorkorder,args="$CONTROL_CIMPL",kwargs={"workorderNumber" : "$cimplWONumber"}))
-openReadWorkorder.addTask(Task(name="readFullWorkorder",func=Cimpl.CimplDriver.Workorders_ReadFullWorkorder,args="$CONTROL_CIMPL",contextID="Default",resultDest="cimplWO"))
-#endregion === Recipe - Open Workorder ===
-#c.addRecipe(openReadWorkorder,{"cimplWONumber" : "43221"})
-
-#region === Recipe - Get OrderNumber from Workorder ===
-getOrderNumberFromWorkorder = Recipe(name="getOrderNumberFromWorkorder",contextID="getOrderNumberFromWorkorder",requiredKwargs=["cimplWO_InputContext","outputContext"],deleteContextAfterExecution=True)
-getOrderNumberFromWorkorder.addTask(Task(name="getCimplWO",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$cimplWO_InputContext", "key" : "'cimplWO'"},resultDest="cimplWO"))
-getOrderNumberFromWorkorder.addTask(Task(name="findOrderNumber",func=Cimpl.findPlacedOrderNumber,kwargs={"noteList" : "$cimplWO['Notes']"},resultDest="foundOrderNumber"))
-getOrderNumberFromWorkorder.addTask(Task(name="returnToContext",func=Controller.copyToContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$outputContext","key" : "'verizonOrderNumber'", "newValue" : "$foundOrderNumber"}))
-#endregion === Recipe - Get OrderNumber from Workorder ===
-#c.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
-
-#region === Recipe - Read Verizon Order Info ===
-readVerizonOrderNumber = Recipe(name="readVerizonOrderNumber",contextID="readVerizonOrderNumber",requiredKwargs=["orderNumber_inputContext"],deleteContextAfterExecution=True)
-readVerizonOrderNumber.addTask(Task(name="getVerizonOrderNumber",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$orderNumber_inputContext","key" : "'verizonOrderNumber'"},resultDest="verizonOrderNumber"))
-readVerizonOrderNumber.addTask(Task(name="navToVerizonHome",func=Verizon.VerizonDriver.navToHomescreen,args="$CONTROL_VERIZON"))
-readVerizonOrderNumber.addTask(Task(name="navToVOrderViewer",func=Verizon.VerizonDriver.navToOrderViewer,args="$CONTROL_VERIZON"))
-readVerizonOrderNumber.addTask(Task(name="searchOrder",func=Verizon.VerizonDriver.OrderViewer_SearchOrder,args="$CONTROL_VERIZON",kwargs={"orderNumber" : "$verizonOrderNumber"}))
-readVerizonOrderNumber.addTask(Task(name="readFullDisplayedOrder",func=Verizon.VerizonDriver.OrderViewer_ReadDisplayedOrder,args="$CONTROL_VERIZON",contextID="Default",resultDest="verizonOrderInfo"))
-#endregion === Recipe - Read Verizon Order Info ===
-#c.addRecipe(readVerizonOrderNumber,{"orderNumber_inputContext" : "Default"})
-
 #region === Recipe - Fill Cimpl New Install ===
 # TODO testing to ensure we're already on Cimpl WO, OR automatic navigation, OR both :)
 # TODO Conditionally check that order is actually completed, not still pending (no service number)
@@ -428,62 +400,100 @@ fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.W
 fillCimplNewInstall.addTask(Task(name="addTrackingNote",func=Cimpl.CimplDriver.Workorders_WriteNote,args="$CONTROL_CIMPL",kwargs={"subject" : "'Tracking'","noteType" : "'Information Only'","status" : "'Completed'","content" : "$verizonOrderInfo['Courier'] + ' : ' + $verizonOrderInfo['TrackingNumber']"}))
 fillCimplNewInstall.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Workorders_SetStatus,args="$CONTROL_CIMPL",kwargs={"status" : "'Complete'"}))
 #endregion === Recipe - Fill Cimpl New Install ===
-#c.addRecipe(fillCimplNewInstall)
+#c.addRecipe(fillCimplNewInstall,{"inputContext" : "Default"})
 
-woNumber = "43221"
-c.addRecipe(openReadWorkorder,{"cimplWONumber" : woNumber})
-c.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
-c.addRecipe(readVerizonOrderNumber,{"orderNumber_inputContext" : "Default"})
-c.addRecipe(gatherServiceToBuildArgs,{"inputContext" : "Default", "outputContext" : "Default"})
-c.addRecipe(newInstall,{"inputContext" : "Default"})
-c.addRecipe(fillCimplNewInstall,{"inputContext" : "Default"})
+#region === Recipe - Gather Upgrade Service Args === # TODO only currently supports Verizon :(
+gatherUpgradeServiceArgs = Recipe(name="gatherUpgradeServiceArgs",contextID="gatherServiceToBuildArgs",requiredKwargs=["inputContext","outputContext"],deleteContextAfterExecution=True)
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'cimplWO'"},resultDest="cimplWO"))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs5",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_serviceNum'","newValue" : "$cimplWO['ServiceID']"}))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs6",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_installDate'","newValue" : "$verizonOrderInfo['OrderDate']"}))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs7",func=Cimpl.getDeviceModelID,kwargs={"hardwareInfo" : "$cimplWO['HardwareInfo']"},resultDest="deviceModelID"))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs8",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_device'","newValue" : "$deviceModelID"}))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs9",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_imei'","newValue" : "$verizonOrderInfo['IMEI']"}))
+#TODO VERIZON SUPPORT ONLY :( :( :(
+gatherUpgradeServiceArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_carrier'","newValue" : "'Verizon Wireless'"}))
+#endregion === Recipe - Gather ServiceToBuild Args ===
+#c.addRecipe(gatherUpgradeServiceArgs,{"inputContext" : "Default", "OutputContext" : "Default"})
+#region === Recipe - Upgrade ===
+upgrade = Recipe(name="upgrade",contextID="upgrade",requiredKwargs=["inputContext"],deleteContextAfterExecution=False)
+upgrade.addTask(Task(name="gatherArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_device'"},resultDest="device"))
+upgrade.addTask(Task(name="gatherArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_serviceNum'"},resultDest="serviceNum"))
+upgrade.addTask(Task(name="gatherArgs3",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_installDate'"},resultDest="installDate"))
+upgrade.addTask(Task(name="gatherArgs4",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_imei'"},resultDest="IMEI"))
+upgrade.addTask(Task(name="navToService",func=TMA.TMADriver.navToLocation,args=("$CONTROL_TMA"),kwargs={"client":"'Sysco'","entryType":"'Service'","entryID":"$serviceNum"}))
+upgrade.addTask(Task(name="formatExpDateObj1",func="$expDateObj = datetime.strptime($installDate,'%m/%d/%Y')"))
+upgrade.addTask(Task(name="formatExpDateObj2",func="$expDateObj = $expDateObj.replace(year=$expDateObj.year + 2)"))
+upgrade.addTask(Task(name="writeUpgradeEligibilityDate",func=TMA.TMADriver.Service_WriteUpgradeEligibilityDate,args=("$CONTROL_TMA"),kwargs={"rawValue":"$expDateObj.strftime('%m/%d/%Y')"}))
+upgrade.addTask(Task(name="writeContractEndDate",func=TMA.TMADriver.Service_WriteContractEndDate,args=("$CONTROL_TMA"),kwargs={"rawValue":"$expDateObj.strftime('%m/%d/%Y')"}))
+upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("$CONTROL_TMA")))
+upgrade.addTask(Task(name="getCurrentServiceType",func=TMA.TMADriver.Service_ReadMainInfo,args=("$CONTROL_TMA"),resultDest="currentServiceMainInfo"))
+upgrade.addTask(Task(name="getNewServiceType",func="$newServiceType = &equipment[$device]['serviceType']"))
+upgrade.addTask(Task(name="compareServiceTypes",func="$testForNewServiceType = $newServiceType != $currentServiceMainInfo.info_ServiceType"))
+upgrade.addTask(Task(name="setNewServiceTypeIfNeeded",func=TMA.TMADriver.Service_WriteServiceType,args=("$CONTROL_TMA"),kwargs={"rawValue" : "$newServiceType"},conditionCheck="testForNewServiceType"))
+upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("$CONTROL_TMA"),conditionCheck="testForNewServiceType"))
+upgrade.addTask(Task(name="navToEquipmentFromService",func=TMA.TMADriver.Service_NavToEquipmentFromService,args=("$CONTROL_TMA")))
+upgrade.addTask(Task(name="buildEquipmentObject",func=TMA.Equipment,kwargs={"mainType" : "&equipment[$device]['mainType']","subType" : "&equipment[$device]['subType']","make" : "&equipment[$device]['make']","model" : "&equipment[$device]['model']"},resultDest="thisEquipment"))
+upgrade.addTask(Task(name="setEquipmentIMEI",func="$thisEquipment.info_IMEI = $IMEI"))
+upgrade.addTask(Task(name="writeFullEquipment",func=TMA.TMADriver.Equipment_WriteAll,args=("$CONTROL_TMA"),kwargs={"equipmentObject" : "$thisEquipment"}))
+upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Equipment_InsertUpdate,args=("$CONTROL_TMA")))
+#endregion === Recipe - Upgrade ===
+#c.addRecipe(upgrade,{"inputContext" : "Default"})
+#region === Recipe - Fill Cimpl Upgrade ===
+# TODO testing to ensure we're already on Cimpl WO, OR automatic navigation, OR both :)
+# TODO Conditionally check that order is actually completed, not still pending (no service number)
+fillCimplUpgrade = Recipe(name="fillCimplUpgrade",contextID="fillCimplUpgrade",requiredKwargs=["inputContext"],deleteContextAfterExecution=True)
+fillCimplUpgrade.addTask(Task(name="getVerizonOrderInfo",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
+fillCimplUpgrade.addTask(Task(name="navToSummaryTab",func=Cimpl.CimplDriver.Workorders_NavToSummaryTab,args="$CONTROL_CIMPL"))
+fillCimplUpgrade.addTask(Task(name="addTrackingNote",func=Cimpl.CimplDriver.Workorders_WriteNote,args="$CONTROL_CIMPL",kwargs={"subject" : "'Tracking'","noteType" : "'Information Only'","status" : "'Completed'","content" : "$verizonOrderInfo['Courier'] + ' : ' + $verizonOrderInfo['TrackingNumber']"}))
+fillCimplUpgrade.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Workorders_SetStatus,args="$CONTROL_CIMPL",kwargs={"status" : "'Complete'"}))
+#endregion === Recipe - Fill Cimpl Upgrade ===
+#c.addRecipe(fillCimplUpgrade,{"inputContext" : "Default"})
 
-print(c)
-c.run()
+#region === Recipe - Open/Read Workorder ===
+openReadWorkorder = Recipe(name="openWorkorder",contextID="openReadWorkorder",requiredKwargs=["cimplWONumber"],deleteContextAfterExecution=True)
+openReadWorkorder.addTask(Task(name="navToWOCenter",func=Cimpl.CimplDriver.navToWorkorderCenter,args="$CONTROL_CIMPL"))
+openReadWorkorder.addTask(Task(name="clearFilters",func=Cimpl.CimplDriver.Filters_Clear,args="$CONTROL_CIMPL"))
+openReadWorkorder.addTask(Task(name="addWONumFilter",func=Cimpl.CimplDriver.Filters_AddWorkorderNumber,args="$CONTROL_CIMPL",kwargs={"status" : "'Contains'","workorderNumber" : "$cimplWONumber"}))
+openReadWorkorder.addTask(Task(name="applyFilters",func=Cimpl.CimplDriver.Filters_Apply,args="$CONTROL_CIMPL"))
+openReadWorkorder.addTask(Task(name="openWorkorder",func=Cimpl.CimplDriver.openWorkorder,args="$CONTROL_CIMPL",kwargs={"workorderNumber" : "$cimplWONumber"}))
+openReadWorkorder.addTask(Task(name="readFullWorkorder",func=Cimpl.CimplDriver.Workorders_ReadFullWorkorder,args="$CONTROL_CIMPL",contextID="Default",resultDest="cimplWO"))
+#endregion === Recipe - Open Workorder ===
+#c.addRecipe(openReadWorkorder,{"cimplWONumber" : "43221"})
+#region === Recipe - Read Verizon Order Info ===
+readVerizonOrderNumber = Recipe(name="readVerizonOrderNumber",contextID="readVerizonOrderNumber",requiredKwargs=["orderNumber_inputContext"],deleteContextAfterExecution=True)
+readVerizonOrderNumber.addTask(Task(name="getVerizonOrderNumber",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$orderNumber_inputContext","key" : "'verizonOrderNumber'"},resultDest="verizonOrderNumber"))
+readVerizonOrderNumber.addTask(Task(name="navToVerizonHome",func=Verizon.VerizonDriver.navToHomescreen,args="$CONTROL_VERIZON"))
+readVerizonOrderNumber.addTask(Task(name="navToVOrderViewer",func=Verizon.VerizonDriver.navToOrderViewer,args="$CONTROL_VERIZON"))
+readVerizonOrderNumber.addTask(Task(name="searchOrder",func=Verizon.VerizonDriver.OrderViewer_SearchOrder,args="$CONTROL_VERIZON",kwargs={"orderNumber" : "$verizonOrderNumber"}))
+readVerizonOrderNumber.addTask(Task(name="readFullDisplayedOrder",func=Verizon.VerizonDriver.OrderViewer_ReadDisplayedOrder,args="$CONTROL_VERIZON",contextID="Default",resultDest="verizonOrderInfo"))
+#endregion === Recipe - Read Verizon Order Info ===
+#c.addRecipe(readVerizonOrderNumber,{"orderNumber_inputContext" : "Default"})
+
+#region === Recipe - Get OrderNumber from Workorder ===
+getOrderNumberFromWorkorder = Recipe(name="getOrderNumberFromWorkorder",contextID="getOrderNumberFromWorkorder",requiredKwargs=["cimplWO_InputContext","outputContext"],deleteContextAfterExecution=True)
+getOrderNumberFromWorkorder.addTask(Task(name="getCimplWO",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$cimplWO_InputContext", "key" : "'cimplWO'"},resultDest="cimplWO"))
+getOrderNumberFromWorkorder.addTask(Task(name="findOrderNumber",func=Cimpl.findPlacedOrderNumber,kwargs={"noteList" : "$cimplWO['Notes']"},resultDest="foundOrderNumber"))
+getOrderNumberFromWorkorder.addTask(Task(name="returnToContext",func=Controller.copyToContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$outputContext","key" : "'verizonOrderNumber'", "newValue" : "$foundOrderNumber"}))
+#endregion === Recipe - Get OrderNumber from Workorder ===
+#c.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
 
 
-# TODO
-def syscoUpgrade(serviceNum,upgradeEligibilityDate,device,imei,browser=None,existingTMADriver=None):
-    if(device not in b.equipment.keys()):
-        print("Wrong device, idiot.")
-        return False
-    if(browser is None):
-        browser = Browser.Browser()
-    if(existingTMADriver is not None):
-        t = existingTMADriver
-    else:
-        t = TMA.TMADriver(browser)
-        t.logInToTMA()
+def completeNewInstall(_controller : Controller, woNumber):
+    _controller.addRecipe(openReadWorkorder,{"cimplWONumber" : woNumber})
+    _controller.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
+    _controller.addRecipe(readVerizonOrderNumber,{"orderNumber_inputContext" : "Default"})
+    _controller.addRecipe(gatherNewInstallServiceArgs,{"inputContext" : "Default", "outputContext" : "Default"})
+    _controller.addRecipe(newInstall,{"inputContext" : "Default"})
+    _controller.addRecipe(fillCimplNewInstall,{"inputContext" : "Default"})
+    _controller.run()
+def completeUpgrade(_controller : Controller, woNumber):
+    _controller.addRecipe(openReadWorkorder,{"cimplWONumber" : woNumber})
+    _controller.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
+    _controller.addRecipe(readVerizonOrderNumber,{"orderNumber_inputContext" : "Default"})
+    _controller.addRecipe(gatherUpgradeServiceArgs,{"inputContext" : "Default", "outputContext" : "Default"})
+    _controller.addRecipe(upgrade,{"inputContext" : "Default"})
+    _controller.addRecipe(fillCimplUpgrade,{"inputContext" : "Default"})
+    _controller.run()
 
-    # First, we navigate to the service that's been upgraded.
-    t.navToLocation(client="Sysco", entryType="Service", entryID=serviceNum.strip())
-
-
-    # First thing to update in the upgrade elib and expiration dates.
-    t.Service_WriteUpgradeEligibilityDate(rawValue=upgradeEligibilityDate)
-    t.Service_WriteContractEndDate(rawValue=upgradeEligibilityDate)
-    t.Service_InsertUpdate()
-
-    # Now we check to make sure that the Service Type hasn't changed.
-    newServiceType = b.equipment[device]["ServiceType"]
-    if(newServiceType != t.Service_ReadMainInfo().info_ServiceType):
-        t.Service_WriteServiceType(rawValue=newServiceType)
-        t.Service_InsertUpdate()
-
-    # Now, we navigate to the equipment and update the IMEI and device info.
-    t.Service_NavToEquipmentFromService()
-
-    thisEquipment = TMA.Equipment(mainType=b.equipment[device]["mainType"],
-                                  subType=b.equipment[device]["subType"],
-                                  make=b.equipment[device]["make"],
-                                  model=b.equipment[device]["model"])
-    deviceToBuild = thisEquipment
-    deviceToBuild.info_IMEI = imei
-    t.Equipment_WriteAll(equipmentObject=deviceToBuild)
-    t.Equipment_InsertUpdate()
-
-    print(f"Finished upgrading service {serviceNum}")
-
-
-
-
+completeUpgrade(c,"43223")
