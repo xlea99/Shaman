@@ -1,5 +1,14 @@
 title = "Equipment Information Data"
 
+[CimplMappings]
+"iPhone 13 128GB" = "iPhone13_128GB"
+"Bell iPhone 11 64GB" = "iPhone11_64GB"
+"Rogers iPhone 11 64GB" = "iPhone11_64GB"
+
+"Samsung Galaxy S21 FE 5G 128GB" = "GalaxyS21_128GB"
+"BELL - Samsung Galaxy A53" = "GalaxyA54_128GB"
+
+
 # iPhones
 [iPhoneSE_64GB]
 serviceType = "iPhone"
@@ -97,3 +106,5 @@ mainType = "Wireless"
 subType = "Tablet"
 make = "Apple"
 model = "IPAD PRO 11 128GB"
+
+

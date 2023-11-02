@@ -4,7 +4,9 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 import time
+from datetime import datetime
 import os
+import re
 
 class CimplDriver:
 
@@ -78,23 +80,26 @@ class CimplDriver:
         self.browser.get("https://apps.cimpl.com/Cimpl/Authentication#/logon")
 
         self.browser.implicitly_wait(10)
-        usernameInputString = "//log-on-page/div/div/div/div/div/input[@automation-id='log-on-page__userName__input']"
-        passwordInputString = "//log-on-page/div/div/div/div/div/input[@automation-id='log-on-page__password__input']"
-        usernameInput = self.browser.find_element(by=By.XPATH,value=usernameInputString)
-        passwordInput = self.browser.find_element(by=By.XPATH,value=passwordInputString)
+        self.waitForLoadingScreen()
+
+        usernameInput = self.browser.find_element(by=By.XPATH, value="//input[@id='username']")
         usernameInput.send_keys(b.config["authentication"]["cimplUser"])
+
+        continueButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+        continueButton.click()
+        self.waitForLoadingScreen()
+
+        selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
+        selectionDropdown.send_keys("Sysco")
+        syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
+        syscoSelection.click()
+        self.waitForLoadingScreen()
+
+        passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
         passwordInput.send_keys(b.config["authentication"]["cimplPass"])
 
-        signInButton = self.browser.find_element(by=By.XPATH,value="//log-on-page/div/div/div/div/cimpl-button/button[@automation-id='log-on-page__signIn__button']")
+        signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
         signInButton.click()
-
-        selectionDropdownString = "//div[text()='Company Name']/following-sibling::div/cimpl-dropdown/div/div/span[contains(@class,'cimpl-dropdown')]/span/span/span[contains(@class,'k-i-arrow-s')]"
-        self.selectFromDropdown(by=By.XPATH,dropdownString=selectionDropdownString,selectionString="Sysco")
-
-        self.waitForLoadingScreen()
-        continueButtonString = "//cimpl-button/button/div/span[@class='button-label ng-binding uppercase'][text()='Continue']"
-        WebDriverWait(self.browser.driver,30).until(expected_conditions.element_to_be_clickable((By.XPATH, continueButtonString)))
-        self.browser.find_element(by=By.XPATH,value=continueButtonString).click()
         self.waitForLoadingScreen()
 
     #region === WOCenter ===
@@ -108,7 +113,7 @@ class CimplDriver:
         if(onWorkorderPage):
             return True
         else:
-            menuString = "//i[@class='material-icons'][text()='menu']/parent::div"
+            menuString = "//i[text()='menu']/parent::div"
             # First, we test to ensure that the menu is in the "super icon view" so that we can select
             # the inventory section.
             self.waitForLoadingScreen()
@@ -116,6 +121,7 @@ class CimplDriver:
             # In case the menu was already open when we got here, we click it again to close it.
             if(not self.browser.elementExists(by=By.XPATH,value=f"{menuString}[contains(@class,'cimpl-header__icon-transform')]")):
                 menuButton = self.browser.find_element(by=By.XPATH, value=menuString)
+                self.waitForLoadingScreen()
                 menuButton.click()
                 self.waitForLoadingScreen()
 
@@ -124,14 +130,13 @@ class CimplDriver:
             # inventory section.
             inventoryButtonString = "//div/nav/div/ul[@id='mainSideBar']/li[2]/span/i[contains(@class,'menu-list__menuIcon')]"
             inventoryButton = WebDriverWait(self.browser.driver, 5).until(
-                EC.element_to_be_clickable((By.XPATH, inventoryButtonString))
+                EC.element_to_be_clickable((By.XPATH, "//i[contains(text(),'store')]"))
             )
-            #inventoryButton = self.browser.find_element(by=By.XPATH,value=inventoryButtonString)
             inventoryButton.click()
             self.waitForLoadingScreen()
 
             # Now, the inventory selection submenu should be open, and we can select the workorder tab.
-            workorderCenterButtonString = "//div/ul/li/ul/li/span[contains(@class,'menu-list__spaceLeft')][text()='Workorder Center']"
+            workorderCenterButtonString = "//span[contains(@class,'menu-list__spaceLeft')][text()='Workorder Center']"
             workorderCenterButton = self.browser.find_element(by=By.XPATH,value=workorderCenterButtonString)
             workorderCenterButton.click()
             self.waitForLoadingScreen()
@@ -199,6 +204,7 @@ class CimplDriver:
         self.waitForLoadingScreen()
     def Filters_Clear(self):
         self.browser.switchToTab("Cimpl")
+        self.waitForLoadingScreen()
         # Clear all filters.
         clearAllButtonString = "//div/div/cimpl-button[@class='ng-isolate-scope']/button[@automation-id='__button']/div[@class='button-content']/span[@class='button-label ng-binding uppercase'][text()='Clear All']/parent::div/parent::button"
         clearAllButton = self.browser.find_element(by=By.XPATH,value=clearAllButtonString)
@@ -387,7 +393,7 @@ class CimplDriver:
         operationTypeElement = self.browser.find_element(by=By.XPATH,value=operationTypeString)
         return operationTypeElement.text
     def Workorders_ReadStatus(self):
-        statusString = "//ng-transclude/div/div/div[@ng-bind='vm.statusLabel']"
+        statusString = "//div[@ng-bind='vm.statusLabel']"
         statusElement = self.browser.find_element(by=By.XPATH, value=statusString)
         return statusElement.text
     def Workorders_ReadWONumber(self):
@@ -527,6 +533,36 @@ class CimplDriver:
             returnList.append(actionRow.text)
 
         return returnList
+    # Combined method for reading a full workorder into a neat dictionary. Assumes
+    # that we're currently open on a workorder.
+    def Workorders_ReadFullWorkorder(self):
+        returnDict = {}
+        # Read all header info
+        returnDict["WONumber"] = self.Workorders_ReadWONumber()
+        returnDict["Status"] = self.Workorders_ReadStatus()
+        returnDict["Carrier"] = self.Workorders_ReadCarrier()
+        returnDict["DueDate"] = self.Workorders_ReadDueDate()
+        returnDict["OperationType"] = self.Workorders_ReadOperationType()
+
+        # Read summary info
+        self.Workorders_NavToSummaryTab()
+        returnDict["Comment"] = self.Workorders_ReadComment()
+        returnDict["ReferenceNumber"] = self.Workorders_ReadReferenceNo()
+        returnDict["Subject"] = self.Workorders_ReadSubject()
+        returnDict["WorkorderOwner"] = self.Workorders_ReadWorkorderOwner()
+        returnDict["Requestor"] = self.Workorders_ReadRequester()
+        returnDict["Notes"] = self.Workorders_ReadNotes()
+
+        # Read detail info
+        self.Workorders_NavToDetailsTab()
+        returnDict["ServiceID"] = self.Workorders_ReadServiceID()
+        returnDict["Account"] = self.Workorders_ReadAccount()
+        returnDict["StartDate"] = self.Workorders_ReadStartDate()
+        returnDict["HardwareInfo"] = self.Workorders_ReadHardwareInfo()
+        returnDict["Actions"] = self.Workorders_ReadActions()
+
+        return returnDict
+
 
     # Front (Summary) page write methods
     def Workorders_WriteComment(self,comment):
@@ -589,7 +625,7 @@ class CimplDriver:
         serviceIDString = "//div[contains(@class,'control-label cimpl-form')][text()='Service ID']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
         serviceIDElement = self.browser.find_element(by=By.XPATH, value=serviceIDString)
         serviceIDElement.clear()
-        serviceIDElement.send_keys(str(serviceID))
+        serviceIDElement.send_keys(b.convertServiceIDFormat(str(serviceID),"raw"))
     def Workorders_WriteAccount(self,accountNum):
         self.browser.switchToTab("Cimpl")
 
@@ -752,3 +788,34 @@ class CimplDriver:
 
     #endregion === Interior Workorders ===
 
+
+# This helper method looks through a list of Notes to try and locate the Order Number. It prioritizes recent orders
+# over older ones.
+def findPlacedOrderNumber(noteList : list):
+    targetOrder = None
+    targetOrderDate = None
+    verizonOrderPattern = re.compile(r"MB\d+")
+    for note in noteList:
+        thisDate = datetime.strptime(note["CreatedDate"], '%m/%d/%Y %I:%M %p')
+
+        subject = note["Subject"].strip().lower()
+        if(subject == "order placed" or subject == "order number"):
+            match = verizonOrderPattern.search(note["Content"])
+            if match:
+                if(targetOrderDate is None or thisDate > targetOrderDate):
+                    targetOrderDate = thisDate
+                    targetOrder = match.group()
+    return targetOrder
+
+# This helper method simply extracts the assigned userID from the Actions of a Cimpl WO.
+def getUserID(actionsList : list):
+    for action in actionsList:
+        if(action.startswith("Assigned to Employee")):
+            return action.split("Assigned to Employee - ")[1].split(" - ")[0]
+
+# This helper method returns the string of the device that was actually ordered in a Cimpl WO, in my custom
+# format.
+def getDeviceModelID(hardwareInfo : list):
+    for hardware in hardwareInfo:
+        if(hardware["Type"] == "Equipment"):
+            return b.equipment["CimplMappings"][hardware["Name"]]

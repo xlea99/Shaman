@@ -103,18 +103,23 @@ class Browser:
     def elementExists(self,by,value,timeout=0.2):
         self.driver.implicitly_wait(1)
         foundElement = False
+        resultElement = None
         try:
             if type(value) is str:
-                WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
+                resultElement = WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
             else:
                 WebDriverWait(self.driver, timeout).until(EC.staleness_of(value))
+                resultElement = value
             b.log.debug(f"elementExists: Successfully found element '{value}' by '{by}'")
             foundElement = True
         #except (selenium.common.exceptions.TimeoutException, selenium.common.exceptions.InvalidSelectorException, selenium.common.exceptions.StaleElementReferenceException, selenium.common.exceptions.NoSuchWindowException, selenium.common.exceptions.NoSuchElementException):
         except(TimeoutError,selenium.common.exceptions.TimeoutException):
             b.log.debug(f"elementExists: Could not find element '{value}' by '{by}'")
         finally:
-            return foundElement
+            if(foundElement):
+                return resultElement
+            else:
+                return False
 
     # This method tests whether the given element value (according to the By
     # specification) exists AND is clickable.

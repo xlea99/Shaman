@@ -5,6 +5,7 @@ import Browser
 import TMA
 import Cimpl
 import Helpers as h
+#import Controller
 
 br = Browser.Browser()
 
@@ -15,7 +16,7 @@ t.logInToTMA()
 #c = Cimpl.CimplDriver(browserObject=br)
 #c.logInToCimpl()
 #c.navToWorkorderCenter()
-
+#c.Workorders_ReadFullWorkorder()
 
 #testyFilePath = f"{b.paths.emailTemplates}/S20NewInstall.html"
 #with open(testyFilePath, 'r', encoding='utf-8') as file:
@@ -25,11 +26,12 @@ t.logInToTMA()
 
 # New Install
 
-iphone11 = "iPhone 11"
-iphone12 = "iPhone 12"
-iphone13 = "iPhone 13"
-s21 = "Galaxy S21"
-mifi = "Jetpack 8800L"
+iphone11 = "iPhone11_64GB"
+iphone12 = "iPhone12_64GB"
+iphone13 = "iPhone13_128GB"
+s21 = "GalaxyS21_128GB"
+mifi = "Jetpack8800L"
+ipad = "iPad11_128GB"
 
 verizon = "Verizon Wireless"
 att = "AT&T Mobility"
@@ -37,15 +39,15 @@ tmobile = "T Mobile"
 bell = "Bell Mobility"
 rogers = "Rogers"
 
-h.syscoNewInstall(  existingTMADriver = t,
-                    browser   = br,
-                    netID     = "shay3727",
-                    serviceNum= "368-887-8992",
-                    installDate="10/5/2023",
-                    device    = "iPhone11_64GB",
-                    carrier   = rogers,
-                    imei      = "352563745466921")
 
+h.syscoNewInstall(existingTMADriver = t,
+                  browser   = br,
+                  netID     = "kjoh3810",
+                  serviceNum= "346-689-5331",
+                  installDate="10/20/2023",
+                  device    = iphone13,
+                  carrier   = verizon,
+                  imei      = "351415631968679")
 
 
 

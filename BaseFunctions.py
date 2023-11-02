@@ -3,6 +3,7 @@ from logging.handlers import RotatingFileHandler
 import tomli
 import os
 import sqlite3
+import re
 
 # region === Config and Pathing Setup ===
 
@@ -45,6 +46,10 @@ with open(f"{paths.data}/clients.toml", "rb") as f:
     clients = tomli.load(f)
 with open(f"{paths.data}/equipment.toml","rb") as f:
     equipment = tomli.load(f)
+
+globalData = {"config": config,
+              "clients": clients,
+              "equipment": equipment}
 
 # endregion === Config and Pathing Setup ===
 
@@ -104,3 +109,100 @@ class DBConn:
 
 
 #endregion === Database Setup ===
+
+
+
+#region === Misc Functions ===
+
+# This function accepts a phone number in ANY format (assuming it contains an actual phone number an
+# no extra numbers), and converts it to one of three forms:
+# -dashed (512-819-2010)
+# -dotted (512.819.2010)
+# -raw    (5128192010)
+def convertServiceIDFormat(serviceID, targetFormat):
+    # First, strip all non-numeric characters to get the raw format
+    rawNumber = re.sub(r'\D', '', serviceID)  # \D matches any non-digit
+
+    # Based on the desired target format, format the raw number accordingly
+    if targetFormat == 'dashed':
+        return f"{rawNumber[:3]}-{rawNumber[3:6]}-{rawNumber[6:]}"
+    elif targetFormat == 'dotted':
+        return f"{rawNumber[:3]}.{rawNumber[3:6]}.{rawNumber[6:]}"
+    elif targetFormat == 'raw':
+        return rawNumber
+    else:
+        raise ValueError("Invalid target format. Use 'dashed', 'dotted', or 'raw'.")
+
+# This function accepts a string that contains some sort of number, and tries to convert it into
+# the actual number it represents.
+def fuzzyStringToNumber(string : str):
+    string = string.strip()
+
+    if(string == ""):
+        return 0
+    elif(string.startswith("%") or string.endswith("%")):
+        string = string.strip("%")
+        return float(string) / 100
+    elif(string.startswith("$") or string.endswith("$")):
+        return float(re.sub(r'[^\d.]', '', string))
+    elif("x10^" in string):
+        base, exponent = string.split('×10^')
+        return float(base) * (10 ** int(exponent))
+    elif re.match(r'^\d+(\.\d+)?$', string):
+        return float(string)
+    else:
+        raise ValueError(f"Unable to convert '{string}' to number")
+
+
+
+# This method assumes that a given string s may contain delimiter variables. This method uses the
+# specified delimiter (by default $) to match all these variables. For example,
+# ```$flounderMan.getWalrus() + 2 * $hippo + "$duck``` would specifically match only $flounderMan and $hippo.
+# Also supports fstring type strings for delimiter variables.
+def findDelimiterVariables(s, delimiter='$'):
+    # Adjust the regex pattern to incorporate the delimiter
+    generalPattern = rf'{re.escape(delimiter)}[a-zA-Z][a-zA-Z0-9_]*'
+
+    # Extract potential matches along with their start positions
+    potentialMatches = [(match.start(), match.end(), match.group(0)) for match in re.finditer(generalPattern, s)]
+
+    validMatchPositions = []
+
+    # Significant characters
+    significantChars = ['"', "'", '{', '}']
+
+    for startIdx, endIdx, match in potentialMatches:
+
+        # Determine the firstSignificantPrefix
+        prefix = s[:startIdx][::-1]  # reverse the prefix for easy search
+        firstSignificantPrefix = None
+        for char in prefix:
+            if char in significantChars:
+                firstSignificantPrefix = char
+                break
+
+        # Determine the firstSignificantSuffix
+        suffix = s[endIdx:]
+        firstSignificantSuffix = None
+        for char in suffix:
+            if char in significantChars:
+                firstSignificantSuffix = char
+                break
+
+        # Determine the firstSignificantPair
+        if firstSignificantPrefix in ['"', "'"]:
+            if firstSignificantSuffix == firstSignificantPrefix:
+                # Find the corresponding pair for the first significant character
+                correspondingPairPos = suffix.index(firstSignificantSuffix) + endIdx
+                if correspondingPairPos > endIdx:
+                    validMatchPositions.append((match, (startIdx, endIdx)))
+            else:
+                validMatchPositions.append((match, (startIdx, endIdx)))
+        elif firstSignificantPrefix == '{' and firstSignificantSuffix == '}':
+            validMatchPositions.append((match, (startIdx, endIdx)))
+        elif firstSignificantPrefix not in significantChars:
+            validMatchPositions.append((match, (startIdx, endIdx)))
+
+    return validMatchPositions
+
+#endregion === Misc Functions ===

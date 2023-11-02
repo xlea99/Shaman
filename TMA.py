@@ -56,8 +56,11 @@ class TMALocation:
             isEqual =  (self.isLoggedIn == otherLocationData.isLoggedIn and
                         self.client == otherLocationData.client and
                         self.entryType == otherLocationData.entryType and
-                        self.entryID == otherLocationData.entryID and
-                        self.isInactive == otherLocationData.isInactive)
+                        self.entryID == otherLocationData.entryID)
+                        #TODO Theoretically, it shouldn't make sense to test inactivity. However, if I'm wrong
+                        # about this, we'll need to adjust the navToLocation comparison which sometimes gets
+                        # data from readPage's "simpleRead" that lacks accurate inactivity information.
+                        #self.isInactive == otherLocationData.isInactive)
             b.log.debug(f"Tested equality between {self} and {otherLocationData} : {isEqual}")
             return isEqual
         else:
@@ -391,7 +394,10 @@ class TMADriver():
     # This method reads the current open page in TMA, and generates a new (or overrides a provided)
     # TMALocation to be returned for navigational use. Default behavior is to store this new location
     # data as the current location.
-    def readPage(self,storeAsCurrent = True):
+    #TODO Decide if the concept of "simple read" is a long term solution.
+    # Simple read means that the read will NOT interact with any page at all, but some various info might
+    # not be read.
+    def readPage(self,storeAsCurrent = True,readAttempts=3,simpleRead=False):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
         locationData = TMALocation()
 
@@ -417,86 +423,98 @@ class TMADriver():
 
                 # Test whether we're on the DomainPage, or on a specific page.
                 if (locationData.client != "DOMAIN"):
-                    # ----------------------------------------------------------
-                    # Here we test for what entry type we're on right now, the
-                    # associated "EntryID", and whether or not it is considered
-                    # "inactive".
-                    # ----------------------------------------------------------
-                    if ("Client/People/" in locationData.rawURL):
-                        locationData.entryType = "People"
-                        # TODO implement dynamic support for other clients than just Sysco
-                        # We pull the Sysco Network ID as our EntryID for People.
-                        networkIDXPATH = "/html/body/form/div[3]/div[3]/div[2]/div/div[2]/div[4]/fieldset/ol[1]/li[2]/span[2]"
-                        networkID = self.browser.find_element(by=By.XPATH, value=networkIDXPATH).text
-                        locationData.entryID = networkID
-                        # We also have to check whether this person is considered "Terminated"
-                        # TODO implement navigation to correct linked tab.
-                        employmentStatusSearchString = "//div/div/div/div/fieldset/ol/li/span[contains(@id,'Detail_ddlpeopleStatus___gvctl00')][text()='Status:']/following-sibling::span"
-                        employmentStatus = self.browser.find_element(by=By.XPATH, value=employmentStatusSearchString)
-                        employmentStatusResultString = employmentStatus.text
-                        if (employmentStatusResultString == "Active"):
+                    try:
+                        # ----------------------------------------------------------
+                        # Here we test for what entry type we're on right now, the
+                        # associated "EntryID", and whether or not it is considered
+                        # "inactive".
+                        # ----------------------------------------------------------
+                        if ("Client/People/" in locationData.rawURL):
+                            locationData.entryType = "People"
+                            # TODO implement dynamic support for other clients than just Sysco
+                            # We pull the Sysco Network ID as our EntryID for People.
+                            networkIDXPATH = "/html/body/form/div[3]/div[3]/div[2]/div/div[2]/div[4]/fieldset/ol[1]/li[2]/span[2]"
+                            networkID = self.browser.find_element(by=By.XPATH, value=networkIDXPATH,timeout=1).text
+                            locationData.entryID = networkID
+                            # We also have to check whether this person is considered "Terminated"
+                            # TODO implement navigation to correct linked tab.
+                            employmentStatusSearchString = "//div/div/div/div/fieldset/ol/li/span[contains(@id,'Detail_ddlpeopleStatus___gvctl00')][text()='Status:']/following-sibling::span"
+                            employmentStatus = self.browser.find_element(by=By.XPATH, value=employmentStatusSearchString,timeout=1)
+                            employmentStatusResultString = employmentStatus.text
+                            if (employmentStatusResultString == "Active"):
+                                locationData.isInactive = False
+                            else:
+                                locationData.isInactive = True
+                        elif ("Client/Services/" in locationData.rawURL):
+                            locationData.entryType = "Service"
+                            # We pull the service number as our EntryID for Service.
+                            serviceNumber = self.browser.find_element(by=By.CSS_SELECTOR, value="#ctl00_MainPanel_Detail_txtServiceId",timeout=1).get_attribute("value")
+                            locationData.entryID = serviceNumber.strip()
+                            # We also have to check whether this service is considered "Inactive"
+                            currentTab = self.Service_GetCurrentServiceTab()
+                            if(simpleRead):
+                                locationData.isInactive = False
+                            else:
+                                if(currentTab != "Line Info"):
+                                    self.Service_NavToServiceTab("Line Info")
+                                inactiveBoxString = "//div/div/div/div/ol/li/input[contains(@id,'Detail_chkInactive_ctl01')][@type='checkbox']"
+                                inactiveBox = self.browser.find_element(by=By.XPATH, value=inactiveBoxString,timeout=1)
+                                isInactiveString = str(inactiveBox.get_attribute("CHECKED"))
+                                if (isInactiveString == "true"):
+                                    locationData.isInactive = True
+                                else:
+                                    locationData.isInactive = False
+                                if(currentTab != "Line Info"):
+                                    self.Service_NavToServiceTab(currentTab)
+                        elif ("Client/Interactions/" in locationData.rawURL):
+                            locationData.entryType = "Interaction"
+                            # Here, we pull the Interaction Number as our EntryID.
+                            intNumCSS = "span.BigBlueFont:nth-child(2)"
+                            if (self.browser.elementExists(by=By.CSS_SELECTOR, value=intNumCSS)):
+                                interactionNumber = self.browser.find_element(by=By.CSS_SELECTOR, value=intNumCSS,timeout=1).text
+                                locationData.entryID = interactionNumber
+                            else:
+                                locationData.entryID = "InteractionSearch"
+                            # Interactions can never be considered Inactive.
                             locationData.isInactive = False
-                        else:
-                            locationData.isInactive = True
-                    elif ("Client/Services/" in locationData.rawURL):
-                        #self.Service_NavToServiceTab("Line Info")
-                        #TODO GRRRR
-                        #time.sleep(3)
-                        locationData.entryType = "Service"
-                        # We pull the service number as our EntryID for Service.
-                        serviceNumber = self.browser.find_element(by=By.CSS_SELECTOR, value="#ctl00_MainPanel_Detail_txtServiceId").get_attribute("value")
-                        locationData.entryID = serviceNumber.strip()
-                        # We also have to check whether this service is considered "Inactive"
-                        # TODO implement navigation to correct linked tab.
-                        inactiveBoxString = "//div/div/div/div/ol/li/input[contains(@id,'Detail_chkInactive_ctl01')][@type='checkbox']"
-                        inactiveBox = self.browser.find_element(by=By.XPATH, value=inactiveBoxString)
-                        isInactiveString = str(inactiveBox.get_attribute("CHECKED"))
-                        if (isInactiveString == "true"):
-                            locationData.isInactive = True
-                        else:
+                        elif ("Client/Orders/" in locationData.rawURL):
+                            locationData.entryType = "Order"
+                            # Orders are special in that their entryID should consist of three
+                            # separate parts - the TMAOrderNumber, ticketOrderNumber, and
+                            # vendorOrderNumber.
+                            vendorOrderLocation = "//div/fieldset/ol/li/input[contains(@id,'ICOMMTextbox10')]"
+                            vendorOrderNumber = self.browser.find_element(by=By.XPATH, value=vendorOrderLocation,timeout=1).get_attribute("value")
+
+                            TMAOrderLocation = "//div/fieldset/ol/li/span[contains(@id,'txtOrder__label')]/following-sibling::span"
+                            TMAOrderNumber = self.browser.find_element(by=By.XPATH, value=TMAOrderLocation,timeout=1).text
+
+                            ticketOrderLocation = "//div/fieldset/ol/li/input[contains(@id,'ICOMMTextbox9')]"
+                            ticketOrderNumber = self.browser.find_element(by=By.XPATH, value=ticketOrderLocation,timeout=1).get_attribute("value")
+
+                            locationData.entryID = [TMAOrderNumber, ticketOrderNumber, vendorOrderNumber]
+
+                            # Orders are never considered Inactive.
                             locationData.isInactive = False
-                    elif ("Client/Interactions/" in locationData.rawURL):
-                        locationData.entryType = "Interaction"
-                        # Here, we pull the Interaction Number as our EntryID.
-                        intNumCSS = "span.BigBlueFont:nth-child(2)"
-                        if (self.browser.elementExists(by=By.CSS_SELECTOR, value=intNumCSS)):
-                            interactionNumber = self.browser.find_element(by=By.CSS_SELECTOR, value=intNumCSS).text
-                            locationData.entryID = interactionNumber
+                        elif ("Client/Equipment/" in locationData.rawURL):
+                            locationData.entryType = "Equipment"
+                            locationData.entryID = "RegularEquipment"
+                            # Equipment is never considered Inactive
+                            locationData.isInactive = False
+                        elif ("Client/ClientHome" in locationData.rawURL):
+                            locationData.entryType = "ClientHomePage"
+                            # EntryID for ClientHome is always 0.
+                            locationData.entryID = 0
+                            locationData.isInactive = False
+                        # ----------------------------------------------------------
+                        # ----------------------------------------------------------
+                        # ----------------------------------------------------------
+                    except (selenium.common.exceptions.NoSuchElementException,selenium.common.exceptions.StaleElementReferenceException):
+                        if(readAttempts > 0):
+                            print("oopsie!")
+                            return self.readPage(storeAsCurrent=storeAsCurrent,readAttempts=readAttempts-1)
                         else:
-                            locationData.entryID = "InteractionSearch"
-                        # Interactions can never be considered Inactive.
-                        locationData.isInactive = False
-                    elif ("Client/Orders/" in locationData.rawURL):
-                        locationData.entryType = "Order"
-                        # Orders are special in that their entryID should consist of three
-                        # separate parts - the TMAOrderNumber, ticketOrderNumber, and
-                        # vendorOrderNumber.
-                        vendorOrderLocation = "//div/fieldset/ol/li/input[contains(@id,'ICOMMTextbox10')]"
-                        vendorOrderNumber = self.browser.find_element(by=By.XPATH, value=vendorOrderLocation).get_attribute("value")
-
-                        TMAOrderLocation = "//div/fieldset/ol/li/span[contains(@id,'txtOrder__label')]/following-sibling::span"
-                        TMAOrderNumber = self.browser.find_element(by=By.XPATH, value=TMAOrderLocation).text
-
-                        ticketOrderLocation = "//div/fieldset/ol/li/input[contains(@id,'ICOMMTextbox9')]"
-                        ticketOrderNumber = self.browser.find_element(by=By.XPATH, value=ticketOrderLocation).get_attribute("value")
-
-                        locationData.entryID = [TMAOrderNumber, ticketOrderNumber, vendorOrderNumber]
-
-                        # Orders are never considered Inactive.
-                        locationData.isInactive = False
-                    elif ("Client/Equipment/" in locationData.rawURL):
-                        locationData.entryType = "Equipment"
-                        locationData.entryID = "RegularEquipment"
-                        # Equipment is never considered Inactive
-                        locationData.isInactive = False
-                    elif ("Client/ClientHome" in locationData.rawURL):
-                        locationData.entryType = "ClientHomePage"
-                        # EntryID for ClientHome is always 0.
-                        locationData.entryID = 0
-                        locationData.isInactive = False
-                    # ----------------------------------------------------------
-                    # ----------------------------------------------------------
-                    # ----------------------------------------------------------
+                            #TODO proper error
+                            raise ValueError("Failed to read!! :(")
                 # This means we're just on the DomainPage.
                 else:
                     locationData.entryType = "DomainPage"
@@ -573,10 +591,11 @@ class TMADriver():
         b.log.error("Could not navigate to DomainPage for an unknown reason!")
     # This method intelligently searches for and opens an entry as specified by a locationData. Method is able to be called from anywhere as long as TMA is
     # currently logged in, and locationData is valid.
-    # TODO This function sure is convoluted. Fix it.
+    # TODO This function has some reliability issues. Sometimes, the result is clicked too quickly OR the page is read too quickly before the result page can load.
     def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData : TMALocation = None, timeout=20):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
+        entryID = entryID.strip("'")
         # First, if the function wasn't already provided with built locationData, we need to build it
         # off of the variables that WERE provided for future use.
         if(locationData is None):
@@ -663,10 +682,11 @@ class TMADriver():
             searchBar.send_keys(str(locationData.entryID))
             time.sleep(2)
             searchBar.send_keys(u'\ue007')
+            targetServiceIDField = f"//input[contains(@id,'txtServiceId')][@value='{b.convertServiceIDFormat(locationData.entryID,'dashed')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'dotted')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'raw')}']"
             resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(text(),'" + locationData.entryID + " (')]"
             resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
-            self.browser.safeClick(by=None,element=resultItem,repeat=True,repeatUntilElementDoesNotExist=resultItem)
-            #resultItem.click()
+            self.browser.safeClick(by=None,element=resultItem,repeat=True,repeatUntilElementDoesNotExist=targetServiceIDField)
+            time.sleep(3)
         elif(locationData.entryType == "People"):
             peopleOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='people']")
             peopleOption.click()
@@ -756,7 +776,7 @@ class TMADriver():
         # Now we test to see whether or not we made it to the correct page.
         correctPageFound = False
         for i in range(timeout):
-            self.readPage()
+            self.readPage(simpleRead=True)
             if (self.currentLocation == copyOfTargetLocation):
                 correctPageFound = True
                 break
@@ -1328,7 +1348,7 @@ class TMADriver():
 
         prefix = '//div[@class="newitem"][contains(@id,"divFeature")]'
         createNewButton = '//a[contains(@id, "_lnkNewFeature")][text()="Create New"]'
-        commentBoxTestFor = prefix + '/div/div/textarea[contains(@name, "$txtComments")]'
+        newItemTestFor = '//div[contains(@id,"divFeature")][@class="newitem"]'
 
 
         for costToWrite in costsToWrite:
@@ -1336,10 +1356,11 @@ class TMADriver():
             time.sleep(1)
             self.browser.driver.execute_script("arguments[0].click();",createNewButtonElement)
             time.sleep(3)
-            # TODO THIS is glue, fix it for real
-            self.browser.safeClick(by=By.XPATH, element=createNewButton, repeat=True, repeatUntilNewElementExists=commentBoxTestFor)
-            featureNameForm = self.browser.find_element(by=By.XPATH, value=f"{prefix}/div/div/select[contains(@name,'$ddlFeature$ddlFeature_ddl')]/option[text()='{costToWrite.info_FeatureString}']")
-            featureNameForm.click()
+            # TODO TMA is ass, and this section just proves it. The thing is, cost names are selected from dropdown, but clicking it doesn't actually update the "selected='selected'" attribute, so there's literally no way to tell. only solution is try, then test. implement this later (try adding it, test if the right feature was added and if not, try again.)
+            self.browser.safeClick(by=By.XPATH, element=createNewButton, repeat=True, repeatUntilNewElementExists=newItemTestFor)
+            print(f"Hello Mr. Testicles: {costToWrite.info_FeatureString}")
+            featureNameSelectionString = f"{prefix}/div/div/select[contains(@name,'$ddlFeature$ddlFeature_ddl')]/option[text()='{costToWrite.info_FeatureString}']"
+            self.browser.safeClick(by=By.XPATH, element=featureNameSelectionString,repeat=True,timeout=5)
 
             if(costToWrite.info_Gross is not None):
                 grossForm = self.browser.find_element(by=By.XPATH, value=f'{prefix}/div/div/ol/li/input[contains(@name,"$txtCost_gross")][contains(@id,"_txtCost_gross")]')
@@ -1393,29 +1414,22 @@ class TMADriver():
     # if that is the currently active service tab. Dictionaries are also defined
     # for the various tab XPATHs, as well as XPATHs to various elements
     # used to verify that the nav was successful.
-    serviceTabDictionary = {"line info": "btnLineInfoExtended",
-                            "assignments": "btnAssignments",
-                            "used for": "btnUsedFor",
-                            "base costs": "btnBaseCosts",
-                            "features": "btnFeatures",
-                            "fees": "btnFees",
-                            "links": "btnLinks",
-                            "history": "btnHistory"}
-    serviceTabCheckFor = {
-        "line info": "//div/ol/li/input[contains(@name,'Detail$txtDateInstalled')][contains(@id,'Detail_txtDateInstalled')]",
-        "assignments": "//div[contains(@id,'Accounts_sites_link1_updAssociationsLink')]/a[contains(@id,'Accounts_sites_link1_lnkNewAssignment')]",
-        "used for": "//div/fieldset/a[contains(@id,'Detail_ucUsedFor_lnkNewUse')]",
-        "base costs": "//div/fieldset/a[contains(@id,'Detail_sfBaseCosts_lnkNewFeature')]",
-        "features": "//div/fieldset/a[contains(@id,'Detail_sfStandardFeatures_lnkNewFeature')]",
-        "fees": "//div/fieldset/a[contains(@id,'Detail_sfFees_lnkNewFeature')]",
-        "links": "//tr[@class='gridviewbuttons']/td/span[contains(@class,'propercase')]",
-        "history": "//tr[@class='headeritem']/td/b[text()='Message']"}
+
+    # Method to navigate between all service tabs, and one for getting the current service tab.
     def Service_NavToServiceTab(self, serviceTab):
+        serviceTabDictionary = {"line info": "btnLineInfoExtended",
+                                "assignments": "btnAssignments",
+                                "used for": "btnUsedFor",
+                                "base costs": "btnBaseCosts",
+                                "features": "btnFeatures",
+                                "fees": "btnFees",
+                                "links": "btnLinks",
+                                "history": "btnHistory"}
+
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
-        nameXPATH = self.serviceTabDictionary[serviceTab.lower()]
-        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[contains(@name,'{nameXPATH}')][translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='{serviceTab.lower()}']"
-        serviceTabTestFor = self.serviceTabCheckFor[serviceTab.lower()]
+        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[contains(@name,'{serviceTabDictionary[serviceTab.lower()]}')][translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='{serviceTab.lower()}']"
+        serviceTabTestFor = f"{targetTab}[@class='selected']"
 
         if (self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=serviceTabTestFor)):
             b.log.info(f"Successfully navigated to serviceTab '{serviceTab}'.")
@@ -1423,6 +1437,9 @@ class TMADriver():
         else:
             b.log.error(f"Failed to navigate to serviceTab '{serviceTab}'.")
             return False
+    def Service_GetCurrentServiceTab(self):
+        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[@class='selected']"
+        return self.browser.find_element(by=By.XPATH,value=targetTab).get_attribute("value")
     # Helper method to easily navigate to linked tabs.
     # TODO add error handling here
     def Service_NavToLinkedTab(self, linkedTabName):
