@@ -396,6 +396,7 @@ fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.W
 fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_WriteServiceID,args="$CONTROL_CIMPL",kwargs={"serviceID" : "$verizonOrderInfo['WirelessNumber']"}))
 fillCimplNewInstall.addTask(Task(name="writeAccountNum",func=Cimpl.CimplDriver.Workorders_WriteAccount,args="$CONTROL_CIMPL",kwargs={"accountNum" : "&clients['Sysco']['Accounts']['Verizon Wireless']"}))
 fillCimplNewInstall.addTask(Task(name="writeStartDate",func=Cimpl.CimplDriver.Workorders_WriteStartDate,args="$CONTROL_CIMPL",kwargs={"startDate" : "$verizonOrderInfo['OrderDate']"}))
+fillCimplNewInstall.addTask(Task(name="writeStartDate",func=Cimpl.CimplDriver.Workorders_ApplyChanges,args="$CONTROL_CIMPL"))
 fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_NavToSummaryTab,args="$CONTROL_CIMPL"))
 fillCimplNewInstall.addTask(Task(name="addTrackingNote",func=Cimpl.CimplDriver.Workorders_WriteNote,args="$CONTROL_CIMPL",kwargs={"subject" : "'Tracking'","noteType" : "'Information Only'","status" : "'Completed'","content" : "$verizonOrderInfo['Courier'] + ' : ' + $verizonOrderInfo['TrackingNumber']"}))
 fillCimplNewInstall.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Workorders_SetStatus,args="$CONTROL_CIMPL",kwargs={"status" : "'Complete'"}))
@@ -496,4 +497,14 @@ def completeUpgrade(_controller : Controller, woNumber):
     _controller.addRecipe(fillCimplUpgrade,{"inputContext" : "Default"})
     _controller.run()
 
-completeUpgrade(c,"43223")
+
+ordersToClose = {}
+
+
+#for key,value in ordersToClose.items():
+#    if(value == "NewInstall"):
+#        completeNewInstall(c,key)
+#    elif(value == "Upgrade"):
+#        completeUpgrade(c,key)
+#    else:
+#        raise ValueError("MORON IDIOT FUCKER")
