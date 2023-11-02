@@ -153,6 +153,8 @@ def fuzzyStringToNumber(string : str):
     else:
         raise ValueError(f"Unable to convert '{string}' to number")
 
+
+
 # This method assumes that a given string s may contain delimiter variables. This method uses the
 # specified delimiter (by default $) to match all these variables. For example,
 # ```$flounderMan.getWalrus() + 2 * $hippo + "$duck``` would specifically match only $flounderMan and $hippo.
@@ -161,16 +163,15 @@ def findDelimiterVariables(s, delimiter='$'):
     # Adjust the regex pattern to incorporate the delimiter
     generalPattern = rf'{re.escape(delimiter)}[a-zA-Z][a-zA-Z0-9_]*'
 
-    # Extract potential matches
-    potentialMatches = re.findall(generalPattern, s)
+    # Extract potential matches along with their start positions
+    potentialMatches = [(match.start(), match.end(), match.group(0)) for match in re.finditer(generalPattern, s)]
 
-    validMatches = []
+    validMatchPositions = []
 
     # Significant characters
     significantChars = ['"', "'", '{', '}']
 
-    for match in potentialMatches:
-        startIdx = s.index(match)
+    for startIdx, endIdx, match in potentialMatches:
 
         # Determine the firstSignificantPrefix
         prefix = s[:startIdx][::-1]  # reverse the prefix for easy search
@@ -181,7 +182,7 @@ def findDelimiterVariables(s, delimiter='$'):
                 break
 
         # Determine the firstSignificantSuffix
-        suffix = s[startIdx + len(match):]
+        suffix = s[endIdx:]
         firstSignificantSuffix = None
         for char in suffix:
             if char in significantChars:
@@ -191,14 +192,17 @@ def findDelimiterVariables(s, delimiter='$'):
         # Determine the firstSignificantPair
         if firstSignificantPrefix in ['"', "'"]:
             if firstSignificantSuffix == firstSignificantPrefix:
-                continue
+                # Find the corresponding pair for the first significant character
+                correspondingPairPos = suffix.index(firstSignificantSuffix) + endIdx
+                if correspondingPairPos > endIdx:
+                    validMatchPositions.append((match, (startIdx, endIdx)))
             else:
-                validMatches.append(match)
+                validMatchPositions.append((match, (startIdx, endIdx)))
         elif firstSignificantPrefix == '{' and firstSignificantSuffix == '}':
-            validMatches.append(match)
+            validMatchPositions.append((match, (startIdx, endIdx)))
         elif firstSignificantPrefix not in significantChars:
-            validMatches.append(match)
+            validMatchPositions.append((match, (startIdx, endIdx)))
 
-    return validMatches
+    return validMatchPositions
 
 #endregion === Misc Functions ===

@@ -4,7 +4,9 @@ from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 import time
+from datetime import datetime
 import os
+import re
 
 class CimplDriver:
 
@@ -119,6 +121,7 @@ class CimplDriver:
             # In case the menu was already open when we got here, we click it again to close it.
             if(not self.browser.elementExists(by=By.XPATH,value=f"{menuString}[contains(@class,'cimpl-header__icon-transform')]")):
                 menuButton = self.browser.find_element(by=By.XPATH, value=menuString)
+                self.waitForLoadingScreen()
                 menuButton.click()
                 self.waitForLoadingScreen()
 
@@ -201,6 +204,7 @@ class CimplDriver:
         self.waitForLoadingScreen()
     def Filters_Clear(self):
         self.browser.switchToTab("Cimpl")
+        self.waitForLoadingScreen()
         # Clear all filters.
         clearAllButtonString = "//div/div/cimpl-button[@class='ng-isolate-scope']/button[@automation-id='__button']/div[@class='button-content']/span[@class='button-label ng-binding uppercase'][text()='Clear All']/parent::div/parent::button"
         clearAllButton = self.browser.find_element(by=By.XPATH,value=clearAllButtonString)
@@ -560,9 +564,6 @@ class CimplDriver:
         return returnDict
 
 
-
-
-
     # Front (Summary) page write methods
     def Workorders_WriteComment(self,comment):
         self.browser.switchToTab("Cimpl")
@@ -624,7 +625,7 @@ class CimplDriver:
         serviceIDString = "//div[contains(@class,'control-label cimpl-form')][text()='Service ID']/following-sibling::div[contains(@class,'cimpl-form__default')]/div/input"
         serviceIDElement = self.browser.find_element(by=By.XPATH, value=serviceIDString)
         serviceIDElement.clear()
-        serviceIDElement.send_keys(str(serviceID))
+        serviceIDElement.send_keys(b.convertServiceIDFormat(str(serviceID),"raw"))
     def Workorders_WriteAccount(self,accountNum):
         self.browser.switchToTab("Cimpl")
 
@@ -787,3 +788,34 @@ class CimplDriver:
 
     #endregion === Interior Workorders ===
 
+
+# This helper method looks through a list of Notes to try and locate the Order Number. It prioritizes recent orders
+# over older ones.
+def findPlacedOrderNumber(noteList : list):
+    targetOrder = None
+    targetOrderDate = None
+    verizonOrderPattern = re.compile(r"MB\d+")
+    for note in noteList:
+        thisDate = datetime.strptime(note["CreatedDate"], '%m/%d/%Y %I:%M %p')
+
+        subject = note["Subject"].strip().lower()
+        if(subject == "order placed" or subject == "order number"):
+            match = verizonOrderPattern.search(note["Content"])
+            if match:
+                if(targetOrderDate is None or thisDate > targetOrderDate):
+                    targetOrderDate = thisDate
+                    targetOrder = match.group()
+    return targetOrder
+
+# This helper method simply extracts the assigned userID from the Actions of a Cimpl WO.
+def getUserID(actionsList : list):
+    for action in actionsList:
+        if(action.startswith("Assigned to Employee")):
+            return action.split("Assigned to Employee - ")[1].split(" - ")[0]
+
+# This helper method returns the string of the device that was actually ordered in a Cimpl WO, in my custom
+# format.
+def getDeviceModelID(hardwareInfo : list):
+    for hardware in hardwareInfo:
+        if(hardware["Type"] == "Equipment"):
+            return b.equipment["CimplMappings"][hardware["Name"]]
