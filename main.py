@@ -11,25 +11,13 @@ br = Browser.Browser()
 
 t = TMA.TMADriver(browserObject=br)
 t.logInToTMA()
-#t.navToLocation(client="Sysco",entryType="Service",entryID="619-509-2891")
-
-#c = Cimpl.CimplDriver(browserObject=br)
-#c.logInToCimpl()
-#c.navToWorkorderCenter()
-#c.Workorders_ReadFullWorkorder()
-
-#testyFilePath = f"{b.paths.emailTemplates}/S20NewInstall.html"
-#with open(testyFilePath, 'r', encoding='utf-8') as file:
-#    test = file.read()
-
-#t.Assignment_BuildAssignmentFromAccount(client="Sysco",vendor="Verizon Wireless",siteCode="204")
-
 # New Install
 
 iphone11 = "iPhone11_64GB"
 iphone12 = "iPhone12_64GB"
 iphone13 = "iPhone13_128GB"
 s21 = "GalaxyS21_128GB"
+a54 = "GalaxyA54_128GB"
 mifi = "Jetpack8800L"
 ipad = "iPad11_128GB"
 
@@ -40,24 +28,13 @@ bell = "Bell Mobility"
 rogers = "Rogers"
 
 
+#'''
 h.syscoNewInstall(existingTMADriver = t,
                   browser   = br,
-                  netID     = "kjoh3810",
-                  serviceNum= "346-689-5331",
-                  installDate="10/20/2023",
-                  device    = iphone13,
-                  carrier   = verizon,
-                  imei      = "351415631968679")
-
-
-
-# Upgrade
-'''
-h.syscoUpgrade(existingTMADriver = t,
-               browser = b,
-               serviceNum = "224-240-8200",
-               upgradeEligibilityDate = "4/20/2025",
-               device = "iPhone 12",
-               imei = "357716582310785")
-'''
-
+                  netID     = "jmcc5803",
+                  serviceNum= "2042965696",
+                  installDate="10/27/2023",
+                  device    = iphone11,
+                  carrier   = rogers,
+                  imei      = "352563745459520")
+#'''

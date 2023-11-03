@@ -86,7 +86,10 @@ class VerizonDriver:
         self.browser.switchToTab("Verizon")
         self.navToHomescreen()
 
-        viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//span[contains(text(),'View Orders')]")
+        try:
+            viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//span[contains(text(),'View Orders')]",timeout=10)
+        except selenium.common.exceptions.NoSuchElementException:
+            viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'ordersPosition')]",timeout=15)
         viewOrdersLink.click()
         if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=30)):
             # TODO proper error reporting maybe?

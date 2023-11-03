@@ -683,7 +683,7 @@ class TMADriver():
             time.sleep(2)
             searchBar.send_keys(u'\ue007')
             targetServiceIDField = f"//input[contains(@id,'txtServiceId')][@value='{b.convertServiceIDFormat(locationData.entryID,'dashed')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'dotted')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'raw')}']"
-            resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(text(),'" + locationData.entryID + " (')]"
+            resultString = f"//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(text(),'{b.convertServiceIDFormat(locationData.entryID,'dashed')} (')]"
             resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
             self.browser.safeClick(by=None,element=resultItem,repeat=True,repeatUntilElementDoesNotExist=targetServiceIDField)
             time.sleep(3)

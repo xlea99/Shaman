@@ -660,6 +660,10 @@ class CimplDriver:
         startDateElement = self.browser.find_element(by=By.XPATH,value=startDateString)
         startDateElement.clear()
         startDateElement.send_keys(startDate)
+        # We now click, to make sure the html is updated with the actual date we wrote.
+        serviceInformationHeader = self.browser.find_element(by=By.XPATH,value="//div[contains(@ng-bind,'vm.labels.serviceInformation')][text()='Service Information']")
+        self.waitForLoadingScreen()
+        serviceInformationHeader.click()
 
     # Methods for navigating the workorder
     def Workorders_NavToDetailsTab(self):
@@ -671,20 +675,23 @@ class CimplDriver:
         self.browser.switchToTab("Cimpl")
         summaryTabString = "//cimpl-tabs-panel/div/div/div/div/span[contains(@class,'cimpl-tabs-panel__tabLink')][text()='Summary']"
         summaryTabElement = self.browser.find_element(by=By.XPATH,value=summaryTabString)
+        self.waitForLoadingScreen()
         summaryTabElement.click()
     def Workorders_ApplyChanges(self):
         summaryApplyButtonString = "//cimpl-tab/div/ng-transclude/wd-summary-tab/div/div/div/cimpl-button[@text='Apply'][@on-click='vm.update()']/button/div/span[contains(@class,'button-label')][text()='Apply']"
-        detailsApplyButtonString = "//cimpl-tab/div/ng-transclude/wd-details-tab/div/div/cimpl-collapsible-box/div/div/ng-transclude/div/cimpl-form/div/div/div/span/cimpl-button[@text='Apply'][@on-click='vm.update()']/button/div/span[contains(@class,'button-label')][text()='Apply']"
+        detailsApplyButtonString = "//cimpl-tab/div/ng-transclude/wd-details-tab/div/div/cimpl-collapsible-box/div/div/ng-transclude/div/cimpl-form/div/div/div/span/cimpl-button/button/div/span[contains(@class,'button-label')][text()='Apply']"
         # This means we're on the summary tab.
         if(self.browser.elementIsClickable(by=By.XPATH,value=summaryApplyButtonString)):
             summaryApplyButtonElement = self.browser.find_element(by=By.XPATH, value=summaryApplyButtonString)
+            self.waitForLoadingScreen()
             summaryApplyButtonElement.click()
             self.waitForLoadingScreen()
         # This means we're on the details tab.
         elif(self.browser.elementIsClickable(by=By.XPATH,value=detailsApplyButtonString)):
-            detailsApplyButtonElement = self.browser.find_element(by=By.XPATH, value=summaryApplyButtonString)
+            detailsApplyButtonElement = self.browser.find_element(by=By.XPATH, value=detailsApplyButtonString)
+            self.waitForLoadingScreen()
             detailsApplyButtonElement.click()
-            self.waitForLoadingScreen()\
+            self.waitForLoadingScreen()
         # Bad news.
         else:
             #TODO yep, error reporting indeed
