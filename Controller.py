@@ -188,8 +188,8 @@ class Controller:
         for task in recipe.tasks:
             self.addTask(task)
 
-        if(recipe.deleteContextAfterExecution):
-            self.addTask(Task(name="deleteContext",func=self.deleteContext,kwargs={"contextID" : f"'{thisContext}'"}))
+        for contextToDelete in recipe.contextsToBeDeleted:
+            self.addTask(Task(name="deleteContext",func=self.deleteContext,kwargs={"contextID" : f"'{contextToDelete}'"}))
 
     # Simple methods for managing contexts in the Controller.
     def createContext(self,contextID : str,mergeContexts = False):
@@ -276,15 +276,54 @@ class Recipe:
         self.requiredKwargs = requiredKwargs
         self.contextID = contextID
         self.tasks = []
-        self.deleteContextAfterExecution = deleteContextAfterExecution
+
+        self.contextsToBeDeleted = []
+        if(deleteContextAfterExecution):
+            self.contextsToBeDeleted.append(self.contextID)
 
     # Helper method for adding a single task to the recipe quickly. Automatically sets context and base priority
     # to recipe's
-    def addTask(self,task : Task):
+    def addTask(self,task : Task,_basePriorityOverride = None,_contextIDOverride = None):
         if(task.contextID is None):
-            task.contextID = self.contextID
-        task.priority = self.basePriority + task.priority
+            if(_contextIDOverride is None):
+                task.contextID = self.contextID
+            else:
+                task.contextID = _contextIDOverride
+
+        if(_basePriorityOverride is None):
+            task.priority = self.basePriority + task.priority
+        else:
+            task.priority = _basePriorityOverride + task.priority
         self.tasks.append(task)
+    # This method adds an existing recipe to this recipe. Essentially, this is equivalent to adding
+    # all the tasks in the smaller recipe to this recipe, in the order they appear in the small recipe.
+    # If overrideBasePriority or overrideContextID are set to true, the PARENT recipe's value for these arguments
+    # will be used instead of the child's. If doContextDeletion is set to any bool other than None, that bool will
+    # be used to determine whether or not the child's context will be triggered for deletion after the child's
+    # tasks have run through.
+    def addRecipe(self,_recipe,overrideBasePriority = False,overrideContextID = False,doContextDeletion : bool = None):
+        if(overrideBasePriority):
+            _basePriority = self.basePriority
+        else:
+            _basePriority = _recipe.basePriority
+
+        if(overrideContextID):
+            _contextID = self.contextID
+        else:
+            _contextID = _recipe.contextID
+
+        for _task in _recipe.tasks:
+            self.addTask(_task,_basePriorityOverride=_basePriority,_contextIDOverride=_contextID)
+
+        if(doContextDeletion is None):
+            self.contextsToBeDeleted = _recipe.contextsToBeDeleted + self.contextsToBeDeleted
+        else:
+            if(doContextDeletion):
+                self.contextsToBeDeleted.insert(0,_contextID)
+
+
+
+
 
 #region === Controller Initialization ===
 browser = Browser.Browser()
@@ -292,11 +331,11 @@ cimpl = Cimpl.CimplDriver(browser)
 tma = TMA.TMADriver(browser)
 verizon = Verizon.VerizonDriver(browser)
 
-tma.logInToTMA()
-tma.navToClientHome("Sysco")
-cimpl.logInToCimpl()
-cimpl.navToWorkorderCenter()
-verizon.logInToVerizon()
+#tma.logInToTMA()
+#tma.navToClientHome("Sysco")
+#cimpl.logInToCimpl()
+#cimpl.navToWorkorderCenter()
+#verizon.logInToVerizon()
 
 c = Controller(_browser=browser,TMADriver=tma,CimplDriver=cimpl,VerizonDriver=verizon)
 #endregion === Controller Initialization ===
@@ -479,6 +518,12 @@ getOrderNumberFromWorkorder.addTask(Task(name="returnToContext",func=Controller.
 #endregion === Recipe - Get OrderNumber from Workorder ===
 #c.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
 
+testRecipe = Recipe(name="testRecipe",contextID="testRecipe",deleteContextAfterExecution=True)
+testRecipe.addRecipe(getOrderNumberFromWorkorder)
+testRecipe.addRecipe(openReadWorkorder)
+
+c.addRecipe(testRecipe)
+print(c)
 
 def completeNewInstall(_controller : Controller, woNumber):
     _controller.addRecipe(openReadWorkorder,{"cimplWONumber" : woNumber})
