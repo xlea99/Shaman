@@ -153,6 +153,7 @@ class Controller:
 
         # Task Queue
         self.queue = []
+        self.currentQueueIndex = 0
 
         # Context manager
         self.contexts = {"Default" : {}}
@@ -209,32 +210,39 @@ class Controller:
     # retry tasks and insertion of recovery tasks.
     def executeNext(self):
         if(self.queue):
-            currentTask = self.queue.pop(0)
+            currentTask = self.queue[self.currentQueueIndex]
             currentTask.execute(self.contexts[currentTask.contextID],controller=self,tmaDriver = self.tma,cimplDriver=self.cimpl,verizonDriver=self.verizon)
             if(currentTask.status == "Completed"):
+                self.currentQueueIndex += 1
                 return ("Completed",currentTask.result)
             else:
                 if(currentTask.retries > 0):
                     currentTask.retries -= 1
                     currentTask.status = "Pending"
-                    self.queue.insert(0,currentTask)
                     return ("Retrying",currentTask.error)
                 elif(currentTask.recoveryTask is not None):
-                    self.queue.insert(0,currentTask.recoveryTask)
+                    self.currentQueueIndex += 1
+                    self.queue.insert(self.currentQueueIndex + 1,currentTask.recoveryTask)
                     return ("Recovery",currentTask.error)
                 elif(currentTask.status == "Skipped"):
+                    self.currentQueueIndex += 1
                     return ("Skipped",None)
                 else:
+                    #TODO should we advance queue count in event of an error? What else we do???
+                    self.currentQueueIndex += 1
                     return ("Failed",currentTask.error)
 
-    # Simply begins running the controller, IE executing each task in the queue one-by-one.
-    def run(self):
-        while(self.queue):
+    # Runs the entire queue of the controller as a batch, emptying the queue (by default) once complete.
+    def runBatch(self,clearQueueOnCompletion : bool = True):
+        while(self.currentQueueIndex < len(self.queue)):
             print("======================")
             print("Running Next Task...")
             print(self.queue[0])
             print(self.executeNext())
             print("======================\n")
+        if(clearQueueOnCompletion):
+            self.currentQueueIndex = 0
+            self.queue = []
 
     # Helper __str__ method for debugging and easily displaying the queue.
     def __str__(self):
@@ -321,6 +329,17 @@ class Recipe:
             if(doContextDeletion):
                 self.contextsToBeDeleted.insert(0,_contextID)
 
+# Policies are the answer to the question: "What happens when a task does not successfully run fully through?" Policies
+# are attached to Tasks during task creation, and will always refer to ONE TASK AND ONE TASK ONLY. They offer a
+# multitude of safeguards, success tests, and recoverability in the execution of tasks. CHECKPOINTS
+class Policy:
+
+    def __init__(self):
+        pass
+
+
+
+
 
 
 
@@ -331,11 +350,11 @@ cimpl = Cimpl.CimplDriver(browser)
 tma = TMA.TMADriver(browser)
 verizon = Verizon.VerizonDriver(browser)
 
-#tma.logInToTMA()
-#tma.navToClientHome("Sysco")
-#cimpl.logInToCimpl()
-#cimpl.navToWorkorderCenter()
-#verizon.logInToVerizon()
+tma.logInToTMA()
+tma.navToClientHome("Sysco")
+cimpl.logInToCimpl()
+cimpl.navToWorkorderCenter()
+verizon.logInToVerizon()
 
 c = Controller(_browser=browser,TMADriver=tma,CimplDriver=cimpl,VerizonDriver=verizon)
 #endregion === Controller Initialization ===
@@ -522,8 +541,8 @@ testRecipe = Recipe(name="testRecipe",contextID="testRecipe",deleteContextAfterE
 testRecipe.addRecipe(getOrderNumberFromWorkorder)
 testRecipe.addRecipe(openReadWorkorder)
 
-c.addRecipe(testRecipe)
-print(c)
+#c.addRecipe(testRecipe)
+#print(c)
 
 def completeNewInstall(_controller : Controller, woNumber):
     _controller.addRecipe(openReadWorkorder,{"cimplWONumber" : woNumber})
@@ -532,7 +551,7 @@ def completeNewInstall(_controller : Controller, woNumber):
     _controller.addRecipe(gatherNewInstallServiceArgs,{"inputContext" : "Default", "outputContext" : "Default"})
     _controller.addRecipe(newInstall,{"inputContext" : "Default"})
     _controller.addRecipe(fillCimplNewInstall,{"inputContext" : "Default"})
-    _controller.run()
+    _controller.runBatch()
 def completeUpgrade(_controller : Controller, woNumber):
     _controller.addRecipe(openReadWorkorder,{"cimplWONumber" : woNumber})
     _controller.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
@@ -540,16 +559,14 @@ def completeUpgrade(_controller : Controller, woNumber):
     _controller.addRecipe(gatherUpgradeServiceArgs,{"inputContext" : "Default", "outputContext" : "Default"})
     _controller.addRecipe(upgrade,{"inputContext" : "Default"})
     _controller.addRecipe(fillCimplUpgrade,{"inputContext" : "Default"})
-    _controller.run()
+    _controller.runBatch()
 
 
-ordersToClose = {}
+upgrades = ["43286","43287","43290","43291","43314","43315","43316","43317","43318","43320"]
+newInstalls = ["43109","43292","43293","43296","43297","43313"]
 
 
-#for key,value in ordersToClose.items():
-#    if(value == "NewInstall"):
-#        completeNewInstall(c,key)
-#    elif(value == "Upgrade"):
-#        completeUpgrade(c,key)
-#    else:
-#        raise ValueError("MORON IDIOT FUCKER")
+for _newInstall in newInstalls:
+    completeNewInstall(c, _newInstall)
+for _upgrade in upgrades:
+    completeUpgrade(c, _upgrade)
