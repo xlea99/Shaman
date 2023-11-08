@@ -237,7 +237,7 @@ class Controller:
         while(self.currentQueueIndex < len(self.queue)):
             print("======================")
             print("Running Next Task...")
-            print(self.queue[0])
+            print(self.queue[self.currentQueueIndex])
             print(self.executeNext())
             print("======================\n")
         if(clearQueueOnCompletion):
@@ -522,8 +522,7 @@ openReadWorkorder.addTask(Task(name="readFullWorkorder",func=Cimpl.CimplDriver.W
 #region === Recipe - Read Verizon Order Info ===
 readVerizonOrderNumber = Recipe(name="readVerizonOrderNumber",contextID="readVerizonOrderNumber",requiredKwargs=["orderNumber_inputContext"],deleteContextAfterExecution=True)
 readVerizonOrderNumber.addTask(Task(name="getVerizonOrderNumber",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$orderNumber_inputContext","key" : "'verizonOrderNumber'"},resultDest="verizonOrderNumber"))
-readVerizonOrderNumber.addTask(Task(name="navToVerizonHome",func=Verizon.VerizonDriver.navToHomescreen,args="$CONTROL_VERIZON"))
-readVerizonOrderNumber.addTask(Task(name="navToVOrderViewer",func=Verizon.VerizonDriver.navToOrderViewer,args="$CONTROL_VERIZON"))
+readVerizonOrderNumber.addTask(Task(name="navToOrderViewer",func=Verizon.VerizonDriver.navToOrderViewer,args="$CONTROL_VERIZON"))
 readVerizonOrderNumber.addTask(Task(name="searchOrder",func=Verizon.VerizonDriver.OrderViewer_SearchOrder,args="$CONTROL_VERIZON",kwargs={"orderNumber" : "$verizonOrderNumber"}))
 readVerizonOrderNumber.addTask(Task(name="readFullDisplayedOrder",func=Verizon.VerizonDriver.OrderViewer_ReadDisplayedOrder,args="$CONTROL_VERIZON",contextID="Default",resultDest="verizonOrderInfo"))
 #endregion === Recipe - Read Verizon Order Info ===
@@ -562,8 +561,8 @@ def completeUpgrade(_controller : Controller, woNumber):
     _controller.runBatch()
 
 
-upgrades = ["43286","43287","43290","43291","43314","43315","43316","43317","43318","43320"]
-newInstalls = ["43109","43292","43293","43296","43297","43313"]
+upgrades = ["43394","43407"]
+newInstalls = ["43393","43399","43400","43401","43402"]
 
 
 for _newInstall in newInstalls:

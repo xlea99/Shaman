@@ -84,9 +84,9 @@ class VerizonDriver:
     # This method navigates to the Verizon order viewer.
     def navToOrderViewer(self):
         self.browser.switchToTab("Verizon")
-        self.navToHomescreen()
 
-        if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=3)):
+        if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=2)):
+            self.navToHomescreen()
             try:
                 viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//span[contains(text(),'View Orders')]",timeout=10)
             except selenium.common.exceptions.NoSuchElementException:
