@@ -4,6 +4,7 @@ import TMA
 import Cimpl
 import Verizon
 import time
+import copy
 from datetime import datetime
 
 #TODO FIX THE STUPID ORBIC
@@ -157,6 +158,8 @@ class Controller:
 
         # Context manager
         self.contexts = {"Default" : {}}
+        # Checkpoint manager
+        self.checkpoints = {}
 
     # Method for queueing a task, based on the task's priority.
     def addTask(self,task : Task):
@@ -204,6 +207,25 @@ class Controller:
             return contextID
     def deleteContext(self,contextID : str):
         del self.contexts[contextID]
+
+
+    # This method declares a new checkpoint AT THE CURRENT QUEUEINDEX, with the given ID. It snapshots the context
+    # to be saved in case of rollbacks as well. Also, a simple method for checkpoint deletion.
+    def declareCheckpoint(self,checkpointID : str):
+        self.checkpoints[checkpointID] = {"QueueIndex" : self.currentQueueIndex,
+                                          "ContextSnapshot" : copy.deepcopy(self.contexts)}
+    def deleteCheckpoint(self,checkpointID : str):
+        # TODO error handling agian
+        if(checkpointID in self.checkpoints.keys()):
+            del self.checkpoints[checkpointID]
+    # Method for rolling back the entire controller to the given checkpoint. Essentially, this restores the snapshot
+    # of the context as it was taken at the time of checkpoint creation, as well as the currentQueueIndex of that
+    # given checkpoint.
+    def rollbackToCheckpoint(self,checkpointID : str):
+        # TODO guess what! Error handling.
+        self.contexts = copy.deepcopy(self.checkpoints[checkpointID]["ContextSnapshot"])
+        self.currentQueueIndex = self.checkpoints[checkpointID]["QueueIndex"]
+
 
     # This method executes the next method in the queue, regardless of whether or not it works. It outputs a
     # status code tuple containing a status, and either the return value or error. It also manages reinsertion of
@@ -561,11 +583,4 @@ def completeUpgrade(_controller : Controller, woNumber):
     _controller.runBatch()
 
 
-upgrades = ["43394","43407"]
-newInstalls = ["43393","43399","43400","43401","43402"]
 
-
-for _newInstall in newInstalls:
-    completeNewInstall(c, _newInstall)
-for _upgrade in upgrades:
-    completeUpgrade(c, _upgrade)
