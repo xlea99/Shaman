@@ -5,6 +5,7 @@ import Cimpl
 import Verizon
 import time
 import copy
+from typing import Callable
 from datetime import datetime
 
 #TODO FIX THE STUPID ORBIC
@@ -16,6 +17,22 @@ if(execErrorReporting):
 else:
     allExceptions = ()
 
+# Helper method to build and return a namespace quickly, for passing in to callables etc.
+def buildNamespace(controller,tmaDriver,cimplDriver,verizonDriver,context = None):
+    allDrivers = {"CONTROL_CONTROLLER": controller, "CONTROL_TMA": tmaDriver, "CONTROL_CIMPL": cimplDriver,"CONTROL_VERIZON": verizonDriver}
+    packages = {"RESULT": None, "datetime": datetime, "TMA": TMA, "time": time}
+    if(context is None):
+        context = {}
+
+    namespace = {}
+    namespace.update(packages)
+    namespace.update(allDrivers)
+    namespace["context"] = context
+    namespace["context"].update(allDrivers)
+    namespace["globalData"] = b.globalData
+
+    return namespace
+
 
 # This class allows us to abstract a method or function as a "Task", to be understandable by the
 # controller.
@@ -24,21 +41,14 @@ class Task:
     # Simple init methods to store the aspects of this Task. Higher priority means more important.
     # Contexts are indirectly referenced using a string contextID. If conditionCheck is set, it evaluates the
     # given condition based on the context - if True, the task executes. Otherwise, it doesn't.
-    def __init__(self,name, func, args = None, kwargs : dict = None, contextID : str = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None,conditionCheck = None):
+    def __init__(self,name, func, args = None, kwargs : dict = None, contextID : str = None, policy = None, priority = 0,retries=0, recoveryTask = None,resultDest : str = None,conditionCheck = None):
         self.name = name
+        self.policy = policy
 
         # Determine function type
         if(type(func) is str):
-            finalFunc = func
-            foundContextVariables = b.findDelimiterVariables(func,"$")
-            # Iterate over the found variables in reverse order based on their start positions
-            for var, (startPos, endPos) in sorted(foundContextVariables, key=lambda x: x[1][0], reverse=True):
-                replacement = f"context['{var[1:]}']"
-                finalFunc = finalFunc[:startPos] + replacement + finalFunc[endPos:]
-            foundGlobalVariables = b.findDelimiterVariables(finalFunc,"&")
-            for var, (startPos, endPos) in sorted(foundGlobalVariables, key=lambda x: x[1][0], reverse=True):
-                replacement = f"globalData['{var[1:]}']"
-                finalFunc = finalFunc[:startPos] + replacement + finalFunc[endPos:]
+            finalFunc = b.findAndReplaceDelimiterVariables(s=func, delimiter="$", replacement="context['$VARIABLE$']")
+            finalFunc = b.findAndReplaceDelimiterVariables(s=finalFunc, delimiter="&",replacement="globalData['$VARIABLE$']")
             self.func = finalFunc
             self.isLiteralFunc = True
         else:
@@ -53,15 +63,8 @@ class Task:
             args = [args]
         for arg in args:
             if(type(arg) is str):
-                finalArg = arg
-                foundContextVariables = b.findDelimiterVariables(arg,"$")
-                for var, (startPos, endPos) in sorted(foundContextVariables, key=lambda x: x[1][0], reverse=True):
-                    replacement = f"context['{var[1:]}']"
-                    finalArg = finalArg[:startPos] + replacement + finalArg[endPos:]
-                foundGlobalVariables = b.findDelimiterVariables(finalArg,"&")
-                for var, (startPos, endPos) in sorted(foundGlobalVariables, key=lambda x: x[1][0], reverse=True):
-                    replacement = f"globalData['{var[1:]}']"
-                    finalArg = finalArg[:startPos] + replacement + finalArg[endPos:]
+                finalArg = b.findAndReplaceDelimiterVariables(s = arg,delimiter="$",replacement="context['$VARIABLE$']")
+                finalArg = b.findAndReplaceDelimiterVariables(s = finalArg,delimiter="&",replacement="globalData['$VARIABLE$']")
                 self.args.append(finalArg)
             else:
                 self.args.append(arg)
@@ -72,15 +75,8 @@ class Task:
         kwargs = dict(kwargs)
         for key,value in kwargs.items():
             if(type(value) is str):
-                finalKwarg = value
-                foundContextVariables = b.findDelimiterVariables(value,"$")
-                for var, (startPos, endPos) in sorted(foundContextVariables, key=lambda x: x[1][0], reverse=True):
-                    replacement = f"context['{var[1:]}']"
-                    finalKwarg = finalKwarg[:startPos] + replacement + finalKwarg[endPos:]
-                foundGlobalVariables = b.findDelimiterVariables(finalKwarg,"&")
-                for var, (startPos, endPos) in sorted(foundGlobalVariables, key=lambda x: x[1][0], reverse=True):
-                    replacement = f"globalData['{var[1:]}']"
-                    finalKwarg = finalKwarg[:startPos] + replacement + finalKwarg[endPos:]
+                finalKwarg = b.findAndReplaceDelimiterVariables(s = value,delimiter="$",replacement="context['$VARIABLE$']")
+                finalKwarg = b.findAndReplaceDelimiterVariables(s = finalKwarg,delimiter="&",replacement="globalData['$VARIABLE$']")
                 self.kwargs[key] = finalKwarg
             else:
                 self.kwargs[key] = value
@@ -94,24 +90,25 @@ class Task:
         self.resultDest = resultDest
         self.conditionCheck = conditionCheck
 
+        self.isCheckpoint = False
+        self.checkpointID = None
+
         self.status = "Pending"
         self.result = None
         self.error = None
 
     # Method for actually executing the task, and setting the result and error codes.
-    def execute(self,context,controller = None, tmaDriver : TMA.TMADriver = None,cimplDriver : Cimpl.CimplDriver = None,verizonDriver : Verizon.VerizonDriver = None):
+    def execute(self,namespace):
         self.status = "InProgress"
         if(self.conditionCheck is not None):
-            if(context[self.conditionCheck]):
+            #TODO wtf is this?
+            if(namespace["context"][self.conditionCheck]):
                 self.status = "Skipped"
                 return self.status
         try:
-            allDrivers = {"CONTROL_CONTROLLER" : controller,"CONTROL_TMA": tmaDriver, "CONTROL_CIMPL": cimplDriver,"CONTROL_VERIZON": verizonDriver}
-            namespace = {"RESULT": None, "datetime" : datetime, "TMA" : TMA, "time" : time}
-            namespace.update(allDrivers)
-            namespace["context"] = context
-            namespace["context"].update(allDrivers)
-            namespace["globalData"] = b.globalData
+            print(self.kwargs)
+            print("DR BEANS REGARDS")
+            print(namespace)
             if(self.args is None):
                 evaluatedArgs = []
             else:
@@ -124,11 +121,11 @@ class Task:
             if(self.isLiteralFunc):
                 exec(self.func,namespace)
                 if (self.resultDest is not None):
-                    context[self.resultDest] = namespace["result"]
+                    namespace["context"][self.resultDest] = namespace["result"]
             else:
                 self.result = self.func(*evaluatedArgs,**evaluatedKwargs)
                 if (self.resultDest is not None):
-                    context[self.resultDest] = self.result
+                    namespace["context"][self.resultDest] = self.result
             self.status = "Completed"
             self.retries = 0
 
@@ -137,6 +134,12 @@ class Task:
             self.status = "Failed"
             self.error = e
             return self.status
+
+    # Tells the task to declare itself as a checkpoint, with the given checkpointID.
+    def declareAsCheckpoint(self,checkpointID):
+        self.isCheckpoint = True
+        self.checkpointID = checkpointID
+
 
     # Helper __str__ method for displaying and debugging individual tasks.
     def __str__(self):
@@ -233,7 +236,8 @@ class Controller:
     def executeNext(self):
         if(self.queue):
             currentTask = self.queue[self.currentQueueIndex]
-            currentTask.execute(self.contexts[currentTask.contextID],controller=self,tmaDriver = self.tma,cimplDriver=self.cimpl,verizonDriver=self.verizon)
+            namespace = buildNamespace(context=self.contexts[currentTask.contextID],controller=self,tmaDriver = self.tma,cimplDriver=self.cimpl,verizonDriver=self.verizon)
+            currentTask.execute(namespace=namespace)
             if(currentTask.status == "Completed"):
                 self.currentQueueIndex += 1
                 return ("Completed",currentTask.result)
@@ -353,11 +357,91 @@ class Recipe:
 
 # Policies are the answer to the question: "What happens when a task does not successfully run fully through?" Policies
 # are attached to Tasks during task creation, and will always refer to ONE TASK AND ONE TASK ONLY. They offer a
-# multitude of safeguards, success tests, and recoverability in the execution of tasks. CHECKPOINTS
+# multitude of safeguards, success tests, and recoverability in the execution of tasks. Policies are always completely
+# static, and don't change EVER during execution after initial instantiation.
 class Policy:
 
+    # Simple init method.
     def __init__(self):
-        pass
+        self.contextID = None
+
+        self.tests = []
+
+        self.isCheckpoint = False
+        self.checkpointID = None
+
+
+    # Simple method for adding a test to this Policy. All conditions are evaluated and, if they are ALL true,
+    # the tasks are run through. To use a callable function with args, use a dict like this:
+    # {"Function" : someFunction, "args" : [args], "kwargs" : {kwargs}
+    def addTest(self,conditions : str | list | Callable | dict, tasks : list,priority : int = 0):
+        testDict = {"Priority" : priority, "Tasks" : tasks}
+        if(type(conditions) is not list):
+            conditions = [conditions]
+        testDict["Conditions"] = conditions
+
+        foundIndex = False
+        for i in range(len(self.tests)):
+            if(priority > self.tests[i]["Priority"]):
+                self.tests.insert(0,testDict)
+                break
+
+        if(not foundIndex):
+            self.tests.append(testDict)
+
+    # Given a test dictionary, this method evaluates the full condition list and, if True, returns the list of
+    # tasks. If False, it simply returns None.
+    @staticmethod
+    def evaluateTest(testDict : dict, namespace : dict):
+        truth = True
+        for condition in testDict["Conditions"]:
+            if(type(condition) is str):
+                finalFunc = b.findAndReplaceDelimiterVariables(s = condition,delimiter="$",replacement="context['$VARIABLE$']")
+                finalFunc = b.findAndReplaceDelimiterVariables(s = finalFunc,delimiter="&",replacement="globalData['$VARIABLE$']")
+                thisTestResult = eval(finalFunc,namespace)
+            elif(type(condition) is Callable):
+                thisTestResult = condition()
+            elif(type(condition) is dict):
+                args = condition.get("args")
+                kwargs = condition.get("kwargs")
+                if (args is None):
+                    evaluatedArgs = []
+                else:
+                    finalArgs = []
+                    for arg in args:
+                        finalArg = b.findAndReplaceDelimiterVariables(s=arg, delimiter="$",replacement="context['$VARIABLE$']")
+                        finalArg = b.findAndReplaceDelimiterVariables(s=finalArg, delimiter="&",replacement="globalData['$VARIABLE$']")
+                        finalArgs.append(finalArg)
+                    evaluatedArgs = [eval(arg, namespace) for arg in finalArgs]
+                if (kwargs is None):
+                    evaluatedKwargs = {}
+                else:
+                    finalKwargs = {}
+                    for key,value in kwargs.items():
+                        finalKwarg = b.findAndReplaceDelimiterVariables(s=value, delimiter="$",replacement="context['$VARIABLE$']")
+                        finalKwarg = b.findAndReplaceDelimiterVariables(s=finalKwarg, delimiter="&",replacement="globalData['$VARIABLE$']")
+                        finalKwargs[key] = finalKwarg
+                    evaluatedKwargs = {key: eval(value, namespace) for key, value in finalKwargs}
+
+                thisTestResult = condition["Function"](*evaluatedArgs,**evaluatedKwargs)
+            else:
+                raise ValueError(f"This is literally impossible to get to. God speed, cause this was the condition: '{condition}' of type {type(condition)}")
+
+            if(type(thisTestResult) is not bool):
+                raise ValueError(f"ERROR: Test condition '{condition}' return non-bool result '{thisTestResult}'")
+            elif(not thisTestResult):
+                truth = False
+                break
+            else:
+                continue
+
+        if(truth):
+            return testDict["Tasks"]
+        else:
+            return None
+
+
+
 
 
 
@@ -497,7 +581,7 @@ gatherUpgradeServiceArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToC
 #endregion === Recipe - Gather ServiceToBuild Args ===
 #c.addRecipe(gatherUpgradeServiceArgs,{"inputContext" : "Default", "OutputContext" : "Default"})
 #region === Recipe - Upgrade ===
-upgrade = Recipe(name="upgrade",contextID="upgrade",requiredKwargs=["inputContext"],deleteContextAfterExecution=False)
+upgrade = Recipe(name="upgrade",contextID="upgrade",requiredKwargs=["inputContext"],deleteContextAfterExecution=True)
 upgrade.addTask(Task(name="gatherArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_device'"},resultDest="device"))
 upgrade.addTask(Task(name="gatherArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_serviceNum'"},resultDest="serviceNum"))
 upgrade.addTask(Task(name="gatherArgs3",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_installDate'"},resultDest="installDate"))
@@ -532,7 +616,7 @@ fillCimplUpgrade.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Wo
 #c.addRecipe(fillCimplUpgrade,{"inputContext" : "Default"})
 
 #region === Recipe - Open/Read Workorder ===
-openReadWorkorder = Recipe(name="openWorkorder",contextID="openReadWorkorder",requiredKwargs=["cimplWONumber"],deleteContextAfterExecution=True)
+openReadWorkorder = Recipe(name="openReadWorkorder",contextID="openReadWorkorder",requiredKwargs=["cimplWONumber"],deleteContextAfterExecution=True)
 openReadWorkorder.addTask(Task(name="navToWOCenter",func=Cimpl.CimplDriver.navToWorkorderCenter,args="$CONTROL_CIMPL"))
 openReadWorkorder.addTask(Task(name="clearFilters",func=Cimpl.CimplDriver.Filters_Clear,args="$CONTROL_CIMPL"))
 openReadWorkorder.addTask(Task(name="addWONumFilter",func=Cimpl.CimplDriver.Filters_AddWorkorderNumber,args="$CONTROL_CIMPL",kwargs={"status" : "'Contains'","workorderNumber" : "$cimplWONumber"}))

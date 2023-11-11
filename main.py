@@ -37,8 +37,8 @@ carrier = bell
 imei = "351050545832644"
 #endregion === OLD METHOD ===
 #region === NEW METHOD ===
-upgrades = []
-newInstalls = ["43329"]
+upgrades = ["43430"]
+newInstalls = []
 #endregion === NEW METHOD ===
 
 #region Execution
