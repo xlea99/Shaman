@@ -159,7 +159,7 @@ def fuzzyStringToNumber(string : str):
 # specified delimiter (by default $) to match all these variables. For example,
 # ```$flounderMan.getWalrus() + 2 * $hippo + "$duck``` would specifically match only $flounderMan and $hippo.
 # Also supports fstring type strings for delimiter variables.
-def findDelimiterVariables(s, delimiter='$'):
+def findDelimiterVariables(s : str, delimiter : str = "$"):
     # Adjust the regex pattern to incorporate the delimiter
     generalPattern = rf'{re.escape(delimiter)}[a-zA-Z][a-zA-Z0-9_]*'
 
@@ -204,5 +204,16 @@ def findDelimiterVariables(s, delimiter='$'):
             validMatchPositions.append((match, (startIdx, endIdx)))
 
     return validMatchPositions
+# Method for replacing delimiter variables with a different string, and an option to include the variable's
+# name (without the delimiter) by using $VARIABLE$
+def replaceDelimiterVariables(s : str,matchPositions : list,replacement : str):
+    for var, (startPos, endPos) in sorted(matchPositions, key=lambda x: x[1][0], reverse=True):
+        processedReplacement = replacement.replace("$VARIABLE$",var[1:])
+        s = s[:startPos] + processedReplacement + s[endPos:]
+    return s
+# Helper function that combines the two top functions.
+def findAndReplaceDelimiterVariables(s : str,delimiter : str = "$", replacement : str = "$VARIABLE$"):
+    matchPositions = findDelimiterVariables(s = s, delimiter = delimiter)
+    return replaceDelimiterVariables(s = s,matchPositions = matchPositions,replacement = replacement)
 
 #endregion === Misc Functions ===

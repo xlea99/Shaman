@@ -102,6 +102,9 @@ class CimplDriver:
         signInButton.click()
         self.waitForLoadingScreen()
 
+        #TODO glue
+        time.sleep(5)
+
     #region === WOCenter ===
 
     # This method simply returns us to the workorder center, and throws an error if it can not.

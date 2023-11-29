@@ -84,17 +84,18 @@ class VerizonDriver:
     # This method navigates to the Verizon order viewer.
     def navToOrderViewer(self):
         self.browser.switchToTab("Verizon")
-        self.navToHomescreen()
 
-        try:
-            viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//span[contains(text(),'View Orders')]",timeout=10)
-        except selenium.common.exceptions.NoSuchElementException:
-            viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'ordersPosition')]",timeout=15)
-        viewOrdersLink.click()
-        if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=30)):
-            # TODO proper error reporting maybe?
-            raise ValueError("Couldn't navigate successfully to Verizon view-orders screen.")
-        self.OrderViewer_WaitForLoadingScreen()
+        if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=2)):
+            self.navToHomescreen()
+            try:
+                viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//span[contains(text(),'View Orders')]",timeout=10)
+            except selenium.common.exceptions.NoSuchElementException:
+                viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'ordersPosition')]",timeout=15)
+            viewOrdersLink.click()
+            if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=30)):
+                # TODO proper error reporting maybe?
+                raise ValueError("Couldn't navigate successfully to Verizon view-orders screen.")
+            self.OrderViewer_WaitForLoadingScreen()
 
 
     #endregion === Site Navigation ===
