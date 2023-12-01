@@ -26,19 +26,19 @@ def runOldMethod(_browser,_tmaDriver,_netID,_serviceNum,_installDate,_device,_ca
     h.syscoNewInstall(existingTMADriver=_tmaDriver,browser=_browser,netID=_netID,serviceNum=_serviceNum,installDate=_installDate,device=_device,carrier=_carrier,imei=_imei)
 #endregion Setup
 
-newMethod = True
+newMethod = False
 
 #region === OLD METHOD ===
-netID = "sajpc265"
-serviceNum = "(306) 515-1252"
-installDate = "11/7/2023"
+netID = "pkhu9764"
+serviceNum = "(250) 858-7024"
+installDate = "11/28/2023"
 device = iphone11
 carrier = bell
-imei = "351050545832644"
+imei = "351050545009987"
 #endregion === OLD METHOD ===
 #region === NEW METHOD ===
-upgrades = ["43430"]
-newInstalls = []
+upgrades = ["43655","43677","43679","43680","43681"]
+newInstalls = ["43674","43678","43683"]
 #endregion === NEW METHOD ===
 
 #region Execution

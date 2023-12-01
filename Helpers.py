@@ -18,8 +18,7 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=Non
         t.logInToTMA()
 
     netID = netID.strip()
-    serviceNum = serviceNum.strip()
-    serviceNum = serviceNum.replace('.', '-')
+    serviceNum = b.convertServiceIDFormat(serviceID=serviceNum,targetFormat="dashed")
 
 
     t.navToLocation(client="Sysco", entryType="People", entryID=netID.strip())
