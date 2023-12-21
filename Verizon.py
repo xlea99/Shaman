@@ -261,6 +261,8 @@ class VerizonDriver:
 
     #endregion === Order Viewer ===
 
+
+    #region === Page Tests ===
     # This method simply tests to see if the "Session Expiring" message has popped up and, if it has, clicks "yes"
     # on the continue prompt.
     def testForSessionsExpiringMessage(self,clickContinue : bool = True):
@@ -273,10 +275,58 @@ class VerizonDriver:
         else:
             return False
 
+    # This method tests to see if browser is on the correct Verizon site or not.
+    def Test_OnVerizonSite(self):
+        validVerizonSitePrefixes = ["mblogin.verizonwireless.com","mb.verizonwireless.com"]
 
-#br = Browser.Browser()
-#v = VerizonDriver(browserObject=br)
-#v.logInToVerizon()
-#v.navToOrderViewer()
-#v.OrderViewer_SearchOrder(orderNumber="MB1000399200972")
-#foundOrder = v.OrderViewer_ReadDisplayedOrder()
+        for validVerizonSitePrefix in validVerizonSitePrefixes:
+            if(validVerizonSitePrefix in self.browser.get_current_url()):
+                return True
+        return False
+    # This method tests to see if Verizon is currently actually logged in or not.
+    def Test_LoggedIn(self):
+        if("mb.verizonwireless.com" in self.browser.get_current_url()):
+            return True
+        else:
+            return False
+    # This method tests to see if the "Session Expiring" message has popped up or not.
+    def Test_SessionExpiringPopup(self):
+        sessionExpiringBox = "//h2[text()='Session Expiring']/following-sibling::div/div/div/button[text()='Yes']"
+        return self.browser.elementExists(by=By.XPATH,value=sessionExpiringBox)
+    # This method tests to see if a loading menu is currently present that might obfuscate other elements.
+    def Test_LoadingScreen(self):
+        loader1MessageString = "//div[@class='loader']"
+        loader1 = self.browser.elementExists(by=By.XPATH,value=loader1MessageString,timeout=0.5)
+        if(loader1):
+            time.sleep(3)
+            return True
+
+        loader2MessageString = "//div[@class='loading']"
+        loader2 = self.browser.elementExists(by=By.XPATH,value=loader2MessageString,timeout=0.5)
+        if(loader2):
+            time.sleep(3)
+            return True
+
+        return False
+
+
+    #endregion === Page Tests ===
+
+
+# Various errors for handling Verizon Errors.
+class VerizonError(Exception):
+    def __init__(self, message="An error with the Verizon Driver occurred"):
+        self.message = message
+        super().__init__(self.message)
+class NotOnVerizonSite(VerizonError):
+    def __init__(self, currentURL = ""):
+        super().__init__(f"VerizonDriver not currently on the Verizon MyBiz portal. Currently URL: '{currentURL}'")
+class NotLoggedIn(VerizonError):
+    def __init__(self):
+        super().__init__(f"VerizonDriver not currently logged in to the Verizon MyBiz portal.")
+class SessionExpiring(VerizonError):
+    def __init__(self):
+        super().__init__(f"Verizon MyBiz session is expiring - box must be clicked to continue session.")
+class LoadingScreen(VerizonError):
+    def __init__(self):
+        super().__init__(f"Verizon MyBiz still stuck at loading while trying to click a new element.")

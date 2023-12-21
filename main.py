@@ -29,15 +29,15 @@ def runOldMethod(_browser,_tmaDriver,_netID,_serviceNum,_installDate,_device,_ca
 newMethod = True
 
 #region === OLD METHOD ===
-netID = "sajpc265"
-serviceNum = "(306) 515-1252"
-installDate = "11/7/2023"
-device = iphone11
-carrier = bell
-imei = "351050545832644"
+netID = "sbra8466"
+serviceNum = " 341.233.3544 "
+installDate = "12/8/2023"
+device = s21
+carrier = verizon
+imei = "351844427732124"
 #endregion === OLD METHOD ===
 #region === NEW METHOD ===
-upgrades = ["43430"]
+upgrades = [43872]
 newInstalls = []
 #endregion === NEW METHOD ===
 

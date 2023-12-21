@@ -18,18 +18,18 @@ else:
     allExceptions = ()
 
 # Helper method to build and return a namespace quickly, for passing in to callables etc.
-def buildNamespace(controller,tmaDriver,cimplDriver,verizonDriver,context = None):
-    allDrivers = {"CONTROL_CONTROLLER": controller, "CONTROL_TMA": tmaDriver, "CONTROL_CIMPL": cimplDriver,"CONTROL_VERIZON": verizonDriver}
-    packages = {"RESULT": None, "datetime": datetime, "TMA": TMA, "time": time}
+def buildNamespace(controller,tmaDriver,cimplDriver,verizonDriver,executionData,context = None):
+    allDrivers = {"controllerDriver": controller, "tmaDriver": tmaDriver, "cimplDriver": cimplDriver,"verizonDriver": verizonDriver}
+    packages = {"datetime": datetime, "TMA": TMA, "time": time}
     if(context is None):
         context = {}
 
     namespace = {}
     namespace.update(packages)
-    namespace.update(allDrivers)
     namespace["context"] = context
-    namespace["context"].update(allDrivers)
     namespace["globalData"] = b.globalData
+    namespace["executionData"] = executionData
+    namespace["executionData"].update(allDrivers)
 
     return namespace
 
@@ -49,6 +49,7 @@ class Task:
         if(type(func) is str):
             finalFunc = b.findAndReplaceDelimiterVariables(s=func, delimiter="$", replacement="context['$VARIABLE$']")
             finalFunc = b.findAndReplaceDelimiterVariables(s=finalFunc, delimiter="&",replacement="globalData['$VARIABLE$']")
+            finalFunc = b.findAndReplaceDelimiterVariables(s=finalFunc, delimiter="^",replacement="executionData['$VARIABLE$']")
             self.func = finalFunc
             self.isLiteralFunc = True
         else:
@@ -65,6 +66,7 @@ class Task:
             if(type(arg) is str):
                 finalArg = b.findAndReplaceDelimiterVariables(s = arg,delimiter="$",replacement="context['$VARIABLE$']")
                 finalArg = b.findAndReplaceDelimiterVariables(s = finalArg,delimiter="&",replacement="globalData['$VARIABLE$']")
+                finalArg = b.findAndReplaceDelimiterVariables(s = finalArg,delimiter="^",replacement="executionData['$VARIABLE$']")
                 self.args.append(finalArg)
             else:
                 self.args.append(arg)
@@ -77,6 +79,7 @@ class Task:
             if(type(value) is str):
                 finalKwarg = b.findAndReplaceDelimiterVariables(s = value,delimiter="$",replacement="context['$VARIABLE$']")
                 finalKwarg = b.findAndReplaceDelimiterVariables(s = finalKwarg,delimiter="&",replacement="globalData['$VARIABLE$']")
+                finalKwarg = b.findAndReplaceDelimiterVariables(s = finalKwarg,delimiter="^",replacement="executionData['$VARIABLE$']")
                 self.kwargs[key] = finalKwarg
             else:
                 self.kwargs[key] = value
@@ -164,6 +167,12 @@ class Controller:
         # Checkpoint manager
         self.checkpoints = {}
 
+        # Execution Data Manager
+        self.executionData = {"Cycle" : "PreOp", # Can be PreOp (-1), Op(0), PostOp(1), or Recovery(2),
+                              "PreviousTaskStatus" : "",
+                              "PreviousTaskResult" : "",
+                              "ErrorMessage" : None}
+
     # Method for queueing a task, based on the task's priority.
     def addTask(self,task : Task):
         self.createContext(task.contextID,mergeContexts=True)
@@ -236,8 +245,16 @@ class Controller:
     def executeNext(self):
         if(self.queue):
             currentTask = self.queue[self.currentQueueIndex]
-            namespace = buildNamespace(context=self.contexts[currentTask.contextID],controller=self,tmaDriver = self.tma,cimplDriver=self.cimpl,verizonDriver=self.verizon)
+            self.executionData["Cycle"] = "PreOp"
+            namespace = buildNamespace(context=self.contexts[currentTask.contextID],executionData=self.executionData,controller=self,tmaDriver = self.tma,cimplDriver=self.cimpl,verizonDriver=self.verizon)
+            # POLICY CODE GOES HERE
+
+            self.executionData["Cycle"] = "Op"
             currentTask.execute(namespace=namespace)
+
+            self.executionData["Cycle"] = "PostOp"
+            self.executionData["PreviousTaskResult"] = currentTask.result
+            self.executionData["PreviousTaskStatus"] = currentTask.status
             if(currentTask.status == "Completed"):
                 self.currentQueueIndex += 1
                 return ("Completed",currentTask.result)
@@ -367,18 +384,23 @@ class Policy:
 
         self.tests = []
 
-        self.isCheckpoint = False
-        self.checkpointID = None
-
-
     # Simple method for adding a test to this Policy. All conditions are evaluated and, if they are ALL true,
     # the tasks are run through. To use a callable function with args, use a dict like this:
     # {"Function" : someFunction, "args" : [args], "kwargs" : {kwargs}
     def addTest(self,conditions : str | list | Callable | dict, tasks : list,priority : int = 0):
-        testDict = {"Priority" : priority, "Tasks" : tasks}
+        testDict = {"Priority" : priority,"Completed" : False}
         if(type(conditions) is not list):
             conditions = [conditions]
         testDict["Conditions"] = conditions
+
+        finalTaskList = []
+        for item in tasks:
+            if(type(item) is Task):
+                finalTaskList.append(finalTaskList)
+            elif(type(item) is Recipe):
+                #TODO making contextids consistent here plz
+                    pass
+
 
         foundIndex = False
         for i in range(len(self.tests)):
@@ -398,6 +420,7 @@ class Policy:
             if(type(condition) is str):
                 finalFunc = b.findAndReplaceDelimiterVariables(s = condition,delimiter="$",replacement="context['$VARIABLE$']")
                 finalFunc = b.findAndReplaceDelimiterVariables(s = finalFunc,delimiter="&",replacement="globalData['$VARIABLE$']")
+                finalFunc = b.findAndReplaceDelimiterVariables(s = finalFunc,delimiter="^",replacement="executionData['$VARIABLE$']")
                 thisTestResult = eval(finalFunc,namespace)
             elif(type(condition) is Callable):
                 thisTestResult = condition()
@@ -411,6 +434,7 @@ class Policy:
                     for arg in args:
                         finalArg = b.findAndReplaceDelimiterVariables(s=arg, delimiter="$",replacement="context['$VARIABLE$']")
                         finalArg = b.findAndReplaceDelimiterVariables(s=finalArg, delimiter="&",replacement="globalData['$VARIABLE$']")
+                        finalArg = b.findAndReplaceDelimiterVariables(s=finalArg, delimiter="^",replacement="executionData['$VARIABLE$']")
                         finalArgs.append(finalArg)
                     evaluatedArgs = [eval(arg, namespace) for arg in finalArgs]
                 if (kwargs is None):
@@ -420,6 +444,7 @@ class Policy:
                     for key,value in kwargs.items():
                         finalKwarg = b.findAndReplaceDelimiterVariables(s=value, delimiter="$",replacement="context['$VARIABLE$']")
                         finalKwarg = b.findAndReplaceDelimiterVariables(s=finalKwarg, delimiter="&",replacement="globalData['$VARIABLE$']")
+                        finalKwarg = b.findAndReplaceDelimiterVariables(s=finalKwarg, delimiter="^",replacement="executionData['$VARIABLE$']")
                         finalKwargs[key] = finalKwarg
                     evaluatedKwargs = {key: eval(value, namespace) for key, value in finalKwargs}
 
@@ -440,12 +465,30 @@ class Policy:
         else:
             return None
 
+    # Copy helper method for easy instantiation of Policy templates.
+    def __copy__(self):
+        newPolicy = Policy()
+        newPolicy.contextID = self.contextID
+        newPolicy.tests = self.tests
 
 
 
 
+# EACH RECIPE HAS THE FOLLOWING PHASES:
+# PreOp: A set of PreOperation tasks are run through. As long as non set a special end condition, program simply
+# executes these through (generally used to set up and test environment). If PreOp fails, default behavior is to
+# jump to PostOp and entirely skip Op.
+#
+# Op: A set of Operational tasks are run through. These should be the actual meat of the Recipe - the tasks that
+# actually accomplish the stated purpose of the Recipe. If Op fails, default behavior is to jump to PostOp.
+#
+# PostOp: A set of PostOperation tasks are run through. These tend to be conditional based on the final end status
+# of the Op (and sometimes PreOp) phases, and determines logic for repeats, checkpoint restores, etc.
 
 
+
+verizonPolicy_isLoggedInTest = {"Conditions" : ["not ^verizonDriver.isLoggedIn()"],"Instructions" : "SET_FAILED"} # Test to ensure we're logged into Verizon
+verizonPolicy_sessionEndingTest = {"Conditions" : ["^verizonDriver.isLoggedIn()", "^verizonDriver.testForSessionsExpiringMessage(clickContinue=False)"], "Tasks" : "^verizonDriver.testForSessionsExpiringMessage()"}
 
 
 
@@ -467,33 +510,33 @@ c = Controller(_browser=browser,TMADriver=tma,CimplDriver=cimpl,VerizonDriver=ve
 
 #region === Recipe - Gather New Install Service Args === # TODO only currently supports Verizon :(
 gatherNewInstallServiceArgs = Recipe(name="gatherNewInstallServiceArgs",contextID="gatherServiceToBuildArgs",requiredKwargs=["inputContext","outputContext"],deleteContextAfterExecution=True)
-gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'cimplWO'"},resultDest="cimplWO"))
-gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs1",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'cimplWO'"},resultDest="cimplWO"))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs2",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
 gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs3",func=Cimpl.getUserID,kwargs={"actionsList" : "$cimplWO['Actions']"},resultDest="userID"))
-gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs4",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_netID'","newValue" : "$userID"}))
-gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs5",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_serviceNum'","newValue" : "$verizonOrderInfo['WirelessNumber']"}))
-gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs6",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_installDate'","newValue" : "$verizonOrderInfo['OrderDate']"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs4",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_netID'","newValue" : "$userID"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs5",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_serviceNum'","newValue" : "$verizonOrderInfo['WirelessNumber']"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs6",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_installDate'","newValue" : "$verizonOrderInfo['OrderDate']"}))
 gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs7",func=Cimpl.getDeviceModelID,kwargs={"hardwareInfo" : "$cimplWO['HardwareInfo']"},resultDest="deviceModelID"))
-gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs8",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_device'","newValue" : "$deviceModelID"}))
-gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs9",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_imei'","newValue" : "$verizonOrderInfo['IMEI']"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs8",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_device'","newValue" : "$deviceModelID"}))
+gatherNewInstallServiceArgs.addTask(Task(name="newInstallArgs9",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_imei'","newValue" : "$verizonOrderInfo['IMEI']"}))
 #TODO VERIZON SUPPORT ONLY :( :( :(
-gatherNewInstallServiceArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_carrier'","newValue" : "'Verizon Wireless'"}))
+gatherNewInstallServiceArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_carrier'","newValue" : "'Verizon Wireless'"}))
 #endregion === Recipe - Gather ServiceToBuild Args ===
 #c.addRecipe(gatherNewInstallServiceArgs,{"inputContext" : "Default", "OutputContext" : "Default"})
 #region === Recipe - New Install ===
 newInstall = Recipe(name="newInstall",contextID="newInstall",requiredKwargs=["inputContext"],deleteContextAfterExecution=False)
-newInstall.addTask(Task(name="gatherArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_netID'"},resultDest="netID"))
-newInstall.addTask(Task(name="gatherArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_serviceNum'"},resultDest="serviceNum"))
-newInstall.addTask(Task(name="gatherArgs3",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_installDate'"},resultDest="installDate"))
-newInstall.addTask(Task(name="gatherArgs4",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_device'"},resultDest="device"))
-newInstall.addTask(Task(name="gatherArgs5",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_imei'"},resultDest="imei"))
-newInstall.addTask(Task(name="gatherArgs6",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_carrier'"},resultDest="carrier"))
+newInstall.addTask(Task(name="gatherArgs1",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_netID'"},resultDest="netID"))
+newInstall.addTask(Task(name="gatherArgs2",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_serviceNum'"},resultDest="serviceNum"))
+newInstall.addTask(Task(name="gatherArgs3",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_installDate'"},resultDest="installDate"))
+newInstall.addTask(Task(name="gatherArgs4",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_device'"},resultDest="device"))
+newInstall.addTask(Task(name="gatherArgs5",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_imei'"},resultDest="imei"))
+newInstall.addTask(Task(name="gatherArgs6",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_carrier'"},resultDest="carrier"))
 newInstall.addTask(Task(name="stripNetID",func="$netID = $netID.strip()"))
 newInstall.addTask(Task(name="getServiceNum",func=b.convertServiceIDFormat,kwargs={"serviceID" : "$serviceNum","targetFormat" : "'dashed'"},resultDest="serviceNum"))
-newInstall.addTask(Task(name="lookupPerson",func=TMA.TMADriver.navToLocation,args=("$CONTROL_TMA"),kwargs={"client":"'Sysco'","entryType":"'People'","entryID":"$netID"}))
-newInstall.addTask(Task(name="getTargetUser",func=TMA.People,kwargs={"locationData" : "CONTROL_TMA.currentLocation"},resultDest="targetUser"))
+newInstall.addTask(Task(name="lookupPerson",func=TMA.TMADriver.navToLocation,args=("^tmaDriver"),kwargs={"client":"'Sysco'","entryType":"'People'","entryID":"$netID"}))
+newInstall.addTask(Task(name="getTargetUser",func=TMA.People,kwargs={"locationData" : "^tmaDriver.currentLocation"},resultDest="targetUser"))
 newInstall.addTask(Task(name="setTargetUserClient",func="$targetUser.info_Client = 'Sysco'"))
-newInstall.addTask(Task(name="readTargetUser",func=TMA.TMADriver.People_ReadBasicInfo,args=("$CONTROL_TMA","$targetUser")))
+newInstall.addTask(Task(name="readTargetUser",func=TMA.TMADriver.People_ReadBasicInfo,args=("^tmaDriver","$targetUser")))
 newInstall.addTask(Task(name="instantiateNewService",func=TMA.Service,resultDest="newService"))
 newInstall.addTask(Task(name="setNewServiceClient",func="$newService.info_Client = 'Sysco'"))
 newInstall.addTask(Task(name="setNewServiceCarrier",func="$newService.info_Carrier = $carrier"))
@@ -522,123 +565,123 @@ newInstall.addTask(Task(name="getAllCosts2",func='''$baseCost = next((TMA.Cost(i
 newInstall.addTask(Task(name="getAllCosts3",func='''$featureCosts = [TMA.Cost(isBaseCost=cost["isBaseCost"], featureName=cost["featureName"], gross=cost["gross"], discountFlat=cost["discountFlat"], discountPercentage=cost["discountPercentage"]) for cost in $allCosts if not cost["isBaseCost"]]'''))
 newInstall.addTask(Task(name="getAllCosts4",func="$newService.info_BaseCost = $baseCost"))
 newInstall.addTask(Task(name="getAllCosts5",func="$newService.info_FeatureCosts = $featureCosts"))
-newInstall.addTask(Task(name="createNewLinkedService",func=TMA.TMADriver.People_CreateNewLinkedService,args=("$CONTROL_TMA")))
-newInstall.addTask(Task(name="switchToTab",func=TMA.TMADriver.switchToNewTab,args=("$CONTROL_TMA")))
-newInstall.addTask(Task(name="selectModalServiceType",func=TMA.TMADriver.Service_SelectModalServiceType,args=("$CONTROL_TMA","'Cellular'")))
-newInstall.addTask(Task(name="writeServiceMainInformation",func=TMA.TMADriver.Service_WriteMainInformation,args=("$CONTROL_TMA","$newService","'Sysco'")))
-newInstall.addTask(Task(name="writeServiceInstalledDate",func=TMA.TMADriver.Service_WriteInstalledDate,args=("$CONTROL_TMA","$newService")))
-newInstall.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("$CONTROL_TMA")))
+newInstall.addTask(Task(name="createNewLinkedService",func=TMA.TMADriver.People_CreateNewLinkedService,args=("^tmaDriver")))
+newInstall.addTask(Task(name="switchToTab",func=TMA.TMADriver.switchToNewTab,args=("^tmaDriver")))
+newInstall.addTask(Task(name="selectModalServiceType",func=TMA.TMADriver.Service_SelectModalServiceType,args=("^tmaDriver","'Cellular'")))
+newInstall.addTask(Task(name="writeServiceMainInformation",func=TMA.TMADriver.Service_WriteMainInformation,args=("^tmaDriver","$newService","'Sysco'")))
+newInstall.addTask(Task(name="writeServiceInstalledDate",func=TMA.TMADriver.Service_WriteInstalledDate,args=("^tmaDriver","$newService")))
+newInstall.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("^tmaDriver")))
 # TODO Detect that we ACTUALLY HAVE transitioned to assignment screen
-newInstall.addTask(Task(name="buildAssignmentFromAccount",func=TMA.TMADriver.Assignment_BuildAssignmentFromAccount,args=("$CONTROL_TMA","'Sysco'","$carrier","$targetUser.info_OpCo")))
-newInstall.addTask(Task(name="returnToBaseTMA",func=TMA.TMADriver.returnToBaseTMA,args=("$CONTROL_TMA")))
-newInstall.addTask(Task(name="verifyInsert1",func=TMA.TMADriver.People_NavToLinkedTab,args=("$CONTROL_TMA","'orders'")))
-newInstall.addTask(Task(name="verifyInsert2",func=TMA.TMADriver.People_NavToLinkedTab,args=("$CONTROL_TMA","'services'")))
-newInstall.addTask(Task(name="openNewServiceScreen",func=TMA.TMADriver.People_OpenServiceFromPeople,args=("$CONTROL_TMA","$serviceNum")))
+newInstall.addTask(Task(name="buildAssignmentFromAccount",func=TMA.TMADriver.Assignment_BuildAssignmentFromAccount,args=("^tmaDriver","'Sysco'","$carrier","$targetUser.info_OpCo")))
+newInstall.addTask(Task(name="returnToBaseTMA",func=TMA.TMADriver.returnToBaseTMA,args=("^tmaDriver")))
+newInstall.addTask(Task(name="verifyInsert1",func=TMA.TMADriver.People_NavToLinkedTab,args=("^tmaDriver","'orders'")))
+newInstall.addTask(Task(name="verifyInsert2",func=TMA.TMADriver.People_NavToLinkedTab,args=("^tmaDriver","'services'")))
+newInstall.addTask(Task(name="openNewServiceScreen",func=TMA.TMADriver.People_OpenServiceFromPeople,args=("^tmaDriver","$serviceNum")))
 # TODO GLUE GLUE GLUE WE HATE GLUE!
 newInstall.addTask(Task(name="glue1",func="time.sleep(5)"))
-newInstall.addTask(Task(name="writeServiceCosts1",func=TMA.TMADriver.Service_WriteCosts,args=("$CONTROL_TMA","$newService"),kwargs={"isBase" : "True"}))
-newInstall.addTask(Task(name="writeServiceCosts2",func=TMA.TMADriver.Service_WriteCosts,args=("$CONTROL_TMA","$newService"),kwargs={"isBase" : "False"}))
-newInstall.addTask(Task(name="navToLinksServiceTab",func=TMA.TMADriver.Service_NavToServiceTab,args=("$CONTROL_TMA","'links'")))
-newInstall.addTask(Task(name="navToEquipmentLinkedTab",func=TMA.TMADriver.Service_NavToLinkedTab,args=("$CONTROL_TMA","'equipment'")))
-newInstall.addTask(Task(name="createNewLinkedEquipment",func=TMA.TMADriver.Service_CreateLinkedEquipment,args=("$CONTROL_TMA")))
-newInstall.addTask(Task(name="switchToNewEquipmentTab",func=TMA.TMADriver.switchToNewTab,args=("$CONTROL_TMA")))
-newInstall.addTask(Task(name="writeEquipmentType",func=TMA.TMADriver.Equipment_SelectEquipmentType,args=("$CONTROL_TMA","$newService.info_LinkedEquipment.info_MainType")))
-newInstall.addTask(Task(name="writeEquipmentMainInformation",func=TMA.TMADriver.Equipment_WriteAll,args=("$CONTROL_TMA","$newService.info_LinkedEquipment")))
-newInstall.addTask(Task(name="insertUpdateEquipment",func=TMA.TMADriver.Equipment_InsertUpdate,args=("$CONTROL_TMA")))
-newInstall.addTask(Task(name="returnToBaseTMA",func=TMA.TMADriver.returnToBaseTMA,args=("$CONTROL_TMA")))
-newInstall.addTask(Task(name="verifyFinishedServiceBuild1",func=TMA.TMADriver.Service_NavToLinkedTab,args=("$CONTROL_TMA","'orders'")))
-newInstall.addTask(Task(name="verifyFinishedServiceBuild2",func=TMA.TMADriver.Service_NavToLinkedTab,args=("$CONTROL_TMA","'equipment'")))
-newInstall.addTask(Task(name="finalServiceInsertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("$CONTROL_TMA")))
+newInstall.addTask(Task(name="writeServiceCosts1",func=TMA.TMADriver.Service_WriteCosts,args=("^tmaDriver","$newService"),kwargs={"isBase" : "True"}))
+newInstall.addTask(Task(name="writeServiceCosts2",func=TMA.TMADriver.Service_WriteCosts,args=("^tmaDriver","$newService"),kwargs={"isBase" : "False"}))
+newInstall.addTask(Task(name="navToLinksServiceTab",func=TMA.TMADriver.Service_NavToServiceTab,args=("^tmaDriver","'links'")))
+newInstall.addTask(Task(name="navToEquipmentLinkedTab",func=TMA.TMADriver.Service_NavToLinkedTab,args=("^tmaDriver","'equipment'")))
+newInstall.addTask(Task(name="createNewLinkedEquipment",func=TMA.TMADriver.Service_CreateLinkedEquipment,args=("^tmaDriver")))
+newInstall.addTask(Task(name="switchToNewEquipmentTab",func=TMA.TMADriver.switchToNewTab,args=("^tmaDriver")))
+newInstall.addTask(Task(name="writeEquipmentType",func=TMA.TMADriver.Equipment_SelectEquipmentType,args=("^tmaDriver","$newService.info_LinkedEquipment.info_MainType")))
+newInstall.addTask(Task(name="writeEquipmentMainInformation",func=TMA.TMADriver.Equipment_WriteAll,args=("^tmaDriver","$newService.info_LinkedEquipment")))
+newInstall.addTask(Task(name="insertUpdateEquipment",func=TMA.TMADriver.Equipment_InsertUpdate,args=("^tmaDriver")))
+newInstall.addTask(Task(name="returnToBaseTMA",func=TMA.TMADriver.returnToBaseTMA,args=("^tmaDriver")))
+newInstall.addTask(Task(name="verifyFinishedServiceBuild1",func=TMA.TMADriver.Service_NavToLinkedTab,args=("^tmaDriver","'orders'")))
+newInstall.addTask(Task(name="verifyFinishedServiceBuild2",func=TMA.TMADriver.Service_NavToLinkedTab,args=("^tmaDriver","'equipment'")))
+newInstall.addTask(Task(name="finalServiceInsertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("^tmaDriver")))
 #endregion === Recipe - New Install ===
 #c.addRecipe(newInstall,{"inputContext" : "Default"})
 #region === Recipe - Fill Cimpl New Install ===
 # TODO testing to ensure we're already on Cimpl WO, OR automatic navigation, OR both :)
 # TODO Conditionally check that order is actually completed, not still pending (no service number)
 fillCimplNewInstall = Recipe(name="fillCimplNewInstall",contextID="fillCimplNewInstall",requiredKwargs=["inputContext"],deleteContextAfterExecution=True)
-fillCimplNewInstall.addTask(Task(name="getVerizonOrderInfo",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
-fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_NavToDetailsTab,args="$CONTROL_CIMPL"))
-fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_WriteServiceID,args="$CONTROL_CIMPL",kwargs={"serviceID" : "$verizonOrderInfo['WirelessNumber']"}))
-fillCimplNewInstall.addTask(Task(name="writeAccountNum",func=Cimpl.CimplDriver.Workorders_WriteAccount,args="$CONTROL_CIMPL",kwargs={"accountNum" : "&clients['Sysco']['Accounts']['Verizon Wireless']"}))
-fillCimplNewInstall.addTask(Task(name="writeStartDate",func=Cimpl.CimplDriver.Workorders_WriteStartDate,args="$CONTROL_CIMPL",kwargs={"startDate" : "$verizonOrderInfo['OrderDate']"}))
-fillCimplNewInstall.addTask(Task(name="writeStartDate",func=Cimpl.CimplDriver.Workorders_ApplyChanges,args="$CONTROL_CIMPL"))
-fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_NavToSummaryTab,args="$CONTROL_CIMPL"))
-fillCimplNewInstall.addTask(Task(name="addTrackingNote",func=Cimpl.CimplDriver.Workorders_WriteNote,args="$CONTROL_CIMPL",kwargs={"subject" : "'Tracking'","noteType" : "'Information Only'","status" : "'Completed'","content" : "$verizonOrderInfo['Courier'] + ' : ' + $verizonOrderInfo['TrackingNumber']"}))
-fillCimplNewInstall.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Workorders_SetStatus,args="$CONTROL_CIMPL",kwargs={"status" : "'Complete'"}))
+fillCimplNewInstall.addTask(Task(name="getVerizonOrderInfo",func=Controller.copyFromContext,args="^controllerDriver",kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
+fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_NavToDetailsTab,args="^cimplDriver"))
+fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_WriteServiceID,args="^cimplDriver",kwargs={"serviceID" : "$verizonOrderInfo['WirelessNumber']"}))
+fillCimplNewInstall.addTask(Task(name="writeAccountNum",func=Cimpl.CimplDriver.Workorders_WriteAccount,args="^cimplDriver",kwargs={"accountNum" : "&clients['Sysco']['Accounts']['Verizon Wireless']"}))
+fillCimplNewInstall.addTask(Task(name="writeStartDate",func=Cimpl.CimplDriver.Workorders_WriteStartDate,args="^cimplDriver",kwargs={"startDate" : "$verizonOrderInfo['OrderDate']"}))
+fillCimplNewInstall.addTask(Task(name="writeStartDate",func=Cimpl.CimplDriver.Workorders_ApplyChanges,args="^cimplDriver"))
+fillCimplNewInstall.addTask(Task(name="writeServiceNum",func=Cimpl.CimplDriver.Workorders_NavToSummaryTab,args="^cimplDriver"))
+fillCimplNewInstall.addTask(Task(name="addTrackingNote",func=Cimpl.CimplDriver.Workorders_WriteNote,args="^cimplDriver",kwargs={"subject" : "'Tracking'","noteType" : "'Information Only'","status" : "'Completed'","content" : "$verizonOrderInfo['Courier'] + ' : ' + $verizonOrderInfo['TrackingNumber']"}))
+fillCimplNewInstall.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Workorders_SetStatus,args="^cimplDriver",kwargs={"status" : "'Complete'"}))
 #endregion === Recipe - Fill Cimpl New Install ===
 #c.addRecipe(fillCimplNewInstall,{"inputContext" : "Default"})
 
 #region === Recipe - Gather Upgrade Service Args === # TODO only currently supports Verizon :(
 gatherUpgradeServiceArgs = Recipe(name="gatherUpgradeServiceArgs",contextID="gatherServiceToBuildArgs",requiredKwargs=["inputContext","outputContext"],deleteContextAfterExecution=True)
-gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'cimplWO'"},resultDest="cimplWO"))
-gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
-gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs5",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_serviceNum'","newValue" : "$cimplWO['ServiceID']"}))
-gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs6",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_installDate'","newValue" : "$verizonOrderInfo['OrderDate']"}))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs1",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'cimplWO'"},resultDest="cimplWO"))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs2",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs5",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_serviceNum'","newValue" : "$cimplWO['ServiceID']"}))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs6",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_installDate'","newValue" : "$verizonOrderInfo['OrderDate']"}))
 gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs7",func=Cimpl.getDeviceModelID,kwargs={"hardwareInfo" : "$cimplWO['HardwareInfo']"},resultDest="deviceModelID"))
-gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs8",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_device'","newValue" : "$deviceModelID"}))
-gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs9",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_imei'","newValue" : "$verizonOrderInfo['IMEI']"}))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs8",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_device'","newValue" : "$deviceModelID"}))
+gatherUpgradeServiceArgs.addTask(Task(name="upgradeArgs9",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_imei'","newValue" : "$verizonOrderInfo['IMEI']"}))
 #TODO VERIZON SUPPORT ONLY :( :( :(
-gatherUpgradeServiceArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_carrier'","newValue" : "'Verizon Wireless'"}))
+gatherUpgradeServiceArgs.addTask(Task(name="gatherArgs2",func=Controller.copyToContext,args=("^controllerDriver"),kwargs={"contextID" : "$outputContext","key" : "'serviceToBuild_carrier'","newValue" : "'Verizon Wireless'"}))
 #endregion === Recipe - Gather ServiceToBuild Args ===
 #c.addRecipe(gatherUpgradeServiceArgs,{"inputContext" : "Default", "OutputContext" : "Default"})
 #region === Recipe - Upgrade ===
 upgrade = Recipe(name="upgrade",contextID="upgrade",requiredKwargs=["inputContext"],deleteContextAfterExecution=True)
-upgrade.addTask(Task(name="gatherArgs1",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_device'"},resultDest="device"))
-upgrade.addTask(Task(name="gatherArgs2",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_serviceNum'"},resultDest="serviceNum"))
-upgrade.addTask(Task(name="gatherArgs3",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_installDate'"},resultDest="installDate"))
-upgrade.addTask(Task(name="gatherArgs4",func=Controller.copyFromContext,args=("$CONTROL_CONTROLLER"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_imei'"},resultDest="IMEI"))
-upgrade.addTask(Task(name="navToService",func=TMA.TMADriver.navToLocation,args=("$CONTROL_TMA"),kwargs={"client":"'Sysco'","entryType":"'Service'","entryID":"$serviceNum"}))
+upgrade.addTask(Task(name="gatherArgs1",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_device'"},resultDest="device"))
+upgrade.addTask(Task(name="gatherArgs2",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_serviceNum'"},resultDest="serviceNum"))
+upgrade.addTask(Task(name="gatherArgs3",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_installDate'"},resultDest="installDate"))
+upgrade.addTask(Task(name="gatherArgs4",func=Controller.copyFromContext,args=("^controllerDriver"),kwargs={"contextID" : "$inputContext","key" : "'serviceToBuild_imei'"},resultDest="IMEI"))
+upgrade.addTask(Task(name="navToService",func=TMA.TMADriver.navToLocation,args=("^tmaDriver"),kwargs={"client":"'Sysco'","entryType":"'Service'","entryID":"$serviceNum"}))
 upgrade.addTask(Task(name="formatExpDateObj1",func="$expDateObj = datetime.strptime($installDate,'%m/%d/%Y')"))
 upgrade.addTask(Task(name="formatExpDateObj2",func="$expDateObj = $expDateObj.replace(year=$expDateObj.year + 2)"))
-upgrade.addTask(Task(name="writeUpgradeEligibilityDate",func=TMA.TMADriver.Service_WriteUpgradeEligibilityDate,args=("$CONTROL_TMA"),kwargs={"rawValue":"$expDateObj.strftime('%m/%d/%Y')"}))
-upgrade.addTask(Task(name="writeContractEndDate",func=TMA.TMADriver.Service_WriteContractEndDate,args=("$CONTROL_TMA"),kwargs={"rawValue":"$expDateObj.strftime('%m/%d/%Y')"}))
-upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("$CONTROL_TMA")))
-upgrade.addTask(Task(name="getCurrentServiceType",func=TMA.TMADriver.Service_ReadMainInfo,args=("$CONTROL_TMA"),resultDest="currentServiceMainInfo"))
+upgrade.addTask(Task(name="writeUpgradeEligibilityDate",func=TMA.TMADriver.Service_WriteUpgradeEligibilityDate,args=("^tmaDriver"),kwargs={"rawValue":"$expDateObj.strftime('%m/%d/%Y')"}))
+upgrade.addTask(Task(name="writeContractEndDate",func=TMA.TMADriver.Service_WriteContractEndDate,args=("^tmaDriver"),kwargs={"rawValue":"$expDateObj.strftime('%m/%d/%Y')"}))
+upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("^tmaDriver")))
+upgrade.addTask(Task(name="getCurrentServiceType",func=TMA.TMADriver.Service_ReadMainInfo,args=("^tmaDriver"),resultDest="currentServiceMainInfo"))
 upgrade.addTask(Task(name="getNewServiceType",func="$newServiceType = &equipment[$device]['serviceType']"))
 upgrade.addTask(Task(name="compareServiceTypes",func="$testForNewServiceType = $newServiceType != $currentServiceMainInfo.info_ServiceType"))
-upgrade.addTask(Task(name="setNewServiceTypeIfNeeded",func=TMA.TMADriver.Service_WriteServiceType,args=("$CONTROL_TMA"),kwargs={"rawValue" : "$newServiceType"},conditionCheck="testForNewServiceType"))
-upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("$CONTROL_TMA"),conditionCheck="testForNewServiceType"))
-upgrade.addTask(Task(name="navToEquipmentFromService",func=TMA.TMADriver.Service_NavToEquipmentFromService,args=("$CONTROL_TMA")))
+upgrade.addTask(Task(name="setNewServiceTypeIfNeeded",func=TMA.TMADriver.Service_WriteServiceType,args=("^tmaDriver"),kwargs={"rawValue" : "$newServiceType"},conditionCheck="testForNewServiceType"))
+upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Service_InsertUpdate,args=("^tmaDriver"),conditionCheck="testForNewServiceType"))
+upgrade.addTask(Task(name="navToEquipmentFromService",func=TMA.TMADriver.Service_NavToEquipmentFromService,args=("^tmaDriver")))
 upgrade.addTask(Task(name="buildEquipmentObject",func=TMA.Equipment,kwargs={"mainType" : "&equipment[$device]['mainType']","subType" : "&equipment[$device]['subType']","make" : "&equipment[$device]['make']","model" : "&equipment[$device]['model']"},resultDest="thisEquipment"))
 upgrade.addTask(Task(name="setEquipmentIMEI",func="$thisEquipment.info_IMEI = $IMEI"))
-upgrade.addTask(Task(name="writeFullEquipment",func=TMA.TMADriver.Equipment_WriteAll,args=("$CONTROL_TMA"),kwargs={"equipmentObject" : "$thisEquipment"}))
-upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Equipment_InsertUpdate,args=("$CONTROL_TMA")))
+upgrade.addTask(Task(name="writeFullEquipment",func=TMA.TMADriver.Equipment_WriteAll,args=("^tmaDriver"),kwargs={"equipmentObject" : "$thisEquipment"}))
+upgrade.addTask(Task(name="insertUpdate",func=TMA.TMADriver.Equipment_InsertUpdate,args=("^tmaDriver")))
 #endregion === Recipe - Upgrade ===
 #c.addRecipe(upgrade,{"inputContext" : "Default"})
 #region === Recipe - Fill Cimpl Upgrade ===
 # TODO testing to ensure we're already on Cimpl WO, OR automatic navigation, OR both :)
 # TODO Conditionally check that order is actually completed, not still pending (no service number)
 fillCimplUpgrade = Recipe(name="fillCimplUpgrade",contextID="fillCimplUpgrade",requiredKwargs=["inputContext"],deleteContextAfterExecution=True)
-fillCimplUpgrade.addTask(Task(name="getVerizonOrderInfo",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
-fillCimplUpgrade.addTask(Task(name="navToSummaryTab",func=Cimpl.CimplDriver.Workorders_NavToSummaryTab,args="$CONTROL_CIMPL"))
-fillCimplUpgrade.addTask(Task(name="addTrackingNote",func=Cimpl.CimplDriver.Workorders_WriteNote,args="$CONTROL_CIMPL",kwargs={"subject" : "'Tracking'","noteType" : "'Information Only'","status" : "'Completed'","content" : "$verizonOrderInfo['Courier'] + ' : ' + $verizonOrderInfo['TrackingNumber']"}))
-fillCimplUpgrade.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Workorders_SetStatus,args="$CONTROL_CIMPL",kwargs={"status" : "'Complete'"}))
+fillCimplUpgrade.addTask(Task(name="getVerizonOrderInfo",func=Controller.copyFromContext,args="^controllerDriver",kwargs={"contextID" : "$inputContext","key" : "'verizonOrderInfo'"},resultDest="verizonOrderInfo"))
+fillCimplUpgrade.addTask(Task(name="navToSummaryTab",func=Cimpl.CimplDriver.Workorders_NavToSummaryTab,args="^cimplDriver"))
+fillCimplUpgrade.addTask(Task(name="addTrackingNote",func=Cimpl.CimplDriver.Workorders_WriteNote,args="^cimplDriver",kwargs={"subject" : "'Tracking'","noteType" : "'Information Only'","status" : "'Completed'","content" : "$verizonOrderInfo['Courier'] + ' : ' + $verizonOrderInfo['TrackingNumber']"}))
+fillCimplUpgrade.addTask(Task(name="completeWorkorder",func=Cimpl.CimplDriver.Workorders_SetStatus,args="^cimplDriver",kwargs={"status" : "'Complete'"}))
 #endregion === Recipe - Fill Cimpl Upgrade ===
 #c.addRecipe(fillCimplUpgrade,{"inputContext" : "Default"})
 
 #region === Recipe - Open/Read Workorder ===
 openReadWorkorder = Recipe(name="openReadWorkorder",contextID="openReadWorkorder",requiredKwargs=["cimplWONumber"],deleteContextAfterExecution=True)
-openReadWorkorder.addTask(Task(name="navToWOCenter",func=Cimpl.CimplDriver.navToWorkorderCenter,args="$CONTROL_CIMPL"))
-openReadWorkorder.addTask(Task(name="clearFilters",func=Cimpl.CimplDriver.Filters_Clear,args="$CONTROL_CIMPL"))
-openReadWorkorder.addTask(Task(name="addWONumFilter",func=Cimpl.CimplDriver.Filters_AddWorkorderNumber,args="$CONTROL_CIMPL",kwargs={"status" : "'Contains'","workorderNumber" : "$cimplWONumber"}))
-openReadWorkorder.addTask(Task(name="applyFilters",func=Cimpl.CimplDriver.Filters_Apply,args="$CONTROL_CIMPL"))
-openReadWorkorder.addTask(Task(name="openWorkorder",func=Cimpl.CimplDriver.openWorkorder,args="$CONTROL_CIMPL",kwargs={"workorderNumber" : "$cimplWONumber"}))
-openReadWorkorder.addTask(Task(name="readFullWorkorder",func=Cimpl.CimplDriver.Workorders_ReadFullWorkorder,args="$CONTROL_CIMPL",contextID="Default",resultDest="cimplWO"))
+openReadWorkorder.addTask(Task(name="navToWOCenter",func=Cimpl.CimplDriver.navToWorkorderCenter,args="^cimplDriver"))
+openReadWorkorder.addTask(Task(name="clearFilters",func=Cimpl.CimplDriver.Filters_Clear,args="^cimplDriver"))
+openReadWorkorder.addTask(Task(name="addWONumFilter",func=Cimpl.CimplDriver.Filters_AddWorkorderNumber,args="^cimplDriver",kwargs={"status" : "'Contains'","workorderNumber" : "$cimplWONumber"}))
+openReadWorkorder.addTask(Task(name="applyFilters",func=Cimpl.CimplDriver.Filters_Apply,args="^cimplDriver"))
+openReadWorkorder.addTask(Task(name="openWorkorder",func=Cimpl.CimplDriver.openWorkorder,args="^cimplDriver",kwargs={"workorderNumber" : "$cimplWONumber"}))
+openReadWorkorder.addTask(Task(name="readFullWorkorder",func=Cimpl.CimplDriver.Workorders_ReadFullWorkorder,args="^cimplDriver",contextID="Default",resultDest="cimplWO"))
 #endregion === Recipe - Open Workorder ===
 #c.addRecipe(openReadWorkorder,{"cimplWONumber" : "43221"})
 #region === Recipe - Read Verizon Order Info ===
 readVerizonOrderNumber = Recipe(name="readVerizonOrderNumber",contextID="readVerizonOrderNumber",requiredKwargs=["orderNumber_inputContext"],deleteContextAfterExecution=True)
-readVerizonOrderNumber.addTask(Task(name="getVerizonOrderNumber",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$orderNumber_inputContext","key" : "'verizonOrderNumber'"},resultDest="verizonOrderNumber"))
-readVerizonOrderNumber.addTask(Task(name="navToOrderViewer",func=Verizon.VerizonDriver.navToOrderViewer,args="$CONTROL_VERIZON"))
-readVerizonOrderNumber.addTask(Task(name="searchOrder",func=Verizon.VerizonDriver.OrderViewer_SearchOrder,args="$CONTROL_VERIZON",kwargs={"orderNumber" : "$verizonOrderNumber"}))
-readVerizonOrderNumber.addTask(Task(name="readFullDisplayedOrder",func=Verizon.VerizonDriver.OrderViewer_ReadDisplayedOrder,args="$CONTROL_VERIZON",contextID="Default",resultDest="verizonOrderInfo"))
+readVerizonOrderNumber.addTask(Task(name="getVerizonOrderNumber",func=Controller.copyFromContext,args="^controllerDriver",kwargs={"contextID" : "$orderNumber_inputContext","key" : "'verizonOrderNumber'"},resultDest="verizonOrderNumber"))
+readVerizonOrderNumber.addTask(Task(name="navToOrderViewer",func=Verizon.VerizonDriver.navToOrderViewer,args="^verizonDriver"))
+readVerizonOrderNumber.addTask(Task(name="searchOrder",func=Verizon.VerizonDriver.OrderViewer_SearchOrder,args="^verizonDriver",kwargs={"orderNumber" : "$verizonOrderNumber"}))
+readVerizonOrderNumber.addTask(Task(name="readFullDisplayedOrder",func=Verizon.VerizonDriver.OrderViewer_ReadDisplayedOrder,args="^verizonDriver",contextID="Default",resultDest="verizonOrderInfo"))
 #endregion === Recipe - Read Verizon Order Info ===
 #c.addRecipe(readVerizonOrderNumber,{"orderNumber_inputContext" : "Default"})
 
 #region === Recipe - Get OrderNumber from Workorder ===
 getOrderNumberFromWorkorder = Recipe(name="getOrderNumberFromWorkorder",contextID="getOrderNumberFromWorkorder",requiredKwargs=["cimplWO_InputContext","outputContext"],deleteContextAfterExecution=True)
-getOrderNumberFromWorkorder.addTask(Task(name="getCimplWO",func=Controller.copyFromContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$cimplWO_InputContext", "key" : "'cimplWO'"},resultDest="cimplWO"))
+getOrderNumberFromWorkorder.addTask(Task(name="getCimplWO",func=Controller.copyFromContext,args="^controllerDriver",kwargs={"contextID" : "$cimplWO_InputContext", "key" : "'cimplWO'"},resultDest="cimplWO"))
 getOrderNumberFromWorkorder.addTask(Task(name="findOrderNumber",func=Cimpl.findPlacedOrderNumber,kwargs={"noteList" : "$cimplWO['Notes']"},resultDest="foundOrderNumber"))
-getOrderNumberFromWorkorder.addTask(Task(name="returnToContext",func=Controller.copyToContext,args="$CONTROL_CONTROLLER",kwargs={"contextID" : "$outputContext","key" : "'verizonOrderNumber'", "newValue" : "$foundOrderNumber"}))
+getOrderNumberFromWorkorder.addTask(Task(name="returnToContext",func=Controller.copyToContext,args="^controllerDriver",kwargs={"contextID" : "$outputContext","key" : "'verizonOrderNumber'", "newValue" : "$foundOrderNumber"}))
 #endregion === Recipe - Get OrderNumber from Workorder ===
 #c.addRecipe(getOrderNumberFromWorkorder,{"cimplWO_InputContext" : "Default", "outputContext" : "Default"})
 
