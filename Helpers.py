@@ -257,11 +257,11 @@ def processWorkorder(drivers,workorderNumber):
 
     if(workorder["OperationType"] == "New Request"):
         userID = Cimpl.getUserID(workorder["Actions"])
-        syscoTMANewInstall(drivers=drivers,client="Sysco",netID=userID,serviceNum=carrierOrder["WirelessNumber"],
+        TMANewInstall(drivers=drivers,client="Sysco",netID=userID,serviceNum=carrierOrder["WirelessNumber"],
                            installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"],carrier="Verizon Wireless")
         writeServiceToCimplWorkorder(drivers=drivers,serviceNum=carrierOrder["WirelessOrder"],carrier="Verizon Wireless",installDate=carrierOrder["OrderDate"])
     if(workorder["OperationType"] == "Upgrade"):
-        syscoTMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],
+        TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],
                         installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"])
 
     drivers["Browser"].switchToTab("Cimpl")
