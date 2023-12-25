@@ -77,33 +77,56 @@ class CimplDriver:
     def logInToCimpl(self):
         self.browser.switchToTab("Cimpl")
 
-        self.browser.get("https://apps.cimpl.com/Cimpl/Authentication#/logon")
+        currentLocation = self.getLocation()
+        # Test if already logged in
+        if(currentLocation["LoggedIn"]):
+            return True
+        else:
+            self.browser.get("https://apps.cimpl.com/Cimpl/Authentication#/logon")
 
-        self.browser.implicitly_wait(10)
-        self.waitForLoadingScreen()
+            self.browser.implicitly_wait(10)
+            self.waitForLoadingScreen()
 
-        usernameInput = self.browser.find_element(by=By.XPATH, value="//input[@id='username']")
-        usernameInput.send_keys(b.config["authentication"]["cimplUser"])
+            usernameInput = self.browser.find_element(by=By.XPATH, value="//input[@id='username']")
+            usernameInput.send_keys(b.config["authentication"]["cimplUser"])
 
-        continueButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-        continueButton.click()
-        self.waitForLoadingScreen()
+            continueButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+            continueButton.click()
+            self.waitForLoadingScreen()
 
-        selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
-        selectionDropdown.send_keys("Sysco")
-        syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
-        syscoSelection.click()
-        self.waitForLoadingScreen()
+            selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
+            selectionDropdown.send_keys("Sysco")
+            syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
+            syscoSelection.click()
+            self.waitForLoadingScreen()
 
-        passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
-        passwordInput.send_keys(b.config["authentication"]["cimplPass"])
+            passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
+            passwordInput.send_keys(b.config["authentication"]["cimplPass"])
 
-        signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-        signInButton.click()
-        self.waitForLoadingScreen()
+            signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+            signInButton.click()
+            self.waitForLoadingScreen()
 
-        #TODO glue
-        time.sleep(5)
+            #TODO glue
+            time.sleep(5)
+
+    # Method to determine the current location of the CimplDriver
+    def getLocation(self):
+        self.browser.switchToTab("Cimpl")
+        url = self.browser.get_current_url()
+
+        if(not url.startswith("https://apps.cimpl.com")):
+            return {"LoggedIn" : False, "Location" : "NotOnCimpl"}
+        elif(url.startswith("https://apps.cimpl.com/auth")):
+            return {"LoggedIn" : False, "Location" : "LogInScreen"}
+        elif(url.startswith("https://apps.cimpl.com//Cimpl/Actions#/home/workorder")):
+            return {"LoggedIn" : True, "Location" : "WorkorderCenter"}
+        elif(url.startswith("https://apps.cimpl.com/Cimpl/Actions#/home/workorderDetails")):
+            thisWorkorder = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'workorder-details__woNumber')]").text
+            return {"LoggedIn": True, "Location": f"Workorder_{thisWorkorder}"}
+        else:
+            return {"LoggedIn": True, "Location": "Other"}
+
 
     #region === WOCenter ===
 
@@ -112,8 +135,8 @@ class CimplDriver:
         self.browser.switchToTab("Cimpl")
 
         workorderCenterHeaderString = "//div[@class='cimpl-static-header__headerTitle___1d-aN subtitle1 ng-binding'][text()='Workorder Center']"
-        onWorkorderPage = self.browser.elementExists(by=By.XPATH,value=workorderCenterHeaderString)
-        if(onWorkorderPage):
+        #onWorkorderPage = self.browser.elementExists(by=By.XPATH,value=workorderCenterHeaderString)
+        if(self.getLocation()["Location"] == "WorkorderCenter"):
             return True
         else:
             menuString = "//i[text()='menu']/parent::div"
@@ -210,9 +233,10 @@ class CimplDriver:
         self.waitForLoadingScreen()
         # Clear all filters.
         clearAllButtonString = "//div/div/cimpl-button[@class='ng-isolate-scope']/button[@automation-id='__button']/div[@class='button-content']/span[@class='button-label ng-binding uppercase'][text()='Clear All']/parent::div/parent::button"
-        clearAllButton = self.browser.find_element(by=By.XPATH,value=clearAllButtonString)
-        clearAllButton.click()
-        self.waitForLoadingScreen()
+        if(self.browser.elementExists(by=By.XPATH,value=clearAllButtonString)):
+            clearAllButton = self.browser.find_element(by=By.XPATH,value=clearAllButtonString)
+            clearAllButton.click()
+            self.waitForLoadingScreen()
 
     # Methods to add specific filters, along with their status and value.
     def Filters_AddEmployeeNumber(self,status : str,employeeNumber):

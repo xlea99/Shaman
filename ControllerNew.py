@@ -40,64 +40,118 @@ def Setup_LogInToVerizon(_verizonDriver : Verizon.VerizonDriver):
 #endregion LogIn Tasks
 
 @flow
-def Setup_BuildBrowserEnvironment():
+def Setup_BuildBrowserEnvironment(buildTMA = True,buildCimpl = True,buildVerizon = True):
     browserDriver = Setup_LaunchBrowser()
-    tmaDriver = Setup_LaunchTMADriver(browserDriver)
-    cimplDriver = Setup_LaunchCimplDriver(browserDriver)
-    verizonDriver = Setup_LaunchVerizonDriver(browserDriver)
+    if(buildTMA):
+        tmaDriver = Setup_LaunchTMADriver(browserDriver)
+        Setup_LogInToTMA(tmaDriver)
+        tmaDriver.navToClientHome("Sysco")
+    else:
+        tmaDriver = None
 
-    Setup_LogInToTMA(tmaDriver)
-    tmaDriver.navToClientHome("Sysco")
-    Setup_LogInToCimpl(cimplDriver)
-    cimplDriver.navToWorkorderCenter()
-    Setup_LogInToVerizon(verizonDriver)
+    if(buildCimpl):
+        cimplDriver = Setup_LaunchCimplDriver(browserDriver)
+        Setup_LogInToCimpl(cimplDriver)
+        cimplDriver.navToWorkorderCenter()
+    else:
+        cimplDriver = None
 
-    return {"BrowserDriver" : browserDriver, "TMADriver" : tmaDriver, "CimplDriver" : cimplDriver, "VerizonDriver" : verizonDriver}
+    if(buildVerizon):
+        verizonDriver = Setup_LaunchVerizonDriver(browserDriver)
+        Setup_LogInToVerizon(verizonDriver)
+    else:
+        verizonDriver = None
+
+
+    return {"Browser" : browserDriver, "TMA" : tmaDriver, "Cimpl" : cimplDriver, "Verizon" : verizonDriver}
 
 #endregion === Setup ===
+
+
+
+#region === TMA ===
+
+
+#endregion === TMA ===
+
+
+#region === Cimpl ===
+
+@task
+def Cimpl_LoginToCimpl(drivers):
+    drivers["Cimpl"].loginToCimpl()
+
+@task
+def Cimpl_NavToWorkorderCenter(drivers):
+    drivers["Cimpl"].navToWorkorderCenter()
+
+@task Cimpl_
+
+@task
+# Filters for, searches up, and opens the given workorderNumber.
+def Cimpl_OpenWorkorder(drivers,workorderNumber):
+    drivers["Cimpl"].Filters_Clear()
+    drivers["Cimpl"].Filters_AddWorkorderNumber(status="Equals",workorderNumber=workorderNumber)
+    drivers["Cimpl"].Filters_Apply()
+    drivers["Cimpl"].openWorkorder(workorderNumber=workorderNumber)
+
+#endregion === Cimpl ===
+
 
 #region === Verizon ===
 
 @task
-def Verizon_NavToOrderViewer(verizonDriver : Verizon.VerizonDriver):
-    verizonDriver.browser.switchToTab("Verizon")
-    verizonDriver.navToOrderViewer()
+def Verizon_NavToOrderViewer(drivers):
+    drivers["Verizon"].browser.switchToTab("Verizon")
+    drivers["Verizon"].navToOrderViewer()
 @task
-def Verizon_SearchOrder(verizonDriver : Verizon.VerizonDriver,orderNumber):
-    verizonDriver.browser.switchToTab("Verizon")
-    verizonDriver.OrderViewer_SearchOrder(orderNumber)
+def Verizon_SearchOrder(drivers,orderNumber):
+    drivers["Verizon"].browser.switchToTab("Verizon")
+    drivers["Verizon"].OrderViewer_SearchOrder(orderNumber)
 @task
-def Verizon_ReadFullDisplayedOrder(verizonDriver : Verizon.VerizonDriver):
-    verizonDriver.browser.switchToTab("Verizon")
-    return verizonDriver.OrderViewer_ReadDisplayedOrder()
+def Verizon_ReadFullDisplayedOrder(drivers):
+    drivers["Verizon"].browser.switchToTab("Verizon")
+    return drivers["Verizon"].OrderViewer_ReadDisplayedOrder()
 
 @flow
-def Verizon_SearchAndReadOrder(verizonDriver : Verizon.VerizonDriver,orderNumber):
+def Verizon_SearchAndReadOrder(drivers,orderNumber):
     try:
-        Verizon_NavToOrderViewer(verizonDriver=verizonDriver)
-        Verizon_SearchOrder(verizonDriver=verizonDriver,orderNumber=orderNumber)
-        Verizon_ReadFullDisplayedOrder(verizonDriver=verizonDriver)
-    except:
+        Verizon_NavToOrderViewer(drivers=drivers)
+        Verizon_SearchOrder(drivers=drivers,orderNumber=orderNumber)
+        Verizon_ReadFullDisplayedOrder(drivers=drivers)
+    except Exception as e:
+        print("e")
 
 
 @task
-def Verizon_DetermineError(verizonDriver : Verizon.VerizonDriver,literalError : Exception):
-    if(not verizonDriver.Test_OnVerizonSite()):
-        raise Verizon.NotOnVerizonSite(currentURL=verizonDriver.browser.get_current_url())
-    elif(not verizonDriver.Test_LoggedIn()):
+def Verizon_DetermineError(drivers,literalError : Exception):
+    if(not drivers["Verizon"].Test_OnVerizonSite()):
+        raise Verizon.NotOnVerizonSite(currentURL=drivers["Verizon"].browser.get_current_url())
+    elif(not drivers["Verizon"].Test_LoggedIn()):
         raise Verizon.NotLoggedIn()
-    elif(verizonDriver.Test_SessionExpiringPopup()):
+    elif(drivers["Verizon"].Test_SessionExpiringPopup()):
         raise Verizon.SessionExpiring()
-    elif(verizonDriver.Test_LoadingScreen()):
+    elif(drivers["Verizon"].Test_LoadingScreen()):
         raise Verizon.LoadingScreen()
     else:
         raise literalError
 #endregion === Verizon ===
 
+
 @flow
 def testFlow():
-    br = Setup_LaunchBrowser()
-    v = Setup_LaunchVerizonDriver(br)
+    drivers = Setup_BuildBrowserEnvironment(buildTMA = False,buildCimpl = False,buildVerizon = True)
+    br = drivers["Browser"]
+    v = drivers["Verizon"]
     Verizon_NavToOrderViewer(v)
 
-testFlow()
+
+
+@flow
+# Gets an order number, if present, from a Cimpl Workorder.
+def getOrderNumFromWO(woNumber):
+
+
+
+
+#testFlow()

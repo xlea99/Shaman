@@ -2,7 +2,7 @@ title = "Shaman Config"
 
 
 [paths]
-base = "S:/Coding/TheShaman/Shaman/Base"    # Folder for runtime program files.
+base = "C:/Crap/Coding/Python/Shaman/Base"    # Folder for runtime program files.
 downloads = "/downloads"                    # Where runtime downloads are stored and accessed
 logs = "/logs"                              # Where log files are stored
 data = "/data"                              # Where program data is stored

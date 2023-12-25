@@ -2,6 +2,7 @@ import Browser
 import BaseFunctions as b
 import time
 import copy
+from datetime import datetime
 from selenium import webdriver
 import selenium.common.exceptions
 from selenium.webdriver.common.by import By
@@ -1207,6 +1208,8 @@ class TMADriver():
 
         upgradeEligibilityDateInput = self.browser.find_element(by=By.XPATH, value="//div/fieldset/ol/li/input[contains(@name,'Detail$txtContractEligibilityDate')][contains(@id,'Detail_txtContractEligibilityDate')]")
         upgradeEligibilityDateInput.clear()
+        if(type(valueToWrite) is datetime):
+            valueToWrite = va
         upgradeEligibilityDateInput.send_keys(valueToWrite)
         b.log.info(f"Successfully wrote: {valueToWrite}")
     def Service_WriteServiceType(self,serviceObject : Service = None,rawValue = None):

@@ -4,6 +4,7 @@ import selenium.common.exceptions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.firefox.service import Service
 import time
 from urllib.parse import urlparse
 
@@ -43,7 +44,9 @@ class Browser:
                 b.log.critical("Tried opening webdriver, but a webdriver browser is already open!")
                 raise BrowserAlreadyOpen()
         # Initialize the Firefox browser with the profile
-        self.driver = webdriver.Firefox(options=firefox_profile)
+
+        service = Service(f"{b.paths.seleniumPath}/geckodriver.exe")
+        self.driver = webdriver.Firefox(service=service,options=firefox_profile)
         self.tabs["Base"] = self.driver.window_handles[0]
         self.currentTab = "Base"
         b.log.debug("Opened browser.")
@@ -237,7 +240,6 @@ class Browser:
 
     # Simple wrapping of a bunch of selenium.webdriver functions.
     def get_current_url(self):
-
         return self.driver.current_url
     def get_current_window_handle(self):
         return self.driver.current_window_handle
