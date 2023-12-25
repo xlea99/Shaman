@@ -215,6 +215,33 @@ class Service:
             returnString += "\nLinked Order: " + str(self.info_LinkedOrders[i])
         returnString += "\n" + str(self.info_LinkedEquipment.__str__())
         return returnString
+class Order:
+
+    # Basic init method to initialize all instance variables.
+    def __init__(self):
+        self.info_Client = None
+
+        self.info_PortalOrderNumber = None
+        self.info_VendorOrderNumber = None
+        self.info_VendorTrackingNumber = None
+        self.info_OrderStatus = None
+        self.info_PlacedBy = None
+        self.info_ContactName = None
+
+        self.info_OrderClass = None
+        self.info_OrderType = None
+        self.info_OrderSubType = None
+        self.info_SubmittedDate = None
+        self.info_CompletedDate = None
+        self.info_DueDate = None
+
+        self.info_RecurringCost = None
+        self.info_RecurringSavings = None
+        self.info_Credits = None
+        self.info_OneTimeCost = None
+        self.info_RefundAmount = None
+
+        self.info_OrderNotes = None
 class Cost:
 
     # Basic init method to initialize instance variables.
@@ -1208,8 +1235,6 @@ class TMADriver():
 
         upgradeEligibilityDateInput = self.browser.find_element(by=By.XPATH, value="//div/fieldset/ol/li/input[contains(@name,'Detail$txtContractEligibilityDate')][contains(@id,'Detail_txtContractEligibilityDate')]")
         upgradeEligibilityDateInput.clear()
-        if(type(valueToWrite) is datetime):
-            valueToWrite = va
         upgradeEligibilityDateInput.send_keys(valueToWrite)
         b.log.info(f"Successfully wrote: {valueToWrite}")
     def Service_WriteServiceType(self,serviceObject : Service = None,rawValue = None):
@@ -1502,6 +1527,348 @@ class TMADriver():
 
     # endregion ====================Service Data & Navigation ===========================
 
+    #region ====================Order Data & Navigation ===========================
+
+    # All these methods assume that TMA is currently on an Order entry.
+
+
+    # Read methods for each part of the Order entry.
+    def Order_ReadMainInfo(self,orderObject : Order = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if(orderObject is None):
+            orderObject = Order()
+
+        orderObject.info_PortalOrderNumber = self.browser.find_element(by=By.XPATH,value="//span[text()='Portal Order Number']/following-sibling::input").text
+        orderObject.info_VendorOrderNumber = self.browser.find_element(by=By.XPATH,value="//span[text()='Vendor Order #:']/following-sibling::input").text
+        orderObject.info_VendorTrackingNumber = self.browser.find_element(by=By.XPATH,value="//span[text()='Vendor Tracking #:']/following-sibling::input").text
+        orderObject.info_OrderStatus = Select(self.browser.find_element(by=By.XPATH,value="//span[text()='Order Status:']/following-sibling::select")).first_selected_option.text
+        orderObject.info_PlacedBy = Select(self.browser.find_element(by=By.XPATH,value="//span[text()='Placed By:']/following-sibling::select")).first_selected_option.text
+        orderObject.info_ContactName = self.browser.find_element(by=By.XPATH,value="//span[text()='Contact Name:']/following-sibling::input").text
+
+        orderObject.info_OrderClass = Select(self.browser.find_element(by=By.XPATH,value="//span[text()='Order Class:']/following-sibling::select")).first_selected_option.text
+        orderObject.info_OrderType = Select(self.browser.find_element(by=By.XPATH,value="//span[text()='Order Type:']/following-sibling::select")).first_selected_option.text
+        orderObject.info_OrderSubType = Select(self.browser.find_element(by=By.XPATH,value="//span[text()='Order Sub-Type:']/following-sibling::select")).first_selected_option.text
+        orderObject.info_SubmittedDate = self.browser.find_element(by=By.XPATH,value="//span[text()='Submitted:']/following-sibling::input").text
+        orderObject.info_CompletedDate = self.browser.find_element(by=By.XPATH,value="//span[text()='Completed:']/following-sibling::input").text
+        orderObject.info_DueDate = self.browser.find_element(by=By.XPATH,value="//span[text()='Due:']/following-sibling::input").text
+
+        orderObject.info_RecurringCost = self.browser.find_element(by=By.XPATH,value="//span[text()='Cost:']/following-sibling::input").text
+        orderObject.info_RecurringSavings = self.browser.find_element(by=By.XPATH,value="//span[text()='Savings:']/following-sibling::input").text
+        orderObject.info_Credits = self.browser.find_element(by=By.XPATH,value="//span[text()='Credits:']/following-sibling::input").text
+        orderObject.info_OneTimeCost = self.browser.find_element(by=By.XPATH,value="//span[text()='One Time Cost:']/following-sibling::input").text
+        orderObject.info_RefundAmount = self.browser.find_element(by=By.XPATH,value="//span[text()='Refund Amount:']/following-sibling::input").text
+
+        return orderObject
+    def Order_ReadOrderNotes(self,orderObject : Order = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if(orderObject is None):
+            orderObject = Order()
+
+        self.Order_NavToOrderTab("notes")
+        orderObject.info_OrderNotes = self.browser.find_element(by=By.XPATH,value="//textarea[contains(@id,'txtSummary')]").text
+        return orderObject
+    # TODO hehe this function doesn't actually work. Make it work.
+    def Order_ReadLinkedService(self,orderObject : Order = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if(orderObject is None):
+            orderObject = Order()
+
+        self.Order_NavToOrderTab("links")
+        self.Order_NavToLinkedTab("services")
+
+    # Write methods for each part of the Order entry.
+    # TODO condense this (and maybe the service equivalents?) down to a single function using mapped values?
+    # Main Info
+    def Order_WritePortalOrderNumber(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_PortalOrderNumber
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Portal Order Number']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteVendorOrderNumber(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_VendorOrderNumber
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Vendor Order #:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteVendorTrackingNumber(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_VendorTrackingNumber
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Vendor Tracking #:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteContactName(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_ContactName
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Contact Name:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteSubmittedDate(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_SubmittedDate
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Submitted:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteCompletedDate(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_CompletedDate
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Completed:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteDueDate(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_DueDate
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Due:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteRecurringCost(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_RecurringCost
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Cost:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteRecurringSavings(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_RecurringSavings
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Savings:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteCredits(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_Credits
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Credits:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteOneTimeCost(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_OneTimeCost
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='One Time Cost:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteRefundAmount(self,orderObject : Order = None,rawValue = None):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_RefundAmount
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        targetField = self.browser.find_element(by=By.XPATH,value="//span[text()='Refund Amount:']/following-sibling::input")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+    def Order_WriteOrderStatus(self, orderObject: Order = None, rawValue=None):
+        self.browser.switchToTab(self.currentTMATab[0], self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_OrderStatus
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        dropdownPrefix = "//span[text()='Order Status:']/following-sibling::select"
+        targetField = self.browser.find_element(by=By.XPATH,value=f"{dropdownPrefix}/option[text()='{valueToWrite}']")
+        targetField.click()
+    def Order_WritePlacedBy(self, orderObject: Order = None, rawValue=None):
+        self.browser.switchToTab(self.currentTMATab[0], self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_PlacedBy
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        dropdownPrefix = "//span[text()='Placed By:']/following-sibling::select"
+        targetField = self.browser.find_element(by=By.XPATH,value=f"{dropdownPrefix}/option[text()='{valueToWrite}']")
+        targetField.click()
+    def Order_WriteOrderClass(self, orderObject: Order = None, rawValue=None):
+        self.browser.switchToTab(self.currentTMATab[0], self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_OrderClass
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        dropdownPrefix = "//span[text()='Order Class:']/following-sibling::select"
+        targetField = self.browser.find_element(by=By.XPATH,value=f"{dropdownPrefix}/option[text()='{valueToWrite}']")
+        targetField.click()
+    def Order_WriteOrderType(self, orderObject: Order = None, rawValue=None):
+        self.browser.switchToTab(self.currentTMATab[0], self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_OrderType
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        dropdownPrefix = "//span[text()='Order Type:']/following-sibling::select"
+        targetField = self.browser.find_element(by=By.XPATH,value=f"{dropdownPrefix}/option[text()='{valueToWrite}']")
+        targetField.click()
+    def Order_WriteOrderSubType(self, orderObject: Order = None, rawValue=None):
+        self.browser.switchToTab(self.currentTMATab[0], self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_OrderSubType
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        dropdownPrefix = "//span[text()='Order Sub-Type:']/following-sibling::select"
+        targetField = self.browser.find_element(by=By.XPATH,value=f"{dropdownPrefix}/option[text()='{valueToWrite}']")
+        targetField.click()
+    # Other
+    def Order_WriteOrderNotes(self, orderObject: Order = None, rawValue=None):
+        self.browser.switchToTab(self.currentTMATab[0], self.currentTMATab[1])
+        if (orderObject is None):
+            valueToWrite = rawValue
+        else:
+            valueToWrite = orderObject.info_RecurringCost
+        if (valueToWrite is None):
+            b.log.warning(f"Didn't write, as valueToWrite is {valueToWrite}")
+            return False
+
+        self.Order_NavToOrderTab("notes")
+
+        targetField = self.browser.find_element(by=By.XPATH, value="//textarea[contains(@id,'txtSummary')]")
+        targetField.clear()
+        targetField.send_keys(rawValue)
+
+    # Method to click either insert or update, whichever is present.
+    def Order_InsertUpdate(self):
+        insertButtonString = "//input[@value='Insert']"
+        insertButton = self.browser.elementExists(by=By.XPATH,value=insertButtonString)
+        if(insertButton):
+            insertButton.click()
+            return True
+
+        updateButtonString = "//input[@value='Update']"
+        updateButton = self.browser.elementExists(by=By.XPATH,value=updateButtonString)
+        if(updateButton):
+            updateButton.click()
+            return True
+
+        return False
+
+    # Method to navigate between all order tabs, and one for getting the current order tab.
+    def Order_NavToOrderTab(self, orderTab):
+        orderTabDictionary = {  "notes": "btnSummary",
+                                "assignments": "btnAssignments",
+                                "links": "btnLinks",
+                                "email": "btnEmail",
+                                "attachments": "btnAttachments",
+                                "notes2": "btnActionComments",
+                                "history": "btnHistory"}
+
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+
+        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[contains(@name,'{orderTabDictionary[orderTab.lower()]}')]"
+        orderTabTestFor = f"{targetTab}[@class='selected']"
+
+        if (self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=orderTabTestFor)):
+            b.log.info(f"Successfully navigated to serviceTab '{orderTab}'.")
+            return True
+        else:
+            b.log.error(f"Failed to navigate to serviceTab '{orderTab}'.")
+            return False
+    def Order_GetCurrentOrderTab(self):
+        targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[@class='selected']"
+        return self.browser.find_element(by=By.XPATH,value=targetTab).get_attribute("value")
+    # Helper method to easily navigate to linked tabs.
+    # TODO add error handling here
+    def Order_NavToLinkedTab(self, linkedTabName):
+        self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
+
+        targetTab = f"//table[contains(@id,'Detail_ucassociations_link_gvTable2')]/tbody/tr[contains(@class,'gridviewbuttons')]/td/span[contains(text(),'{linkedTabName.lower()}')]"
+        targetTabTestFor = f"//span[contains(text(),'{linkedTabName.lower()}')]/parent::td/parent::tr[contains(@class,'gridviewbuttonsSelected')]"
+        self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=targetTabTestFor)
+        b.log.info(f"Successfully navigated to linkedTab '{linkedTabName}'")
+
+    #endregion ====================Order Data & Navigation ===========================
+
     # region =====================People Data & Navigation ===========================
 
     # All these methods assume that TMA is currently on a People entry.
@@ -1612,6 +1979,7 @@ class TMADriver():
     # Reads an array of linked services of a people Object. If a People object is supplied,
     # it reads the info into this object - otherwise, it returns a new People object.
     # Reads an array of linked service numbers into info_LinkedServices
+    # TODO This function likely predates the wheel. Look at it.
     def People_ReadLinkedServices(self,peopleObject : People = None):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
