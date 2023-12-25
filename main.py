@@ -21,43 +21,22 @@ tmobile = "T Mobile"
 bell = "Bell Mobility"
 rogers = "Rogers"
 
-def runOldMethod(_browser,_tmaDriver,_netID,_serviceNum,_installDate,_device,_carrier,_imei):
-    _tmaDriver.logInToTMA()
-    h.syscoNewInstall(existingTMADriver=_tmaDriver,browser=_browser,netID=_netID,serviceNum=_serviceNum,installDate=_installDate,device=_device,carrier=_carrier,imei=_imei)
+d = h.buildDrivers()
 #endregion Setup
 
-newMethod = True
 
-#region === OLD METHOD ===
-netID = "sbra8466"
-serviceNum = " 341.233.3544 "
-installDate = "12/8/2023"
-device = s21
-carrier = verizon
-imei = "351844427732124"
-#endregion === OLD METHOD ===
-#region === NEW METHOD ===
-upgrades = [43872]
-newInstalls = []
-#endregion === NEW METHOD ===
+# To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
+# simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
+# detect the order type, process/build TMA and Cimpl entries, then complete the order.
+cimplWOs = []
+for WO in cimplWOs:
+    h.processWorkorder(d,WO)
 
-#region Execution
-if(newMethod):
-    import Controller
-    for _newInstall in newInstalls:
-        Controller.completeNewInstall(Controller.c, _newInstall)
-    for _upgrade in upgrades:
-        Controller.completeUpgrade(Controller.c, _upgrade)
-else:
-    br = Browser.Browser()
-    t = TMA.TMADriver(br)
-    runOldMethod(_browser=br,
-                 _tmaDriver=t,
-                 _netID=netID,
-                 _serviceNum=serviceNum,
-                 _installDate=installDate,
-                 _device=device,
-                 _carrier=carrier,
-                 _imei=imei)
 
-#endregion Execution
+# To build only TMA new install for a specific service, such as a non-verizon or even non-Sysco service, add the
+# following line as shown below:
+#
+# h.TMANewInstall(d,client="",netID="",serviceNum="",installDate="",device=(device from above),imei="",carrier="")
+#
+# You can add as many of these as you want in succession, and the Shaman should work through each one iteratively.
+# Note that these are NOT mutually exclusive with processing full Cimpl WOs - you can do both in one simultaneous run.

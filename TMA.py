@@ -1816,7 +1816,6 @@ class TMADriver():
         targetField = self.browser.find_element(by=By.XPATH, value="//textarea[contains(@id,'txtSummary')]")
         targetField.clear()
         targetField.send_keys(rawValue)
-
     # Method to click either insert or update, whichever is present.
     def Order_InsertUpdate(self):
         insertButtonString = "//input[@value='Insert']"
@@ -2598,4 +2597,39 @@ class TMADriver():
 class MultipleTMAPopups(Exception):
     def __init__(self):
         super().__init__("Expected a single TMA popup to appear, but found multiple.")
+
+
+# orderType - New Install, Upgrade, etc.
+# client - Sysco, SLB, Rimkus, etc.
+# carrier - Verizon, AT&T, etc.
+# portalOrderNum - Number of portal order, via email, or SNow ticket
+# orderDate - Date order was placed
+# userName - User order was placed for
+# account - Carrier account number
+# device - Name of the device
+# imei - IMEI of the device
+# monthlyChargeback - Who pays the monthly service cost (Corp, BYOD, etc.)
+# deviceChargeback - Who paid for the device (Corp, BYOD, etc.)
+# plan - Name of the plan
+# serviceNum - The number assigned by this order
+# specialNotes - Any special notes
+# tracking - The tracking number
+def genTMAOrderNotes(orderType,carrier=None,portalOrderNum=None,orderDate=None,userName=None,device=None,imei=None,
+                     monthlyChargeback=None,deviceChargeback=None,plan=None,serviceNum=None,specialNotes=None,tracking=None):
+    resultString = f"{orderType.upper()} ordered per  {portalOrderNum} {orderDate} for {userName} on {carrier} account\n"
+    resultString += "\n"
+    resultString += f"DEVICE- {device}\n"
+    resultString += f"IMEI- {imei}\n"
+    resultString += "\n"
+    resultString += f"Chargeback Device: {deviceChargeback}\n"
+    resultString += f"Chargeback Monthly Service: {monthlyChargeback}\n"
+    resultString += "\n"
+    resultString += f"PLANS:{plan}\n"
+    resultString += "\n"
+    resultString += f"Number assigned: {serviceNum}\n"
+    resultString += "\n"
+    resultString += f"Special notes: {orderType} {specialNotes}\n"
+    resultString += f"TRACKING: {tracking}"
+
+    return resultString
 

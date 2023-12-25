@@ -64,7 +64,7 @@ def readVerizonOrder(drivers,verizonOrderNumber):
     return drivers["Verizon"].OrderViewer_ReadDisplayedOrder()
 
 # Performs a full New Install in TMA, building a new service based on the provided information.
-def syscoTMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrier):
+def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrier):
     tmaVerify(drivers=drivers, client=client)
     if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
@@ -179,7 +179,7 @@ def syscoTMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,c
 
     print("DONE BITCH!")
 # Performs a full Upgrade in TMA, editing an existing service based on the provided information.
-def syscoTMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
+def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
     tmaVerify(drivers=drivers,client=client)
     if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
