@@ -77,33 +77,56 @@ class CimplDriver:
     def logInToCimpl(self):
         self.browser.switchToTab("Cimpl")
 
-        self.browser.get("https://apps.cimpl.com/Cimpl/Authentication#/logon")
+        currentLocation = self.getLocation()
+        # Test if already logged in
+        if(currentLocation["LoggedIn"]):
+            return True
+        else:
+            self.browser.get("https://apps.cimpl.com/Cimpl/Authentication#/logon")
 
-        self.browser.implicitly_wait(10)
-        self.waitForLoadingScreen()
+            self.browser.implicitly_wait(10)
+            self.waitForLoadingScreen()
 
-        usernameInput = self.browser.find_element(by=By.XPATH, value="//input[@id='username']")
-        usernameInput.send_keys(b.config["authentication"]["cimplUser"])
+            usernameInput = self.browser.find_element(by=By.XPATH, value="//input[@id='username']")
+            usernameInput.send_keys(b.config["authentication"]["cimplUser"])
 
-        continueButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-        continueButton.click()
-        self.waitForLoadingScreen()
+            continueButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+            continueButton.click()
+            self.waitForLoadingScreen()
 
-        selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
-        selectionDropdown.send_keys("Sysco")
-        syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
-        syscoSelection.click()
-        self.waitForLoadingScreen()
+            selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
+            selectionDropdown.send_keys("Sysco")
+            syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
+            syscoSelection.click()
+            self.waitForLoadingScreen()
 
-        passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
-        passwordInput.send_keys(b.config["authentication"]["cimplPass"])
+            passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
+            passwordInput.send_keys(b.config["authentication"]["cimplPass"])
 
-        signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-        signInButton.click()
-        self.waitForLoadingScreen()
+            signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+            signInButton.click()
+            self.waitForLoadingScreen()
 
-        #TODO glue
-        time.sleep(5)
+            #TODO glue
+            time.sleep(5)
+
+    # Method to determine the current location of the CimplDriver
+    def getLocation(self):
+        self.browser.switchToTab("Cimpl")
+        url = self.browser.get_current_url()
+
+        if(not url.startswith("https://apps.cimpl.com")):
+            return {"LoggedIn" : False, "Location" : "NotOnCimpl"}
+        elif(url.startswith("https://apps.cimpl.com/auth")):
+            return {"LoggedIn" : False, "Location" : "LogInScreen"}
+        elif(url.startswith("https://apps.cimpl.com//Cimpl/Actions#/home/workorder")):
+            return {"LoggedIn" : True, "Location" : "WorkorderCenter"}
+        elif(url.startswith("https://apps.cimpl.com/Cimpl/Actions#/home/workorderDetails")):
+            thisWorkorder = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'workorder-details__woNumber')]").text
+            return {"LoggedIn": True, "Location": f"Workorder_{thisWorkorder}"}
+        else:
+            return {"LoggedIn": True, "Location": "Other"}
+
 
     #region === WOCenter ===
 
@@ -112,8 +135,8 @@ class CimplDriver:
         self.browser.switchToTab("Cimpl")
 
         workorderCenterHeaderString = "//div[@class='cimpl-static-header__headerTitle___1d-aN subtitle1 ng-binding'][text()='Workorder Center']"
-        onWorkorderPage = self.browser.elementExists(by=By.XPATH,value=workorderCenterHeaderString)
-        if(onWorkorderPage):
+        #onWorkorderPage = self.browser.elementExists(by=By.XPATH,value=workorderCenterHeaderString)
+        if(self.getLocation()["Location"] == "WorkorderCenter"):
             return True
         else:
             menuString = "//i[text()='menu']/parent::div"
@@ -210,9 +233,10 @@ class CimplDriver:
         self.waitForLoadingScreen()
         # Clear all filters.
         clearAllButtonString = "//div/div/cimpl-button[@class='ng-isolate-scope']/button[@automation-id='__button']/div[@class='button-content']/span[@class='button-label ng-binding uppercase'][text()='Clear All']/parent::div/parent::button"
-        clearAllButton = self.browser.find_element(by=By.XPATH,value=clearAllButtonString)
-        clearAllButton.click()
-        self.waitForLoadingScreen()
+        if(self.browser.elementExists(by=By.XPATH,value=clearAllButtonString)):
+            clearAllButton = self.browser.find_element(by=By.XPATH,value=clearAllButtonString)
+            clearAllButton.click()
+            self.waitForLoadingScreen()
 
     # Methods to add specific filters, along with their status and value.
     def Filters_AddEmployeeNumber(self,status : str,employeeNumber):
@@ -492,39 +516,42 @@ class CimplDriver:
         # First, we build template dict to avoid and help with error detection for cimpl updates.
         hardwareInfoHeadersString = "//wd-hardware-info/div/cimpl-grid/div/div/div[contains(@class,'k-grid-header')]/div/table/thead/tr/th"
         allHardwareInfoHeaderElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoHeadersString)
-        compareDict = {}
-        for header in allHardwareInfoHeaderElements:
-            compareDict[header.get_attribute("data-title")] = None
+        if(len(allHardwareInfoHeaderElements) == 0):
+            return None
+        else:
+            compareDict = {}
+            for header in allHardwareInfoHeaderElements:
+                compareDict[header.get_attribute("data-title")] = None
 
-        # Detect if, for some reason, cimpl changed its config and error out if so.
-        if(templateDict != compareDict):
-            b.log.error("Cimpl template dict does NOT MATCH the compareDict! Will likely require code rewrites!")
-            raise ValueError
+            # Detect if, for some reason, cimpl changed its config and error out if so.
+            if(templateDict != compareDict):
+                b.log.error("Cimpl template dict does NOT MATCH the compareDict! Will likely require code rewrites!")
+                raise ValueError
 
 
-        hardwareInfoRowsString = "//wd-hardware-info/div/cimpl-grid/div/div/div/table/tbody/tr"
-        allHardwareInfoRowElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoRowsString)
+            hardwareInfoRowsString = "//wd-hardware-info/div/cimpl-grid/div/div/div/table/tbody/tr"
+            allHardwareInfoRowElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoRowsString)
 
-        returnList = []
-        for hardwareRow in allHardwareInfoRowElements:
-            tdElements = hardwareRow.find_elements(by=By.TAG_NAME, value='td')
-            row_data = templateDict.copy()
+            returnList = []
+            for hardwareRow in allHardwareInfoRowElements:
+                tdElements = hardwareRow.find_elements(by=By.TAG_NAME, value='td')
+                row_data = templateDict.copy()
 
-            for i, key in enumerate(templateDict.keys()):
-                if(key == "Primary"):
-                    primaryInnerHTML = tdElements[i].get_attribute("innerHTML")
-                    if("fa-star" in primaryInnerHTML):
-                        # noinspection PyTypeChecker
-                        row_data[key] = True
+                for i, key in enumerate(templateDict.keys()):
+                    if(key == "Primary"):
+                        primaryInnerHTML = tdElements[i].get_attribute("innerHTML")
+                        if("fa-star" in primaryInnerHTML):
+                            # noinspection PyTypeChecker
+                            row_data[key] = True
+                        else:
+                            # noinspection PyTypeChecker
+                            row_data[key] = False
                     else:
-                        # noinspection PyTypeChecker
-                        row_data[key] = False
-                else:
-                    row_data[key] = tdElements[i].text
+                        row_data[key] = tdElements[i].text
 
-            returnList.append(row_data)
+                returnList.append(row_data)
 
-        return returnList
+            return returnList
     def Workorders_ReadActions(self):
         self.browser.switchToTab("Cimpl")
 

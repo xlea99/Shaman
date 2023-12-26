@@ -40,6 +40,10 @@ class Paths:
         createAndCheckAccess(self.databases)
         self.emailTemplates = f"{self.data}/email_templates"
         createAndCheckAccess(self.emailTemplates)
+
+        # Path to Selenium directory
+        self.seleniumPath = f"{self.base}/selenium"
+        createAndCheckAccess(self.seleniumPath)
 paths = Paths()
 
 with open(f"{paths.data}/clients.toml", "rb") as f:
@@ -124,11 +128,11 @@ def convertServiceIDFormat(serviceID, targetFormat):
     rawNumber = re.sub(r'\D', '', serviceID)  # \D matches any non-digit
 
     # Based on the desired target format, format the raw number accordingly
-    if targetFormat == 'dashed':
+    if(targetFormat == 'dashed'):
         return f"{rawNumber[:3]}-{rawNumber[3:6]}-{rawNumber[6:]}"
-    elif targetFormat == 'dotted':
+    elif(targetFormat == 'dotted'):
         return f"{rawNumber[:3]}.{rawNumber[3:6]}.{rawNumber[6:]}"
-    elif targetFormat == 'raw':
+    elif(targetFormat == 'raw'):
         return rawNumber
     else:
         raise ValueError("Invalid target format. Use 'dashed', 'dotted', or 'raw'.")

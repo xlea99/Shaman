@@ -1,30 +1,83 @@
 import BaseFunctions as b
 import Browser
 import TMA
+import Verizon
+import Cimpl
 from datetime import datetime
 
 
-# Valid devices are currently - iPhone 12, Samsung S21, Jetpack 8800L
-def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=None,existingTMADriver=None):
+# This method builds our set of drivers/tabs that will be used.
+def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True):
+    browserDriver = Browser.Browser()
+
+    tmaDriver = None
+    if(buildTMA):
+        tmaDriver = TMA.TMADriver(browserObject=browserDriver)
+
+    cimplDriver = None
+    if(buildCimpl):
+        cimplDriver = Cimpl.CimplDriver(browserObject=browserDriver)
+
+    verizonDriver = None
+    if(buildVerizon):
+        verizonDriver = Verizon.VerizonDriver(browserObject=browserDriver)
+
+    return {"Browser" : browserDriver, "TMA" : tmaDriver, "Cimpl" : cimplDriver, "Verizon" : verizonDriver}
+
+# A set of "verify" methods for ensuring that the respective drivers are logged in, on the
+# correct pages, etc.
+def tmaVerify(drivers,client):
+    drivers["Browser"].switchToTab("TMA")
+    currentLocation = drivers["TMA"].readPage()
+    if(not currentLocation.isLoggedIn):
+        drivers["TMA"].logInToTMA()
+    if(currentLocation.client != client):
+        drivers["TMA"].navToClientHome(client)
+def cimplVerify(drivers):
+    drivers["Browser"].switchToTab("Cimpl")
+    drivers["Cimpl"].logInToCimpl()
+def verizonVerify(drivers): #TODO WAYYYY down the line, but client support
+    drivers["Browser"].switchToTab("Verizon")
+    drivers["Verizon"].logInToVerizon()
+
+
+# Searches up, and reads, a full workorder given by workorderNumber.
+def readCimplWorkorder(drivers,workorderNumber):
+    cimplVerify(drivers=drivers)
+    drivers["Cimpl"].navToWorkorderCenter()
+
+    drivers["Cimpl"].Filters_Clear()
+    drivers["Cimpl"].Filters_AddWorkorderNumber(status="Equals",workorderNumber=workorderNumber)
+    drivers["Cimpl"].Filters_Apply()
+
+    drivers["Cimpl"].openWorkorder(workorderNumber=workorderNumber)
+
+    return drivers["Cimpl"].Workorders_ReadFullWorkorder()
+
+# Searches up, and reads, a full Verizon order number.
+def readVerizonOrder(drivers,verizonOrderNumber):
+    verizonVerify(drivers=drivers)
+    drivers["Verizon"].navToOrderViewer()
+
+    drivers["Verizon"].OrderViewer_SearchOrder(orderNumber=verizonOrderNumber)
+
+    return drivers["Verizon"].OrderViewer_ReadDisplayedOrder()
+
+# Performs a full New Install in TMA, building a new service based on the provided information.
+def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrier):
+    tmaVerify(drivers=drivers, client=client)
     if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
         return False
-    if(browser is None):
-        browser = Browser.Browser()
-    if(existingTMADriver is not None):
-        t = existingTMADriver
-    else:
-        t = TMA.TMADriver(browser)
-        t.logInToTMA()
 
     netID = netID.strip()
     serviceNum = b.convertServiceIDFormat(serviceID=serviceNum,targetFormat="dashed")
 
 
-    t.navToLocation(client="Sysco", entryType="People", entryID=netID.strip())
-    targetUser = TMA.People(locationData=t.currentLocation)
+    drivers["TMA"].navToLocation(client="Sysco", entryType="People", entryID=netID.strip())
+    targetUser = TMA.People(locationData=drivers["TMA"].currentLocation)
     targetUser.info_Client = "Sysco"
-    t.People_ReadBasicInfo(targetUser)
+    drivers["TMA"].People_ReadBasicInfo(targetUser)
 
     # First, we need to build the service as a TMA.Service struct before we actually build it in TMA.
     newService = TMA.Service()
@@ -54,7 +107,7 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=Non
     elif(newService.info_ServiceType == "Cell Phone"):
         costType = "CellPhone"
     elif(newService.info_ServiceType == "Tablet"):
-        costType = "Table"
+        costType = "Tablet"
     elif(newService.info_ServiceType == "Mifi"):
         costType = "Mifi"
     else:
@@ -76,88 +129,87 @@ def syscoNewInstall(netID,serviceNum,installDate,device,imei,carrier,browser=Non
     newService.info_FeatureCosts = featureCosts
 
     # Creates a new linked service, which also opens a new pop up window.
-    t.People_CreateNewLinkedService()
-    t.switchToNewTab()
+    drivers["TMA"].People_CreateNewLinkedService()
+    drivers["TMA"].switchToNewTab()
 
     # Select the modal service type here.
-    t.Service_SelectModalServiceType("Cellular")
+    drivers["TMA"].Service_SelectModalServiceType("Cellular")
 
     # Now we write the main information, and the installed date in LineInfo.
-    t.Service_WriteMainInformation(newService,"Sysco")
-    t.Service_WriteInstalledDate(newService)
+    drivers["TMA"].Service_WriteMainInformation(newService,"Sysco")
+    drivers["TMA"].Service_WriteInstalledDate(newService)
 
     # We can now insert the service.
-    t.Service_InsertUpdate()
+    result = drivers["TMA"].Service_InsertUpdate()
+    if(result == "ServiceAlreadyExists"):
+        drivers["TMA"].returnToBaseTMA()
+        return "ServiceAlreadyExists"
 
     # The screen now changes over to the Accounts wizard, but stays on the same tab.
-    t.Assignment_BuildAssignmentFromAccount("Sysco",carrier,targetUser.info_OpCo)
+    drivers["TMA"].Assignment_BuildAssignmentFromAccount("Sysco",carrier,targetUser.info_OpCo)
+
+    # Return to base TMA now that the popup window should be closed.
+    drivers["TMA"].returnToBaseTMA()
 
     # Now that we've processed the assignment, the popup window has closed and we need to
     # switch back to base TMA window. We also need to force TMA to update and display the new service
-    t.returnToBaseTMA()
-    t.People_NavToLinkedTab("orders")
-    t.People_NavToLinkedTab("services")
+    drivers["TMA"].People_NavToLinkedTab("services")
 
     # We can now open the newly created service from our People object, replacing this window
     # with the service entry.
-    t.People_OpenServiceFromPeople(serviceNum)
-    browser.implicitly_wait(10)
+    drivers["TMA"].People_OpenServiceFromPeople(serviceNum)
+    #TODO is needed? drivers["Browser"].implicitly_wait(10)
 
     # Now, we can write cost objects.
-    t.Service_WriteCosts(newService,isBase=True)
-    t.Service_WriteCosts(newService,isBase=False)
+    drivers["TMA"].Service_WriteCosts(newService,isBase=True)
+    drivers["TMA"].Service_WriteCosts(newService,isBase=False)
 
     # Now we create our new linked equipment, and switch to that new popup tab.
-    t.Service_NavToServiceTab("links")
-    t.Service_NavToLinkedTab("equipment")
-    t.Service_CreateLinkedEquipment()
-    t.switchToNewTab()
+    drivers["TMA"].Service_NavToServiceTab("links")
+    drivers["TMA"].Service_NavToLinkedTab("equipment")
+    drivers["TMA"].Service_CreateLinkedEquipment()
+    drivers["TMA"].switchToNewTab()
 
     # We build our Equipment information. After clicking insert, we forcibly close
     # this tab and return to base TMA.
-    t.Equipment_SelectEquipmentType(newService.info_LinkedEquipment.info_MainType)
-    t.Equipment_WriteAll(newService.info_LinkedEquipment)
-    t.Equipment_InsertUpdate()
-    t.returnToBaseTMA()
+    drivers["TMA"].Equipment_SelectEquipmentType(newService.info_LinkedEquipment.info_MainType)
+    drivers["TMA"].Equipment_WriteAll(newService.info_LinkedEquipment)
+    drivers["TMA"].Equipment_InsertUpdate()
+    drivers["TMA"].returnToBaseTMA()
 
     # Finally, we update the display again and update the service to make sure
     # everything has worked.
-    t.Service_NavToLinkedTab("orders")
-    t.Service_NavToLinkedTab("equipment")
-    t.Service_InsertUpdate()
+    drivers["TMA"].Service_NavToLinkedTab("orders")
+    drivers["TMA"].Service_NavToLinkedTab("equipment")
+    drivers["TMA"].Service_InsertUpdate()
 
-    print("DONE BITCH!")
-
-# TODO
-def syscoUpgrade(serviceNum,upgradeEligibilityDate,device,imei,browser=None,existingTMADriver=None):
+    return "Completed"
+# Performs a full Upgrade in TMA, editing an existing service based on the provided information.
+def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
+    tmaVerify(drivers=drivers,client=client)
     if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
         return False
-    if(browser is None):
-        browser = Browser.Browser()
-    if(existingTMADriver is not None):
-        t = existingTMADriver
-    else:
-        t = TMA.TMADriver(browser)
-        t.logInToTMA()
 
     # First, we navigate to the service that's been upgraded.
-    t.navToLocation(client="Sysco", entryType="Service", entryID=serviceNum.strip())
+    drivers["TMA"].navToLocation(client="Sysco", entryType="Service", entryID=serviceNum.strip())
 
 
     # First thing to update in the upgrade elib and expiration dates.
-    t.Service_WriteUpgradeEligibilityDate(rawValue=upgradeEligibilityDate)
-    t.Service_WriteContractEndDate(rawValue=upgradeEligibilityDate)
-    t.Service_InsertUpdate()
+    upgradeEligibilityDate = datetime.strptime(installDate,"%m/%d/%Y")
+    upgradeEligibilityDate = upgradeEligibilityDate.replace(year=upgradeEligibilityDate.year + 2)
+    drivers["TMA"].Service_WriteUpgradeEligibilityDate(rawValue=upgradeEligibilityDate.strftime("%m/%d/%Y"))
+    drivers["TMA"].Service_WriteContractEndDate(rawValue=upgradeEligibilityDate.strftime("%m/%d/%Y"))
+    drivers["TMA"].Service_InsertUpdate()
 
     # Now we check to make sure that the Service Type hasn't changed.
-    newServiceType = b.equipment[device]["ServiceType"]
-    if(newServiceType != t.Service_ReadMainInfo().info_ServiceType):
-        t.Service_WriteServiceType(rawValue=newServiceType)
-        t.Service_InsertUpdate()
+    newServiceType = b.equipment[device]["serviceType"]
+    if(newServiceType != drivers["TMA"].Service_ReadMainInfo().info_ServiceType):
+        drivers["TMA"].Service_WriteServiceType(rawValue=newServiceType)
+        drivers["TMA"].Service_InsertUpdate()
 
     # Now, we navigate to the equipment and update the IMEI and device info.
-    t.Service_NavToEquipmentFromService()
+    drivers["TMA"].Service_NavToEquipmentFromService()
 
     thisEquipment = TMA.Equipment(mainType=b.equipment[device]["mainType"],
                                   subType=b.equipment[device]["subType"],
@@ -165,7 +217,81 @@ def syscoUpgrade(serviceNum,upgradeEligibilityDate,device,imei,browser=None,exis
                                   model=b.equipment[device]["model"])
     deviceToBuild = thisEquipment
     deviceToBuild.info_IMEI = imei
-    t.Equipment_WriteAll(equipmentObject=deviceToBuild)
-    t.Equipment_InsertUpdate()
+    drivers["TMA"].Equipment_WriteAll(equipmentObject=deviceToBuild)
+    drivers["TMA"].Equipment_InsertUpdate()
 
-    print(f"Finished upgrading service {serviceNum}")
+
+
+# Adds service information to Cimpl (service num, install date, account) and applies it.
+def writeServiceToCimplWorkorder(drivers,serviceNum,carrier,installDate):
+    cimplVerify(drivers=drivers)
+
+    currentLocation = drivers["Cimpl"].getLocation()
+    # TODO Lookie here! simple, barebones error supporting. use this as framework mah boy
+    if(not currentLocation["Location"].startswith("Workorder_")):
+        raise ValueError("Couldn't run writeServiceToCimplWorkorder, as Cimpl Driver is not currently on a workorder!")
+
+    drivers["Cimpl"].Workorders_NavToDetailsTab()
+    drivers["Cimpl"].Workorders_WriteServiceID(serviceID=b.convertServiceIDFormat(serviceNum,targetFormat="raw"))
+    drivers["Cimpl"].Workorders_WriteAccount(accountNum=b.clients['Sysco']['Accounts'][carrier])
+    drivers["Cimpl"].Workorders_WriteStartDate(startDate=installDate)
+
+    drivers["Cimpl"].Workorders_ApplyChanges()
+
+
+# Given a workorderNumber, this method examines it, tries to figure out the type of workorder it is and whether
+# it has a relevant order number, looks up to see if Verizon order is completed, and then closes it in TMA.
+def processWorkorder(drivers,workorderNumber):
+    print(f"Cimpl WO {workorderNumber}: Beginning automation")
+    workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
+
+    if(workorder["OperationType"] not in ("New Request","Upgrade")):
+        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order type '{workorder['OperationType']}' is not understood by the Shaman.")
+        return False
+
+    if(workorder["Status"] == "Completed" or workorder["Status"] == "Cancelled"):
+        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order is already {workorder['Status']}")
+        return False
+
+    if(workorder["Carrier"].lower() != "verizon wireless"):
+        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as carrier is not Verizon ({workorder['Carrier']})")
+        return False
+
+    carrierOrderNumber = Cimpl.findPlacedOrderNumber(workorder["Notes"])
+    if (carrierOrderNumber is None):
+        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as no completed carrier order can be found.")
+        return False
+
+    # TODO only support verizon atm
+    carrierOrder = readVerizonOrder(drivers=drivers,verizonOrderNumber=carrierOrderNumber)
+    if(carrierOrder["Status"] != "Completed"):
+        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order number '{carrierOrderNumber}' has status '{carrierOrder['Status']}' and not Complete.")
+        return False
+
+    print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
+    deviceID = Cimpl.getDeviceModelID(workorder["HardwareInfo"])
+
+    if(workorder["OperationType"] == "New Request"):
+        userID = Cimpl.getUserID(workorder["Actions"])
+        print(f"Cimpl WO {workorderNumber}: Building new service {carrierOrder['WirelessNumber']} for user {userID}")
+        returnCode = TMANewInstall(drivers=drivers,client="Sysco",netID=userID,serviceNum=carrierOrder["WirelessNumber"],installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"],carrier="Verizon Wireless")
+        if(returnCode == "Completed"):
+            writeServiceToCimplWorkorder(drivers=drivers,serviceNum=carrierOrder["WirelessNumber"],carrier="Verizon Wireless",installDate=carrierOrder["OrderDate"])
+            print(f"Cimpl WO {workorderNumber}: Finished building new service {carrierOrder['WirelessNumber']} for user {userID}")
+        elif(returnCode == "ServiceAlreadyExists"):
+            print(f"Cimpl WO {workorderNumber}: Can't build new service for {carrierOrder['WirelessNumber']}, as the service already exists in the TMA database")
+            return False
+    if(workorder["OperationType"] == "Upgrade"):
+        print(f"Cimpl WO {workorderNumber}: Processing Upgrade for service {carrierOrder['WirelessNumber']}")
+        TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],
+                        installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"])
+        print(f"Cimpl WO {workorderNumber}: Finished upgrading service {carrierOrder['WirelessNumber']}")
+
+    drivers["Browser"].switchToTab("Cimpl")
+    drivers["Cimpl"].Workorders_NavToSummaryTab()
+    drivers["Cimpl"].Workorders_WriteNote(subject="Tracking",noteType="Information Only",status="Completed",
+                                          content=f"Courier: {carrierOrder['Courier']}\nTracking Number: {carrierOrder['TrackingNumber']}")
+
+    drivers["Cimpl"].Workorders_SetStatus(status="Complete")
+    print(f"Cimpl WO {workorderNumber}: Finished all Cimpl work")
+    return True

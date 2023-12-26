@@ -37,20 +37,25 @@ class VerizonDriver:
     # logging in.
     def logInToVerizon(self):
         self.browser.switchToTab("Verizon")
-        self.browser.get("https://mblogin.verizonwireless.com/account/business/login/unifiedlogin")
-        self.browser.implicitly_wait(10)
 
-        usernameField = self.browser.find_element(by=By.XPATH,value="//label[text()='User ID']/following-sibling::input")
-        usernameField.send_keys(b.config["authentication"]["verizonUser"])
-        passwordField = self.browser.find_element(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
-        passwordField.send_keys(b.config["authentication"]["verizonPass"])
+        # Test if already signed in.
+        if("https://mb.verizonwireless.com" in self.browser.get_current_url()):
+            return True
+        else:
+            self.browser.get("https://mblogin.verizonwireless.com/account/business/login/unifiedlogin")
+            self.browser.implicitly_wait(10)
 
-        logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-        logInButton.click()
+            usernameField = self.browser.find_element(by=By.XPATH,value="//label[text()='User ID']/following-sibling::input")
+            usernameField.send_keys(b.config["authentication"]["verizonUser"])
+            passwordField = self.browser.find_element(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
+            passwordField.send_keys(b.config["authentication"]["verizonPass"])
 
-        self.waitForLoadingScreen()
+            logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+            logInButton.click()
 
-        # TODO Manage 2FA instances HERE
+            self.waitForLoadingScreen()
+
+            # TODO Manage 2FA instances HERE
 
     # This method simply pauses further action until it confirms that the loading screen is finished loading.
     # Returns true if it detected a loading screen to wait for, otherwise returns false.
@@ -96,7 +101,6 @@ class VerizonDriver:
                 # TODO proper error reporting maybe?
                 raise ValueError("Couldn't navigate successfully to Verizon view-orders screen.")
             self.OrderViewer_WaitForLoadingScreen()
-
 
     #endregion === Site Navigation ===
 
