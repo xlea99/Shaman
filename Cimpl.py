@@ -516,39 +516,42 @@ class CimplDriver:
         # First, we build template dict to avoid and help with error detection for cimpl updates.
         hardwareInfoHeadersString = "//wd-hardware-info/div/cimpl-grid/div/div/div[contains(@class,'k-grid-header')]/div/table/thead/tr/th"
         allHardwareInfoHeaderElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoHeadersString)
-        compareDict = {}
-        for header in allHardwareInfoHeaderElements:
-            compareDict[header.get_attribute("data-title")] = None
+        if(len(allHardwareInfoHeaderElements) == 0):
+            return None
+        else:
+            compareDict = {}
+            for header in allHardwareInfoHeaderElements:
+                compareDict[header.get_attribute("data-title")] = None
 
-        # Detect if, for some reason, cimpl changed its config and error out if so.
-        if(templateDict != compareDict):
-            b.log.error("Cimpl template dict does NOT MATCH the compareDict! Will likely require code rewrites!")
-            raise ValueError
+            # Detect if, for some reason, cimpl changed its config and error out if so.
+            if(templateDict != compareDict):
+                b.log.error("Cimpl template dict does NOT MATCH the compareDict! Will likely require code rewrites!")
+                raise ValueError
 
 
-        hardwareInfoRowsString = "//wd-hardware-info/div/cimpl-grid/div/div/div/table/tbody/tr"
-        allHardwareInfoRowElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoRowsString)
+            hardwareInfoRowsString = "//wd-hardware-info/div/cimpl-grid/div/div/div/table/tbody/tr"
+            allHardwareInfoRowElements = self.browser.find_elements(by=By.XPATH,value=hardwareInfoRowsString)
 
-        returnList = []
-        for hardwareRow in allHardwareInfoRowElements:
-            tdElements = hardwareRow.find_elements(by=By.TAG_NAME, value='td')
-            row_data = templateDict.copy()
+            returnList = []
+            for hardwareRow in allHardwareInfoRowElements:
+                tdElements = hardwareRow.find_elements(by=By.TAG_NAME, value='td')
+                row_data = templateDict.copy()
 
-            for i, key in enumerate(templateDict.keys()):
-                if(key == "Primary"):
-                    primaryInnerHTML = tdElements[i].get_attribute("innerHTML")
-                    if("fa-star" in primaryInnerHTML):
-                        # noinspection PyTypeChecker
-                        row_data[key] = True
+                for i, key in enumerate(templateDict.keys()):
+                    if(key == "Primary"):
+                        primaryInnerHTML = tdElements[i].get_attribute("innerHTML")
+                        if("fa-star" in primaryInnerHTML):
+                            # noinspection PyTypeChecker
+                            row_data[key] = True
+                        else:
+                            # noinspection PyTypeChecker
+                            row_data[key] = False
                     else:
-                        # noinspection PyTypeChecker
-                        row_data[key] = False
-                else:
-                    row_data[key] = tdElements[i].text
+                        row_data[key] = tdElements[i].text
 
-            returnList.append(row_data)
+                returnList.append(row_data)
 
-        return returnList
+            return returnList
     def Workorders_ReadActions(self):
         self.browser.switchToTab("Cimpl")
 

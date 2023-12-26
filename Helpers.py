@@ -140,10 +140,16 @@ def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrie
     drivers["TMA"].Service_WriteInstalledDate(newService)
 
     # We can now insert the service.
-    drivers["TMA"].Service_InsertUpdate()
+    result = drivers["TMA"].Service_InsertUpdate()
+    if(result == "ServiceAlreadyExists"):
+        drivers["TMA"].returnToBaseTMA()
+        return "ServiceAlreadyExists"
 
     # The screen now changes over to the Accounts wizard, but stays on the same tab.
     drivers["TMA"].Assignment_BuildAssignmentFromAccount("Sysco",carrier,targetUser.info_OpCo)
+
+    # Return to base TMA now that the popup window should be closed.
+    drivers["TMA"].returnToBaseTMA()
 
     # Now that we've processed the assignment, the popup window has closed and we need to
     # switch back to base TMA window. We also need to force TMA to update and display the new service
@@ -176,6 +182,8 @@ def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrie
     drivers["TMA"].Service_NavToLinkedTab("orders")
     drivers["TMA"].Service_NavToLinkedTab("equipment")
     drivers["TMA"].Service_InsertUpdate()
+
+    return "Completed"
 # Performs a full Upgrade in TMA, editing an existing service based on the provided information.
 def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
     tmaVerify(drivers=drivers,client=client)
@@ -226,7 +234,7 @@ def writeServiceToCimplWorkorder(drivers,serviceNum,carrier,installDate):
     drivers["Cimpl"].Workorders_NavToDetailsTab()
     drivers["Cimpl"].Workorders_WriteServiceID(serviceID=b.convertServiceIDFormat(serviceNum,targetFormat="raw"))
     drivers["Cimpl"].Workorders_WriteAccount(accountNum=b.clients['Sysco']['Accounts'][carrier])
-    drivers["Cimpl"].Workorders_StartDate(startDate=installDate)
+    drivers["Cimpl"].Workorders_WriteStartDate(startDate=installDate)
 
     drivers["Cimpl"].Workorders_ApplyChanges()
 
@@ -266,10 +274,13 @@ def processWorkorder(drivers,workorderNumber):
     if(workorder["OperationType"] == "New Request"):
         userID = Cimpl.getUserID(workorder["Actions"])
         print(f"Cimpl WO {workorderNumber}: Building new service {carrierOrder['WirelessNumber']} for user {userID}")
-        TMANewInstall(drivers=drivers,client="Sysco",netID=userID,serviceNum=carrierOrder["WirelessNumber"],
-                           installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"],carrier="Verizon Wireless")
-        writeServiceToCimplWorkorder(drivers=drivers,serviceNum=carrierOrder["WirelessOrder"],carrier="Verizon Wireless",installDate=carrierOrder["OrderDate"])
-        print(f"Cimpl WO {workorderNumber}: Finished building new service {carrierOrder['WirelessNumber']} for user {userID}")
+        returnCode = TMANewInstall(drivers=drivers,client="Sysco",netID=userID,serviceNum=carrierOrder["WirelessNumber"],installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"],carrier="Verizon Wireless")
+        if(returnCode == "Completed"):
+            writeServiceToCimplWorkorder(drivers=drivers,serviceNum=carrierOrder["WirelessNumber"],carrier="Verizon Wireless",installDate=carrierOrder["OrderDate"])
+            print(f"Cimpl WO {workorderNumber}: Finished building new service {carrierOrder['WirelessNumber']} for user {userID}")
+        elif(returnCode == "ServiceAlreadyExists"):
+            print(f"Cimpl WO {workorderNumber}: Can't build new service for {carrierOrder['WirelessNumber']}, as the service already exists in the TMA database")
+            return False
     if(workorder["OperationType"] == "Upgrade"):
         print(f"Cimpl WO {workorderNumber}: Processing Upgrade for service {carrierOrder['WirelessNumber']}")
         TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],
@@ -283,3 +294,4 @@ def processWorkorder(drivers,workorderNumber):
 
     drivers["Cimpl"].Workorders_SetStatus(status="Complete")
     print(f"Cimpl WO {workorderNumber}: Finished all Cimpl work")
+    return True

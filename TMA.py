@@ -345,6 +345,7 @@ class TMADriver():
         self.browser.openNewTab("TMA")
 
         self.locationHistory = []
+        self.locationHistory = []
         self.currentLocation = TMALocation()
 
         # Used to reliably work on the appropriate TMA page, popup or otherwise.
@@ -1425,6 +1426,12 @@ class TMADriver():
         else:
             b.log.warn("Neither insert nor update buttons exist.")
             return False
+
+        serviceAlreadyExistsString = "//span[text()='The Service already exists in the database.']"
+        if(self.browser.elementExists(by=By.XPATH,value=serviceAlreadyExistsString,timeout=1)):
+            return "ServiceAlreadyExists"
+        else:
+            return True
     # This method simply clicks on "create new linked equipment" for the service entry we're on. Does nothing
     # with it, and WILL pop up a new window, so switchToNewTab will be required afterwards.
     def Service_CreateLinkedEquipment(self):
@@ -2599,7 +2606,7 @@ class MultipleTMAPopups(Exception):
 # carrier - Verizon, AT&T, etc.
 # portalOrderNum - Number of portal order, via email, or SNow ticket
 # orderDate - Date order was placed
-# userName - User order was placed for
+# uas placeserName - User order wd for
 # account - Carrier account number
 # device - Name of the device
 # imei - IMEI of the device
