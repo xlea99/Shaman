@@ -68,7 +68,7 @@ def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrie
     tmaVerify(drivers=drivers, client=client)
     if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
-        return False
+        return "WrongDevice"
 
     netID = netID.strip()
     serviceNum = b.convertServiceIDFormat(serviceID=serviceNum,targetFormat="dashed")
@@ -187,9 +187,10 @@ def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrie
 # Performs a full Upgrade in TMA, editing an existing service based on the provided information.
 def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
     tmaVerify(drivers=drivers,client=client)
+    print(device)
     if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
-        return False
+        return "WrongDevice"
 
     # First, we navigate to the service that's been upgraded.
     drivers["TMA"].navToLocation(client="Sysco", entryType="Service", entryID=serviceNum.strip())
@@ -281,10 +282,18 @@ def processWorkorder(drivers,workorderNumber):
         elif(returnCode == "ServiceAlreadyExists"):
             print(f"Cimpl WO {workorderNumber}: Can't build new service for {carrierOrder['WirelessNumber']}, as the service already exists in the TMA database")
             return False
+        elif(returnCode == "WrongDevice"):
+            print(f"Cimpl WO {workorderNumber}: Failed to build new service in TMA, got wrong device '{deviceID}'")
+            return False
     if(workorder["OperationType"] == "Upgrade"):
         print(f"Cimpl WO {workorderNumber}: Processing Upgrade for service {carrierOrder['WirelessNumber']}")
-        TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],
+        returnCode = TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],
                         installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"])
+        if(returnCode == "Completed"):
+            print(f"Cimpl WO {workorderNumber}: Finished upgrading TMA service {carrierOrder['WirelessNumber']}")
+        elif(returnCode == "WrongDevice"):
+            print(f"Cimpl WO {workorderNumber}: Failed to upgrade service in TMA, got wrong device '{deviceID}'")
+            return False
         print(f"Cimpl WO {workorderNumber}: Finished upgrading service {carrierOrder['WirelessNumber']}")
 
     drivers["Browser"].switchToTab("Cimpl")

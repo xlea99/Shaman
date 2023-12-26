@@ -85,12 +85,12 @@ mainType = "Wireless"
 subType = "Aircard"
 make = "Verizon"
 model = "JETPACK 4G 8800L"
-[Orbic] #UPDATE WHEN UPDATED
+[Orbic]
 serviceType = "Mifi"
 mainType = "Wireless"
 subType = "Aircard"
 make = "Verizon"
-model = "JETPACK 4G 8800L"
+model = "ORBIC SPEED 5G UW"
 [FranklinA10] #UPDATE WHEN UPDATED
 serviceType = "Mifi"
 mainType = "Wireless"
