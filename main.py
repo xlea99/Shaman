@@ -28,7 +28,7 @@ d = h.buildDrivers()
 # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
 # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
 # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-cimplWOs = []
+cimplWOs = [44028,44032]
 for WO in cimplWOs:
     h.processWorkorder(d,WO)
 

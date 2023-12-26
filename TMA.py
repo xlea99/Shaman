@@ -999,7 +999,6 @@ class TMADriver():
             arrayOfLinkedIntNumbersOnPage = []
             for j in arrayOfLinkedInteractionsOnPage:
                 arrayOfLinkedIntNumbersOnPage.append(j.text)
-                print("just stored this int number: " + str(j.text))
             for j in arrayOfLinkedIntNumbersOnPage:
                 if (j in arrayOfLinkedIntNumbers):
                     continue
@@ -1386,7 +1385,6 @@ class TMADriver():
             time.sleep(3)
             # TODO TMA is ass, and this section just proves it. The thing is, cost names are selected from dropdown, but clicking it doesn't actually update the "selected='selected'" attribute, so there's literally no way to tell. only solution is try, then test. implement this later (try adding it, test if the right feature was added and if not, try again.)
             self.browser.safeClick(by=By.XPATH, element=createNewButton, repeat=True, repeatUntilNewElementExists=newItemTestFor)
-            print(f"Hello Mr. Testicles: {costToWrite.info_FeatureString}")
             featureNameSelectionString = f"{prefix}/div/div/select[contains(@name,'$ddlFeature$ddlFeature_ddl')]/option[text()='{costToWrite.info_FeatureString}']"
             self.browser.safeClick(by=By.XPATH, element=featureNameSelectionString,repeat=True,timeout=5)
 
@@ -2391,7 +2389,6 @@ class TMADriver():
                 foundSiteCode = foundSiteElement.text.split("-")[0]
                 if(foundSiteCode == siteCode):
                     targetSiteElement = foundSiteElement
-                    print("WIGGLES!")
                     foundTargetCode = True
                     break
 
@@ -2405,10 +2402,8 @@ class TMADriver():
                 # Flip to the next page.
                 self.browser.find_element(by=By.CSS_SELECTOR,value=nextButtonString).click()
 
-        print("now you know whats up")
         # If we got here, that means we've now found our element, so we can click on it.
         self.browser.safeClick(by=By.XPATH, element=targetSiteElement,repeat=True,repeatUntilElementDoesNotExist=targetSiteElement)
-        print("--.--")
 
         # At this point, what will pop up next is completely and utterly unpredictable. To remedy this,
         # we use a while loop to continuously react to each screen that pops up next, until we find the
@@ -2616,7 +2611,11 @@ class MultipleTMAPopups(Exception):
 # tracking - The tracking number
 def genTMAOrderNotes(orderType,carrier=None,portalOrderNum=None,orderDate=None,userName=None,device=None,imei=None,
                      monthlyChargeback=None,deviceChargeback=None,plan=None,serviceNum=None,specialNotes=None,tracking=None):
-    resultString = f"{orderType.upper()} ordered per  {portalOrderNum} {orderDate} for {userName} on {carrier} account\n"
+    resultString = ""
+    if(orderType == "New Install"):
+        resultString += f"{orderType.upper()} ordered per  {portalOrderNum} {orderDate} for {userName} on {carrier} account\n"
+    elif(orderType == "Upgrade"):
+        resultString += f"{orderType.upper()} ordered per  {portalOrderNum} {orderDate} for {userName} - {serviceNum} on {carrier} account\n"
     resultString += "\n"
     resultString += f"DEVICE- {device}\n"
     resultString += f"IMEI- {imei}\n"
@@ -2624,12 +2623,15 @@ def genTMAOrderNotes(orderType,carrier=None,portalOrderNum=None,orderDate=None,u
     resultString += f"Chargeback Device: {deviceChargeback}\n"
     resultString += f"Chargeback Monthly Service: {monthlyChargeback}\n"
     resultString += "\n"
-    resultString += f"PLANS:{plan}\n"
-    resultString += "\n"
-    resultString += f"Number assigned: {serviceNum}\n"
+    if(orderType == "New Install"):
+        resultString += f"PLANS:{plan}\n"
+    elif(orderType == "Upgrade"):
+        resultString += f"PLANS changes?: {plan}\n"
+    if(orderType == "New Install"):
+        resultString += "\n"
+        resultString += f"Number assigned: {serviceNum}\n"
     resultString += "\n"
     resultString += f"Special notes: {orderType} {specialNotes}\n"
     resultString += f"TRACKING: {tracking}"
 
     return resultString
-

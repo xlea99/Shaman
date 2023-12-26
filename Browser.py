@@ -66,7 +66,14 @@ class Browser:
     # This method handles switching to the given tabName. If the tabName does not
     # exist, it throws an error.
     def switchToTab(self,tabName,popup=False):
-        if(self.currentTab == tabName and self.tabs.get(self.currentTab) == self.driver.current_window_handle):
+        try:
+            if(self.currentTab == tabName and self.tabs.get(self.currentTab) == self.driver.current_window_handle):
+                onTargetTab = True
+            else:
+                onTargetTab = False
+        except selenium.common.exceptions.NoSuchWindowException:
+            onTargetTab = False
+        if(onTargetTab):
             return True
         if(tabName in self.tabs.keys() and popup is False):
             self.driver.switch_to.window(self.tabs[tabName])
@@ -147,12 +154,10 @@ class Browser:
         for windowHandle in self.driver.window_handles:
             if(windowHandle not in self.tabs.values()):
                 if(windowHandle not in self.popupTabs.values()):
-                    print(f"FOUND YA BITCH!: {windowHandle}")
                     self.driver.switch_to.window(windowHandle)
                     #TODO figure out why this is sometimes needed, and try to use an implicit wait instead.
                     for i in range(5):
                         parsedURL = urlparse(self.driver.current_url)
-                        print(f"here the parse... {parsedURL}")
                         if(str(parsedURL.netloc) == ''):
                             time.sleep(1)
                             continue
