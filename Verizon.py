@@ -263,6 +263,54 @@ class VerizonDriver:
 
     #endregion === Order Viewer ===
 
+    #region === Device Ordering ===
+
+    # This method navigates to homescreen, then clicks "shop devices" to begin a new install
+    # request.
+    def shopNewDevice(self):
+        shopDevicesButton = self.browser.find_element(by=By.XPATH,value="//span[contains(text(),'Shop Devices')]")
+        shopDevicesButton.click()
+
+        # Now we wait to ensure that we've fully navigated to the newDevice screen.
+        for i in range(3):
+            self.browser.waitForClickableElement(by=By.XPATH, value="//button[@id='grid-search-button']",timeout=15)
+            time.sleep(1)
+
+    # Assumes we're on the device selection page. Given a Universal Device ID, searches for that
+    # device (if supported) on Verizon.
+    def searchForDevice(self,deviceID):
+        searchBox = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='search']",timeout=15)
+        searchButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@id='grid-search-button']",timeout=15)
+
+        searchBox.send_keys(b.equipment["VerizonMappings"]["SearchTerms"][deviceID])
+        searchButton.click()
+
+        # Now we test to ensure that the proper device card has fully loaded.
+        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings']['DeviceSKU'][deviceID]}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings']['DeviceCardName'][deviceID]}')]"
+        for i in range(3):
+            self.browser.waitForClickableElement(by=By.XPATH, value=targetDeviceCard, timeout=15)
+            time.sleep(1)
+    def selectDeviceQuickView(self,deviceID):
+        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings']['DeviceSKU'][deviceID]}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings']['DeviceCardName'][deviceID]}')]"
+        print(f"{targetDeviceCard}/following-sibling::div/div[@class='quick-view']/button[contains(@class,'quick-view')]")
+        targetDeviceQuickViewButton = self.browser.waitForClickableElement(by=By.XPATH, value=f"{targetDeviceCard}/following-sibling::div/div[@class='quick-view']/button[contains(@class,'quick-view')]", timeout=15)
+        targetDeviceQuickViewButton.click()
+
+    # Assumes we're in the quick view menu for a device. Various options for this menu.
+    def QuickView_Select2YearContract(self):
+        yearlyContractSelection = self.browser.waitForClickableElement(by=By.XPATH,value="//div[contains(@class,'payment-option-each')]/div[contains(text(),'Yearly contract')]/parent::div",timeout=15)
+        yearlyContractSelection.click()
+
+        twoYearContractSelection = self.browser.waitForClickableElement(by=By.XPATH,value="//div/ul/li/div[contains(text(),'2 Year Contract Required')]/parent::li",timeout=15)
+        twoYearContractSelection.click()
+    def QuickView_AddToCart(self):
+        addToCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@id='device-add-to-cart']")
+        addToCartButton.click()
+
+        self.browser.waitForNotClickableElement(by=By.XPATH,value="//button[@id='device-add-to-cart']")
+
+    #endregion === Device Ordering ===
+
 
     #region === Page Tests ===
     # This method simply tests to see if the "Session Expiring" message has popped up and, if it has, clicks "yes"
@@ -332,3 +380,15 @@ class SessionExpiring(VerizonError):
 class LoadingScreen(VerizonError):
     def __init__(self):
         super().__init__(f"Verizon MyBiz still stuck at loading while trying to click a new element.")
+
+
+br = Browser.Browser()
+v = VerizonDriver(br)
+v.logInToVerizon()
+v.shopNewDevice()
+
+device = "iPhone13_128GB"
+v.searchForDevice(device)
+v.selectDeviceQuickView(device)
+v.QuickView_Select2YearContract()
+v.QuickView_AddToCart()

@@ -186,6 +186,7 @@ class Browser:
     # This wrapper method helps prevent some pains of timeouts and bullshit. If repeat is true,
     # method will continuously click the element until all repeat conditions are met. Element
     # can be either a string representing an XPATH or CSS_SELECTOR, or an already found element.
+    # TODO this function is funky. It's as legacy as TMA is, ironically enough. Merge with its successor.
     def safeClick(self,by=None,element=None,timeout=30,repeat=False,repeatUntilElementDoesNotExist=None,repeatUntilNewElementExists=None,clickDelay=0,jsClick=False):
         logMessage = f"safeClicking element '{element}' by '{by}': "
         clickCounter = 0
@@ -237,6 +238,52 @@ class Browser:
             return False
         else:
             return True
+
+    # Simpler safe click that simply tries to click either until timeout has been reached, or until one successful
+    # click. NO multiple clicks.
+    def simpleSafeClick(self,by=None,element=None,timeout=10):
+        for i in range(timeout * 2):
+            # First, we try to click the element.
+            try:
+                if(type(element) is str):
+                    thisElement = self.find_element(by=by, value=element,timeout=1)
+                    thisElement.click()
+                else:
+                    element.click()
+                break
+            except:
+                time.sleep(0.5)
+
+        # Final attempt, this one will raise error if it fails.
+        if (type(element) is str):
+            thisElement = self.find_element(by=by, value=element, timeout=1)
+            thisElement.click()
+        else:
+            element.click()
+
+    # This method waits for the element given by value to be clickable, then simply returns the
+    # element.
+    def waitForClickableElement(self,by,value : str,timeout=15):
+        # Use WebDriverWait to wait for the element to be clickable
+        try:
+            element = WebDriverWait(self.driver, timeout).until(
+                EC.element_to_be_clickable((by, value))
+            )
+            return element
+        except selenium.common.exceptions.TimeoutException:
+            return False
+    # This method waits for the element given by value to NOT be clickable, then simply returns True or False.
+    def waitForNotClickableElement(self,by,value : str,timeout=15):
+        try:
+            # Wait for the element to either disappear or become not visible
+            WebDriverWait(self.driver, timeout).until_not(
+                EC.element_to_be_clickable((by, value))
+            )
+            return True
+        except selenium.common.exceptions.TimeoutException:
+            # If a timeout occurs, the element is still clickable after the wait
+            return False
+
 
     # Helper method to easily change the download path to the path given. Assumes that the path
     # exists.
