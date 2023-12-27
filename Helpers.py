@@ -3,11 +3,12 @@ import Browser
 import TMA
 import Verizon
 import Cimpl
+import Baka
 from datetime import datetime
 
 
 # This method builds our set of drivers/tabs that will be used.
-def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True):
+def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True,buildBaka=True):
     browserDriver = Browser.Browser()
 
     tmaDriver = None
@@ -22,7 +23,11 @@ def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True):
     if(buildVerizon):
         verizonDriver = Verizon.VerizonDriver(browserObject=browserDriver)
 
-    return {"Browser" : browserDriver, "TMA" : tmaDriver, "Cimpl" : cimplDriver, "Verizon" : verizonDriver}
+    bakaDriver = None
+    if(buildBaka):
+        bakaDriver = Baka.BakaDriver(browserObject=browserDriver)
+
+    return {"Browser" : browserDriver, "TMA" : tmaDriver, "Cimpl" : cimplDriver, "Verizon" : verizonDriver, "Baka" : bakaDriver}
 
 # A set of "verify" methods for ensuring that the respective drivers are logged in, on the
 # correct pages, etc.
@@ -39,6 +44,9 @@ def cimplVerify(drivers):
 def verizonVerify(drivers): #TODO WAYYYY down the line, but client support
     drivers["Browser"].switchToTab("Verizon")
     drivers["Verizon"].logInToVerizon()
+def bakaVerify(drivers):
+    drivers["Browser"].switchToTab("Baka")
+    drivers["Baka"].logInToBaka()
 
 
 # Searches up, and reads, a full workorder given by workorderNumber.
@@ -62,6 +70,15 @@ def readVerizonOrder(drivers,verizonOrderNumber):
     drivers["Verizon"].OrderViewer_SearchOrder(orderNumber=verizonOrderNumber)
 
     return drivers["Verizon"].OrderViewer_ReadDisplayedOrder()
+
+# Searches up, and reads, a full Baka order number.
+def readBakaOrder(drivers,bakaOrderNumber):
+    bakaVerify(drivers)
+
+    drivers["Baka"].navToOrderHistory()
+    drivers["Baka"].openOrder(bakaOrderNumber)
+    return drivers["Baka"].readOrder()
+
 
 # Performs a full New Install in TMA, building a new service based on the provided information.
 def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrier):
@@ -239,7 +256,7 @@ def writeServiceToCimplWorkorder(drivers,serviceNum,carrier,installDate):
 
 
 # Given a workorderNumber, this method examines it, tries to figure out the type of workorder it is and whether
-# it has a relevant order number, looks up to see if Verizon order is completed, and then closes it in TMA.
+# it has a relevant order number, looks up to see if order is completed, and then closes it in TMA.
 def processWorkorder(drivers,workorderNumber):
     print(f"Cimpl WO {workorderNumber}: Beginning automation")
     workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
@@ -252,20 +269,35 @@ def processWorkorder(drivers,workorderNumber):
         print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order is already {workorder['Status']}")
         return False
 
-    if(workorder["Carrier"].lower() != "verizon wireless"):
-        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as carrier is not Verizon ({workorder['Carrier']})")
+    if(workorder["Carrier"].lower() == "verizon wireless"):
+        carrier = "Verizon Wireless"
+    elif(workorder["Carrier"].lower() == "bell mobility"):
+        carrier = "Bell Mobility"
+    else:
+        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as carrier is not Verizon or Bell ({workorder['Carrier']})")
         return False
 
-    carrierOrderNumber = Cimpl.findPlacedOrderNumber(workorder["Notes"])
+    carrierOrderNumber = Cimpl.findPlacedOrderNumber(workorder["Notes"],carrier=carrier)
     if (carrierOrderNumber is None):
         print(f"Cimpl WO {workorderNumber}: Can't complete WO, as no completed carrier order can be found.")
         return False
 
-    # TODO only support verizon atm
-    carrierOrder = readVerizonOrder(drivers=drivers,verizonOrderNumber=carrierOrderNumber)
-    if(carrierOrder["Status"] != "Completed"):
-        print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order number '{carrierOrderNumber}' has status '{carrierOrder['Status']}' and not Complete.")
-        return False
+    # TODO only supports verizon and bell atm
+    # Read Verizon Order
+    if(carrier == "Verizon Wireless"):
+        carrierOrder = readVerizonOrder(drivers=drivers,verizonOrderNumber=carrierOrderNumber)
+        if(carrierOrder["Status"] != "Completed"):
+            print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order number '{carrierOrderNumber}' has status '{carrierOrder['Status']}' and not Complete.")
+            return False
+    # Read Bell Order
+    elif(carrier == "Bell Mobility"):
+        carrierOrder = readBakaOrder(drivers=drivers,bakaOrderNumber=carrierOrderNumber)
+        if(carrierOrder["Status"] != "Complete"):
+            print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order number '{carrierOrderNumber}' has status '{carrierOrder['Status']}' and not Complete.")
+            return False
+    else:
+        raise ValueError("This should never happen. This means a non-supported carrier was validated by function - fix code immediately.")
+
 
     print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
     deviceID = Cimpl.getDeviceModelID(workorder["HardwareInfo"])
@@ -273,9 +305,9 @@ def processWorkorder(drivers,workorderNumber):
     if(workorder["OperationType"] == "New Request"):
         userID = Cimpl.getUserID(workorder["Actions"])
         print(f"Cimpl WO {workorderNumber}: Building new service {carrierOrder['WirelessNumber']} for user {userID}")
-        returnCode = TMANewInstall(drivers=drivers,client="Sysco",netID=userID,serviceNum=carrierOrder["WirelessNumber"],installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"],carrier="Verizon Wireless")
+        returnCode = TMANewInstall(drivers=drivers,client="Sysco",netID=userID,serviceNum=carrierOrder["WirelessNumber"],installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"],carrier=carrier)
         if(returnCode == "Completed"):
-            writeServiceToCimplWorkorder(drivers=drivers,serviceNum=carrierOrder["WirelessNumber"],carrier="Verizon Wireless",installDate=carrierOrder["OrderDate"])
+            writeServiceToCimplWorkorder(drivers=drivers,serviceNum=carrierOrder["WirelessNumber"],carrier=carrier,installDate=carrierOrder["OrderDate"])
             print(f"Cimpl WO {workorderNumber}: Finished building new service {carrierOrder['WirelessNumber']} for user {userID}")
         elif(returnCode == "ServiceAlreadyExists"):
             print(f"Cimpl WO {workorderNumber}: Can't build new service for {carrierOrder['WirelessNumber']}, as the service already exists in the TMA database")
@@ -285,8 +317,7 @@ def processWorkorder(drivers,workorderNumber):
             return False
     if(workorder["OperationType"] == "Upgrade"):
         print(f"Cimpl WO {workorderNumber}: Processing Upgrade for service {carrierOrder['WirelessNumber']}")
-        returnCode = TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],
-                        installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"])
+        returnCode = TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"])
         if(returnCode == "Completed"):
             print(f"Cimpl WO {workorderNumber}: Finished upgrading TMA service {carrierOrder['WirelessNumber']}")
         elif(returnCode == "WrongDevice"):
@@ -296,8 +327,7 @@ def processWorkorder(drivers,workorderNumber):
 
     drivers["Browser"].switchToTab("Cimpl")
     drivers["Cimpl"].Workorders_NavToSummaryTab()
-    drivers["Cimpl"].Workorders_WriteNote(subject="Tracking",noteType="Information Only",status="Completed",
-                                          content=f"Courier: {carrierOrder['Courier']}\nTracking Number: {carrierOrder['TrackingNumber']}")
+    drivers["Cimpl"].Workorders_WriteNote(subject="Tracking",noteType="Information Only",status="Completed",content=f"Courier: {carrierOrder['Courier']}\nTracking Number: {carrierOrder['TrackingNumber']}")
 
     drivers["Cimpl"].Workorders_SetStatus(status="Complete")
     print(f"Cimpl WO {workorderNumber}: Finished all Cimpl work")

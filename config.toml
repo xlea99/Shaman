@@ -8,9 +8,9 @@ logs = "/logs"                              # Where log files are stored
 data = "/data"                              # Where program data is stored
 
 [authentication]
-tmaUser = "dkowalczyk@icomm.co"                   # TMA Username
-tmaPass = "k5170800"                            # TMA Password
-cimplUser = "dan.kowalczyk@uplandsoftware.com"   # Cimpl Username
+tmaUser = "asomheil@icomm.co"                   # TMA Username
+tmaPass = "P@ssw0rd"                            # TMA Password
+cimplUser = "Alex.somheil@uplandsoftware.com"   # Cimpl Username
 cimplPass = "Make!tCimpl"                       # Cimpl Password
 verizonUser = "syscovzw2"                       # Verizon MyBiz Username
 verizonPass = "Sysco2022!"                      # Verizon MyBiz Password

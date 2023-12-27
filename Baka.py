@@ -8,6 +8,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import time
 import os
 import re
+from datetime import datetime
 
 # TODO dynamic checking for Verizon logging out. Cause yeah, it does that.
 
@@ -57,7 +58,6 @@ class BakaDriver:
         else:
             return False
 
-
     #region === Orders and History ===
 
     # This method simply navigates to the Baka "Order History" page.
@@ -89,15 +89,18 @@ class BakaDriver:
         for line in fullDetails.splitlines():
             lowerLine = line.lower()
             if("reference number:" in lowerLine):
-                returnDict["OrderNumber"] = lowerLine.split("reference number:")[1].strip().upper()
+                returnDict["OrderNumber"] = lowerLine.split("reference number:")[1].split("order details")[0].strip().upper()
             elif("status:" in lowerLine):
-                returnDict["Status"] = lowerLine.split("status:")[1].strip().title()
+                returnDict["Status"] = lowerLine.split("status:")[1].split("order details")[0].strip().title()
             elif("order placed on:" in lowerLine):
-                returnDict["OrderDate"] = lowerLine.split("order placed on:")[1].strip().capitalize()
+                dateObj = datetime.strptime(lowerLine.split("order placed on:")[1].split("order details")[0].strip().capitalize(), "%B %d, %Y")
+                formattedDateString = dateObj.strftime("%m/%d/%Y")
+                returnDict["OrderDate"] = formattedDateString
             elif("purolator #:" in lowerLine):
-                returnDict["Tracking"] = lowerLine.split("purolator #:")[1].split("order details")[0].strip().upper()
+                returnDict["TrackingNumber"] = lowerLine.split("purolator #:")[1].split("order details")[0].strip().upper()
+                returnDict["Courier"] = "Purolator"
             elif("cell number:" in lowerLine):
-                returnDict["ServiceNumber"] = lowerLine.split("cell number:")[1].strip()
+                returnDict["WirelessNumber"] = lowerLine.split("cell number:")[1].strip()
             elif("agreement number" in lowerLine):
                 returnDict["AgreementNumber:"] = lowerLine.split("agreement number:")[1].strip()
             elif("imei:" in lowerLine):
@@ -114,10 +117,3 @@ class BakaDriver:
         return returnDict
 
     #endregion === Orders and History ===
-
-br = Browser.Browser()
-baka = BakaDriver(br)
-baka.logInToBaka()
-baka.navToOrderHistory()
-baka.openOrder("N93051554")
-beans = baka.readOrder()

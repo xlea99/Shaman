@@ -828,16 +828,25 @@ class CimplDriver:
 
 # This helper method looks through a list of Notes to try and locate the Order Number. It prioritizes recent orders
 # over older ones.
-def findPlacedOrderNumber(noteList : list):
+def findPlacedOrderNumber(noteList : list,carrier : str):
     targetOrder = None
     targetOrderDate = None
     verizonOrderPattern = re.compile(r"MB\d+")
+    bakaOrderPattern = re.compile(r"N\d{8}")
+
+    if(carrier.lower() == "verizon wireless"):
+        targetOrderPattern = verizonOrderPattern
+    elif(carrier.lower() == "bell mobility"):
+        targetOrderPattern = bakaOrderPattern
+    else:
+        raise ValueError("Unsupported carrier order type.")
+
     for note in noteList:
         thisDate = datetime.strptime(note["CreatedDate"], '%m/%d/%Y %I:%M %p')
 
         subject = note["Subject"].strip().lower()
         if(subject == "order placed" or subject == "order number"):
-            match = verizonOrderPattern.search(note["Content"])
+            match = targetOrderPattern.search(note["Content"])
             if match:
                 if(targetOrderDate is None or thisDate > targetOrderDate):
                     targetOrderDate = thisDate
