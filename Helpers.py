@@ -204,7 +204,6 @@ def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrie
 # Performs a full Upgrade in TMA, editing an existing service based on the provided information.
 def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
     tmaVerify(drivers=drivers,client=client)
-    print(device)
     if(device not in b.equipment.keys()):
         print("Wrong device, idiot.")
         return "WrongDevice"
