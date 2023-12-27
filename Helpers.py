@@ -221,8 +221,6 @@ def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
     drivers["TMA"].Equipment_WriteAll(equipmentObject=deviceToBuild)
     drivers["TMA"].Equipment_InsertUpdate()
 
-
-
 # Adds service information to Cimpl (service num, install date, account) and applies it.
 def writeServiceToCimplWorkorder(drivers,serviceNum,carrier,installDate):
     cimplVerify(drivers=drivers)
