@@ -1,19 +1,5 @@
 title = "Equipment Information Data"
 
-[CimplMappings]
-"iPhone 12 64GB" = "iPhone13_128GB"
-"iPhone 13 128GB" = "iPhone13_128GB"
-"Bell iPhone 11 64GB" = "iPhone11_64GB"
-"Rogers iPhone 11 64GB" = "iPhone11_64GB"
-
-"Samsung Galaxy S21 FE 5G 128GB" = "GalaxyS21_128GB"
-"BELL - Samsung Galaxy A53" = "GalaxyA54_128GB"
-
-"IPAD PRO 11 128GB" = "iPad11_128GB"
-
-"Mifi Orbic 5G UW" = "Orbic"
-
-
 # iPhones
 [iPhoneSE_64GB]
 serviceType = "iPhone"
@@ -51,7 +37,6 @@ mainType = "Wireless"
 subType = "Smart Phone"
 make = "Apple"
 model = "iPhone 13 128GB"
-
 # Androids
 [GalaxyS20_64GB]
 serviceType = "Android"
@@ -77,7 +62,6 @@ mainType = "Wireless"
 subType = "Smart Phone"
 make = "Samsung"
 model = "Galaxy A54"
-
 # Mifis
 [Jetpack8800L]
 serviceType = "Mifi"
@@ -103,7 +87,6 @@ mainType = "Wireless"
 subType = "Aircard"
 make = "Inseego"
 model = "MiFi 8000"
-
 # Tablets
 [iPad11_128GB]
 serviceType = "Tablet"
@@ -113,3 +96,22 @@ make = "Apple"
 model = "IPAD PRO 11 128GB"
 
 
+[CimplMappings]
+"iPhone 12 64GB" = "iPhone13_128GB"
+"iPhone 13 128GB" = "iPhone13_128GB"
+"Bell iPhone 11 64GB" = "iPhone11_64GB"
+"Rogers iPhone 11 64GB" = "iPhone11_64GB"
+"Samsung Galaxy S21 FE 5G 128GB" = "GalaxyS21_128GB"
+"BELL - Samsung Galaxy A53" = "GalaxyA54_128GB"
+"IPAD PRO 11 128GB" = "iPad11_128GB"
+"Mifi Orbic 5G UW" = "Orbic"
+
+[VerizonMappings]
+[VerizonMappings.SearchTerms]
+"iPhone13_128GB" = "iPhone 13"
+
+[VerizonMappings.DeviceCardName]
+"iPhone13_128GB" = "Apple iPhone 13"
+
+[VerizonMappings.DeviceSKU]
+"iPhone13_128GB" = "MLA23LL/A"
