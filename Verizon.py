@@ -1,12 +1,10 @@
-import selenium.common.exceptions
-
 import BaseFunctions as b
 import Browser
+import selenium.common.exceptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common import exceptions
 import time
 import os
 import re
