@@ -261,14 +261,17 @@ def processWorkorder(drivers,workorderNumber):
     print(f"Cimpl WO {workorderNumber}: Beginning automation")
     workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
 
+    # Test to ensure the operation type is valid
     if(workorder["OperationType"] not in ("New Request","Upgrade")):
         print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order type '{workorder['OperationType']}' is not understood by the Shaman.")
         return False
 
+    # Test to ensure status is operable
     if(workorder["Status"] == "Completed" or workorder["Status"] == "Cancelled"):
         print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order is already {workorder['Status']}")
         return False
 
+    # Test for correct carrier
     if(workorder["Carrier"].lower() == "verizon wireless"):
         carrier = "Verizon Wireless"
     elif(workorder["Carrier"].lower() == "bell mobility"):
@@ -277,6 +280,7 @@ def processWorkorder(drivers,workorderNumber):
         print(f"Cimpl WO {workorderNumber}: Can't complete WO, as carrier is not Verizon or Bell ({workorder['Carrier']})")
         return False
 
+    # Test to ensure it can properly locate the order number
     carrierOrderNumber = Cimpl.findPlacedOrderNumber(workorder["Notes"],carrier=carrier)
     if (carrierOrderNumber is None):
         print(f"Cimpl WO {workorderNumber}: Can't complete WO, as no completed carrier order can be found.")
@@ -298,10 +302,11 @@ def processWorkorder(drivers,workorderNumber):
     else:
         raise ValueError("This should never happen. This means a non-supported carrier was validated by function - fix code immediately.")
 
-
+    # Get device model ID from Cimpl
     print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
     deviceID = Cimpl.getDeviceModelID(workorder["HardwareInfo"])
 
+    # If operation type is a New Install
     if(workorder["OperationType"] == "New Request"):
         userID = Cimpl.getUserID(workorder["Actions"])
         print(f"Cimpl WO {workorderNumber}: Building new service {carrierOrder['WirelessNumber']} for user {userID}")
@@ -315,7 +320,8 @@ def processWorkorder(drivers,workorderNumber):
         elif(returnCode == "WrongDevice"):
             print(f"Cimpl WO {workorderNumber}: Failed to build new service in TMA, got wrong device '{deviceID}'")
             return False
-    if(workorder["OperationType"] == "Upgrade"):
+    # If operation type is an Upgrade
+    elif(workorder["OperationType"] == "Upgrade"):
         print(f"Cimpl WO {workorderNumber}: Processing Upgrade for service {carrierOrder['WirelessNumber']}")
         returnCode = TMAUpgrade(drivers=drivers,client="Sysco",serviceNum=carrierOrder["WirelessNumber"],installDate=carrierOrder["OrderDate"],device=deviceID,imei=carrierOrder["IMEI"])
         if(returnCode == "Completed"):
@@ -323,12 +329,13 @@ def processWorkorder(drivers,workorderNumber):
         elif(returnCode == "WrongDevice"):
             print(f"Cimpl WO {workorderNumber}: Failed to upgrade service in TMA, got wrong device '{deviceID}'")
             return False
-        print(f"Cimpl WO {workorderNumber}: Finished upgrading service {carrierOrder['WirelessNumber']}")
 
+    # Write tracking information
     drivers["Browser"].switchToTab("Cimpl")
     drivers["Cimpl"].Workorders_NavToSummaryTab()
     drivers["Cimpl"].Workorders_WriteNote(subject="Tracking",noteType="Information Only",status="Completed",content=f"Courier: {carrierOrder['Courier']}\nTracking Number: {carrierOrder['TrackingNumber']}")
 
+    # Complete workorder
     drivers["Cimpl"].Workorders_SetStatus(status="Complete")
     print(f"Cimpl WO {workorderNumber}: Finished all Cimpl work")
     return True
