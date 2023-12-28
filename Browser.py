@@ -262,16 +262,28 @@ class Browser:
             element.click()
 
     # This method waits for the element given by value to be clickable, then simply returns the
-    # element.
-    def waitForClickableElement(self,by,value : str,timeout=15):
-        # Use WebDriverWait to wait for the element to be clickable
-        try:
-            element = WebDriverWait(self.driver, timeout).until(
-                EC.element_to_be_clickable((by, value))
-            )
-            return element
-        except selenium.common.exceptions.TimeoutException:
-            return False
+    # element. Test click actually attempts to click the element for better testing, but of course,
+    # might end up clicking the element.
+    def waitForClickableElement(self, by, value: str, timeout=10, testClick=False):
+        endTime = time.time() + timeout
+        while True:
+            try:
+                element = WebDriverWait(self.driver, timeout).until(
+                    EC.element_to_be_clickable((by, value))
+                )
+                if testClick:
+                    try:
+                        element.click()  # Attempt to click the element
+                        return element  # Return the element if click is successful
+                    except selenium.common.exceptions.ElementClickInterceptedException:
+                        # If click fails, check if timeout has been reached
+                        if time.time() > endTime:
+                            raise selenium.common.exceptions.TimeoutException("Element not clickable after timeout")
+                        time.sleep(0.5)  # Wait for a short while before retrying
+                else:
+                    return element
+            except selenium.common.exceptions.TimeoutException:
+                raise selenium.common.exceptions.TimeoutException("Element not clickable after timeout")
     # This method waits for the element given by value to NOT be clickable, then simply returns True or False.
     def waitForNotClickableElement(self,by,value : str,timeout=15):
         try:

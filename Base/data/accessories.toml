@@ -1,0 +1,23 @@
+title = "Equipment Information Data"
+
+[CimplMappings]
+"iPhone 12 64GB" = "iPhone13_128GB"
+
+
+[VerizonMappings]
+[VerizonMappings.VerizonWallAdapter]
+SearchTerm = "20w"
+CardName = "Wall Adapter 20W USB-C"
+[VerizonMappings.SamsungVehicleCharger]
+SearchTerm = "40w car charger duo"
+CardName = "40W Car Charger Duo"
+
+[VerizonMappings.iPhoneDefender]
+SearchTerm = "Defender"
+CardName = "Defender Series Pro Case for iPhone 15, iPhone 14, and iPhone 13"
+[VerizonMappings.iPhoneSymmetry]
+SearchTerm = "Symmetry"
+CardName = "Symmetry Series Case with MagSafe for iPhone 15, iPhone 14, and iPhone 13"
+[VerizonMappings.iPhoneCommuter]
+SearchTerm = "Commuter"
+CardName = "Commuter Series Case for iPhone 15, iPhone 14, and iPhone 13"

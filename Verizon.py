@@ -43,6 +43,8 @@ class VerizonDriver:
             self.browser.get("https://mblogin.verizonwireless.com/account/business/login/unifiedlogin")
             self.browser.implicitly_wait(10)
 
+            # TODO Manage 2FA and alternate login instances HERE
+
             usernameField = self.browser.find_element(by=By.XPATH,value="//label[text()='User ID']/following-sibling::input")
             usernameField.send_keys(b.config["authentication"]["verizonUser"])
             passwordField = self.browser.find_element(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
@@ -51,42 +53,51 @@ class VerizonDriver:
             logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
             logInButton.click()
 
-            self.waitForLoadingScreen()
+            # Wait for shop new device button to confirm page load.
+            self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]")
+            self.testForUnregisteredPopup()
 
-            # TODO Manage 2FA instances HERE
 
-    # This method simply pauses further action until it confirms that the loading screen is finished loading.
-    # Returns true if it detected a loading screen to wait for, otherwise returns false.
-    # TODO make this WAY more efficient by making it conditional based on which screen its called from. Loaders
-    # TODO seem to be consistent across certain sections of Verizon.
-    def waitForLoadingScreen(self,timeout=120):
-        self.browser.switchToTab("Verizon")
 
-        loader1MessageString = "//div[@class='loader']"
-        loader1 = self.browser.elementExists(by=By.XPATH,value=loader1MessageString,timeout=1)
-        if(loader1):
-            time.sleep(0.2)
+
+    # This helper method helps protect against loading screens. Must supply an element on the base page
+    # that should be clickable WITHOUT a loading screen.
+    def waitForPageLoad(self,by : By, value : str,testClick = False,waitTime : int = 3):
+        for i in range(waitTime):
+            print(f"waiting {i}")
+            self.browser.waitForClickableElement(by=by, value=value,testClick=testClick,timeout=60)
+            time.sleep(1)
+
+    # This method tests for and handles the "X users are still unregistered" popup that sometimes occurs on the
+    # Homescreen page.
+    def testForUnregisteredPopup(self):
+        unregisteredUsersPopupString = "//app-notification-dialog//div[contains(text(),'users are still unregistered')]//parent::app-notification-dialog"
+        unregisteredUsersCloseButtonString = f"{unregisteredUsersPopupString}//i[contains(@class,'icon-close')]"
+
+        unregisteredUsersCloseButton = self.browser.elementExists(by=By.XPATH,value=unregisteredUsersCloseButtonString,timeout=1.5)
+        if(unregisteredUsersCloseButton):
+            unregisteredUsersCloseButton.click()
+            self.browser.waitForNotClickableElement(by=By.XPATH,value=unregisteredUsersCloseButtonString,timeout=20)
             return True
-
-        loader3MessageString = "//div[@class='loading']"
-        loader3 = self.browser.elementExists(by=By.XPATH,value=loader3MessageString,timeout=1)
-        if(loader3):
-            time.sleep(0.2)
+        else:
             return True
-
-        return False
 
     #region === Site Navigation ===
 
     # This method navigates to the MyBiz homescreen from whatever page Verizon is currently on.
     def navToHomescreen(self):
         self.browser.switchToTab("Verizon")
-        homeLink = self.browser.find_element(by=By.XPATH,value="//a[@title='Home Link']",timeout=10)
+        homeLink = self.browser.waitForClickableElement(by=By.XPATH,value="//a[@title='Home Link']",timeout=10)
         homeLink.click()
-        self.waitForLoadingScreen()
+
+        # Wait for shop new device button to confirm page load.
+        self.waitForPageLoad(by=By.XPATH,value="//span[contains(text(),'Shop Devices')]")
+        self.testForUnregisteredPopup()
+
     # This method navigates to the Verizon order viewer.
     def navToOrderViewer(self):
         self.browser.switchToTab("Verizon")
+        self.testForUnregisteredPopup()
 
         if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=2)):
             self.navToHomescreen()
@@ -268,46 +279,116 @@ class VerizonDriver:
     # This method navigates to homescreen, then clicks "shop devices" to begin a new install
     # request.
     def shopNewDevice(self):
+        self.browser.switchToTab("Verizon")
+        self.testForUnregisteredPopup()
+
         shopDevicesButton = self.browser.find_element(by=By.XPATH,value="//span[contains(text(),'Shop Devices')]")
         shopDevicesButton.click()
 
         # Now we wait to ensure that we've fully navigated to the newDevice screen.
-        for i in range(3):
-            self.browser.waitForClickableElement(by=By.XPATH, value="//button[@id='grid-search-button']",timeout=15)
-            time.sleep(1)
+        self.waitForPageLoad(by=By.XPATH,value="//button[@id='grid-search-button']")
+    # This method clears the full cart, from anywhere. It cancels out whatever was previously
+    # happening, but ensures the cart is fully empty for future automation.
+    def emptyCart(self):
+        self.navToHomescreen()
+
+        miniCart = self.browser.waitForClickableElement(by=By.XPATH,value="//app-mini-cart/div/div/span")
+        miniCart.click()
+        viewCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@clickname='MB View Shopping Cart']")
+        viewCartButton.click()
+
+        clearCartButtonString = "//a[@id='dtm_clearcart']"
+        self.waitForPageLoad(by=By.XPATH,value=clearCartButtonString)
+        clearCartButton = self.browser.waitForClickableElement(by=By.XPATH,value=clearCartButtonString)
+        clearCartButton.click()
+
+        confirmationClearButtonString = "//mat-dialog-container//button[text()='Clear']"
+        confirmationClearButton = self.browser.waitForClickableElement(by=By.XPATH,value=confirmationClearButtonString)
+        confirmationClearButton.click()
+
+        self.waitForPageLoad(by=By.XPATH,value="//h1[text()='Your cart is empty.']")
+        self.navToHomescreen()
 
     # Assumes we're on the device selection page. Given a Universal Device ID, searches for that
     # device (if supported) on Verizon.
-    def searchForDevice(self,deviceID):
+    def DeviceSelection_SearchForDevice(self,deviceID):
         searchBox = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='search']",timeout=15)
         searchButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@id='grid-search-button']",timeout=15)
 
-        searchBox.send_keys(b.equipment["VerizonMappings"]["SearchTerms"][deviceID])
+        searchBox.clear()
+        searchBox.send_keys(b.equipment["VerizonMappings"][deviceID]["SearchTerm"])
         searchButton.click()
 
         # Now we test to ensure that the proper device card has fully loaded.
-        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings']['DeviceSKU'][deviceID]}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings']['DeviceCardName'][deviceID]}')]"
-        for i in range(3):
-            self.browser.waitForClickableElement(by=By.XPATH, value=targetDeviceCard, timeout=15)
-            time.sleep(1)
-    def selectDeviceQuickView(self,deviceID):
-        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings']['DeviceSKU'][deviceID]}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings']['DeviceCardName'][deviceID]}')]"
-        print(f"{targetDeviceCard}/following-sibling::div/div[@class='quick-view']/button[contains(@class,'quick-view')]")
+        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings'][deviceID]['SKU']}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings'][deviceID]['CardName']}')]"
+        self.waitForPageLoad(by=By.XPATH,value=targetDeviceCard)
+    def DeviceSelection_SelectDeviceQuickView(self,deviceID):
+        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings'][deviceID]['SKU']}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings'][deviceID]['CardName']}')]"
         targetDeviceQuickViewButton = self.browser.waitForClickableElement(by=By.XPATH, value=f"{targetDeviceCard}/following-sibling::div/div[@class='quick-view']/button[contains(@class,'quick-view')]", timeout=15)
         targetDeviceQuickViewButton.click()
-
     # Assumes we're in the quick view menu for a device. Various options for this menu.
-    def QuickView_Select2YearContract(self):
+    def DeviceSelection_QuickView_Select2YearContract(self):
         yearlyContractSelection = self.browser.waitForClickableElement(by=By.XPATH,value="//div[contains(@class,'payment-option-each')]/div[contains(text(),'Yearly contract')]/parent::div",timeout=15)
         yearlyContractSelection.click()
 
         twoYearContractSelection = self.browser.waitForClickableElement(by=By.XPATH,value="//div/ul/li/div[contains(text(),'2 Year Contract Required')]/parent::li",timeout=15)
         twoYearContractSelection.click()
-    def QuickView_AddToCart(self):
+    def DeviceSelection_QuickView_AddToCart(self):
         addToCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@id='device-add-to-cart']")
         addToCartButton.click()
 
         self.browser.waitForNotClickableElement(by=By.XPATH,value="//button[@id='device-add-to-cart']")
+    # Method to continue to the next page after the device selection.
+    def DeviceSelection_Continue(self):
+        continueButtonString = "//div/div/h2/following-sibling::button[text()='Continue']"
+        continueButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueButtonString)
+        continueButton.click()
+
+        shopAccessoriesHeaderString = "//section/div/div[text()='Shop Accessories']"
+        self.waitForPageLoad(by=By.XPATH,value=shopAccessoriesHeaderString,testClick=True)
+
+    # Assumes we're on the accessory selection page. Given a Universal Accessory ID, searches
+    # for that accessory (if support) on Verizon.
+    def AccessorySelection_SearchForAccessory(self,accessoryID):
+        searchBox = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='search']",timeout=15)
+        searchButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@id='grid-search-button']",timeout=15)
+
+        searchBox.clear()
+        searchBox.send_keys(b.accessories["VerizonMappings"][accessoryID]["SearchTerm"])
+        searchButton.click()
+
+        # Now we test to ensure that the proper device card has fully loaded.
+        targetAccessoryCard = f"//app-accessory-tile/div/div/div[contains(@class,'product-name')][contains(text(),'{b.accessories['VerizonMappings'][accessoryID]['CardName']}')]"
+        self.waitForPageLoad(by=By.XPATH,value=targetAccessoryCard)
+    def AccessorySelection_SelectAccessoryQuickView(self,accessoryID):
+        targetAccessoryCard = f"//app-accessory-tile/div/div/div[contains(@class,'product-name')][contains(text(),'{b.accessories['VerizonMappings'][accessoryID]['CardName']}')]"
+        targetAccessoryQuickViewButton = self.browser.waitForClickableElement(by=By.XPATH, value=f"{targetAccessoryCard}/parent::div/following-sibling::div/button[contains(@class,'quick-view-btn')]", timeout=15)
+        targetAccessoryQuickViewButton.click()
+
+        productNameHeaderString = "//div[@class='product-name']/h2/span"
+        self.waitForPageLoad(by=By.XPATH,value=productNameHeaderString,testClick=True)
+    # Assumes we're in the quick view menu for an accessory. Various options for this menu.
+    def AccessorySelection_QuickView_AddToCart(self):
+        addToCartButtonString = "//a[contains(text(),'Add to cart')]"
+        addToCartButton = self.browser.waitForClickableElement(by=By.XPATH,value=addToCartButtonString)
+        addToCartButton.click()
+
+        self.browser.waitForClickableElement(by=By.XPATH,value="//div/div/div[contains(text(),'Nice choice! Your new accessory has been added to your cart.')]",testClick=True)
+    def AccessorySelection_QuickView_Close(self):
+        closeQuickViewButtonString = "//mat-dialog-container//span[contains(@class,'icon-close')]"
+        closeQuickViewButton = self.browser.waitForClickableElement(by=By.XPATH,value=closeQuickViewButtonString)
+        closeQuickViewButton.click()
+
+        self.waitForPageLoad(by=By.XPATH,value="//div[text()='Shop Accessories']",testClick=True)
+    # Method to continue to the next page after the accessory selection.
+    def AccessorySelection_Continue(self):
+        continueButtonString = "//div/div/section/div/button[text()='Continue']"
+        continueButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueButtonString)
+        continueButton.click()
+
+        choosePlanHeaderString = "//div/div/div/h1[text()='Select your plan']"
+        self.waitForPageLoad(by=By.XPATH,value=choosePlanHeaderString,testClick=True)
+
 
     #endregion === Device Ordering ===
 
@@ -385,10 +466,29 @@ class LoadingScreen(VerizonError):
 br = Browser.Browser()
 v = VerizonDriver(br)
 v.logInToVerizon()
-v.shopNewDevice()
+v.emptyCart()
 
 device = "iPhone13_128GB"
-v.searchForDevice(device)
-v.selectDeviceQuickView(device)
-v.QuickView_Select2YearContract()
-v.QuickView_AddToCart()
+v.shopNewDevice()
+v.DeviceSelection_SearchForDevice(device)
+v.DeviceSelection_SelectDeviceQuickView(device)
+v.DeviceSelection_QuickView_Select2YearContract()
+v.DeviceSelection_QuickView_AddToCart()
+v.DeviceSelection_Continue()
+
+v.AccessorySelection_SearchForAccessory("iPhoneDefender")
+v.AccessorySelection_SelectAccessoryQuickView("iPhoneDefender")
+v.AccessorySelection_QuickView_AddToCart()
+v.AccessorySelection_QuickView_Close()
+
+v.AccessorySelection_SearchForAccessory("VerizonWallAdapter")
+v.AccessorySelection_SelectAccessoryQuickView("VerizonWallAdapter")
+v.AccessorySelection_QuickView_AddToCart()
+v.AccessorySelection_QuickView_Close()
+
+v.AccessorySelection_SearchForAccessory("SamsungVehicleCharger")
+v.AccessorySelection_SelectAccessoryQuickView("SamsungVehicleCharger")
+v.AccessorySelection_QuickView_AddToCart()
+v.AccessorySelection_QuickView_Close()
+
+v.AccessorySelection_Continue()
