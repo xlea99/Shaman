@@ -490,6 +490,28 @@ class CimplDriver:
                 nextArrowButton = self.browser.find_element(by=By.XPATH, value=nextArrowButtonString)
 
         return allNotes
+    def Workorders_ReadShippingAddress(self):
+        prefix = "//cimpl-collapsible-box[@header='Main Shipping Address']//workorder-summary-address/div/cimpl-form[not(contains(@class,'ng-hide'))]"
+
+
+        address1 = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.addressLine1']").text
+        address2 = self.browser.elementExists(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.addressLine2']")
+        postalCodeLine = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.postalCodeLine']").text
+        country = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.country']").text
+
+        city, state, zipCode = postalCodeLine.split(",")
+
+        returnDict = {"Address1" : address1.strip(),
+                      "City" : city.strip(),
+                      "State" : state.strip(),
+                      "ZipCode" : zipCode.strip(),
+                      "Country" : country.strip()}
+        if(address2):
+            returnDict["Address2"] = address2.text.strip()
+        else:
+            returnDict["Address2"] = None
+
+        return returnDict
     # Back (Details) page read methods
     def Workorders_ReadServiceID(self):
         self.browser.switchToTab("Cimpl")
@@ -582,6 +604,7 @@ class CimplDriver:
         returnDict["WorkorderOwner"] = self.Workorders_ReadWorkorderOwner()
         returnDict["Requestor"] = self.Workorders_ReadRequester()
         returnDict["Notes"] = self.Workorders_ReadNotes()
+        returnDict["Shipping"] = self.Workorders_ReadShippingAddress()
 
         # Read detail info
         self.Workorders_NavToDetailsTab()

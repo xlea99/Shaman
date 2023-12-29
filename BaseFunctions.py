@@ -140,6 +140,85 @@ def convertServiceIDFormat(serviceID, targetFormat):
     else:
         raise ValueError("Invalid target format. Use 'dashed', 'dotted', or 'raw'.")
 
+# This function accepts a string that contains a state represented as either a full name or an
+# abbreviation, then converts to either format:
+# -abbreviation (TX)
+# -name (Texas)
+def convertStateFormat(stateString,targetFormat):
+    stateDict = {
+        "al": "alabama",
+        "ak": "alaska",
+        "az": "arizona",
+        "ar": "arkansas",
+        "ca": "california",
+        "co": "colorado",
+        "ct": "connecticut",
+        "de": "delaware",
+        "fl": "florida",
+        "ga": "georgia",
+        "hi": "hawaii",
+        "id": "idaho",
+        "il": "illinois",
+        "in": "indiana",
+        "ia": "iowa",
+        "ks": "kansas",
+        "ky": "kentucky",
+        "la": "louisiana",
+        "me": "maine",
+        "md": "maryland",
+        "ma": "massachusetts",
+        "mi": "michigan",
+        "mn": "minnesota",
+        "ms": "mississippi",
+        "mo": "missouri",
+        "mt": "montana",
+        "ne": "nebraska",
+        "nv": "nevada",
+        "nh": "new hampshire",
+        "nj": "new jersey",
+        "nm": "new mexico",
+        "ny": "new york",
+        "nc": "north carolina",
+        "nd": "north dakota",
+        "oh": "ohio",
+        "ok": "oklahoma",
+        "or": "oregon",
+        "pa": "pennsylvania",
+        "ri": "rhode island",
+        "sc": "south carolina",
+        "sd": "south dakota",
+        "tn": "tennessee",
+        "tx": "texas",
+        "ut": "utah",
+        "vt": "vermont",
+        "va": "virginia",
+        "wa": "washington",
+        "wv": "west virginia",
+        "wi": "wisconsin",
+        "wy": "wyoming"
+    }
+
+    stateName = None
+    stateAbbrev = None
+    if(stateString.lower() in stateDict.keys()):
+        stateAbbrev = stateString.lower()
+        stateName = stateDict[stateAbbrev]
+    elif(stateString.lower() in stateDict.values()):
+        stateName = stateString.lower()
+        for key,value in stateDict.items():
+            if(value == stateName):
+                stateAbbrev = key
+                break
+    else:
+        raise ValueError(f"Invalid state string given '{stateString}'")
+
+    if(targetFormat.lower() == "abbreviation"):
+        return stateAbbrev.upper()
+    elif(targetFormat.lower() == "name"):
+        return stateName.title()
+    else:
+        raise ValueError(f"Invalid targetFormat specified '{targetFormat}'")
+
 # This function accepts a string that contains some sort of number, and tries to convert it into
 # the actual number it represents.
 def fuzzyStringToNumber(string : str):
@@ -159,8 +238,6 @@ def fuzzyStringToNumber(string : str):
         return float(string)
     else:
         raise ValueError(f"Unable to convert '{string}' to number")
-
-
 
 # This method assumes that a given string s may contain delimiter variables. This method uses the
 # specified delimiter (by default $) to match all these variables. For example,
@@ -224,3 +301,4 @@ def findAndReplaceDelimiterVariables(s : str,delimiter : str = "$", replacement 
     return replaceDelimiterVariables(s = s,matchPositions = matchPositions,replacement = replacement)
 
 #endregion === Misc Functions ===
+

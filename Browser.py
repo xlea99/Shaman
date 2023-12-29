@@ -264,7 +264,7 @@ class Browser:
     # This method waits for the element given by value to be clickable, then simply returns the
     # element. Test click actually attempts to click the element for better testing, but of course,
     # might end up clicking the element.
-    def waitForClickableElement(self, by, value: str, timeout=10, testClick=False):
+    def waitForClickableElement(self, by, value: str, timeout=10, testClick=False,raiseError=True):
         endTime = time.time() + timeout
         while True:
             try:
@@ -278,12 +278,18 @@ class Browser:
                     except selenium.common.exceptions.ElementClickInterceptedException:
                         # If click fails, check if timeout has been reached
                         if time.time() > endTime:
-                            raise selenium.common.exceptions.TimeoutException("Element not clickable after timeout")
+                            if(raiseError):
+                                raise selenium.common.exceptions.TimeoutException("Element not clickable after timeout (with testClick)")
+                            else:
+                                return False
                         time.sleep(0.5)  # Wait for a short while before retrying
                 else:
                     return element
             except selenium.common.exceptions.TimeoutException:
-                raise selenium.common.exceptions.TimeoutException("Element not clickable after timeout")
+                if(raiseError):
+                    raise selenium.common.exceptions.TimeoutException("Element not clickable after timeout")
+                else:
+                    return False
     # This method waits for the element given by value to NOT be clickable, then simply returns True or False.
     def waitForNotClickableElement(self,by,value : str,timeout=15):
         try:

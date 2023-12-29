@@ -15,23 +15,23 @@ title = "Client Information Data"
 "Rogers" = "696151893"
 
 [Sysco.Plans]
-[Sysco.Plans.Smartphone]
+[Sysco.Plans."Smart Phone"]
 "AT&T Mobility" =       [{isBaseCost=true,featureName="Mobile Select 3GB Pool iPhone on 4G LTE VVM",gross=70,discountPercentage=27,discountFlat=11 }]
-"Verizon Wireless" =    [{isBaseCost=true,featureName="Unl Min&Msg+Email&Data",gross=32,discountPercentage=0,discountFlat=0}]
+"Verizon Wireless" =    [{isBaseCost=true,featureName="Unl Min&Msg+Email&Data",gross=32,discountPercentage=0,discountFlat=0,planCode=60740,planType="Aggregate Share"}]
 "T Mobile" =            [{isBaseCost=true,featureName="Bus Unl Phone2.0 Subsidy 2",gross=45,discountPercentage=0,discountFlat=0}]
 "Bell Mobility" =       [{isBaseCost=true,featureName="Corp SmartShare 65 36M",gross=65,discountPercentage=0,discountFlat=20}]
 "Rogers" =              [{isBaseCost=true,featureName="Business 5GB Pooled",gross=65,discountPercentage=0,discountFlat=20.15}]
 [Sysco.Plans.CellPhone]
-"Verizon Wireless" =    [{isBaseCost=true,featureName="Basic Unl Mins&Msg 100mb Shr",gross=25,discountPercentage=0,discountFlat=0}]
+"Verizon Wireless" =    [{isBaseCost=true,featureName="Basic Unl Mins&Msg 100mb Shr",gross=25,discountPercentage=0,discountFlat=0,planCode=94664}]
 "Bell Mobility" =       [{isBaseCost=true,featureName="Corp Smartshare 30 36M",gross=30,discountPercentage=0,discountFlat=10}]
 [Sysco.Plans.Mifi]
 "AT&T Mobility" =       [{isBaseCost=true,featureName="Mobile Select 3GB for Aircards/MiFi 4G LTE",gross=40,discountPercentage=27,discountFlat=7}]
-"Verizon Wireless" =    [{isBaseCost=true,featureName="Mobile Broadband 2gb Share",gross=15,discountPercentage=0,discountFlat=0}]
+"Verizon Wireless" =    [{isBaseCost=true,featureName="Mobile Broadband 2gb Share",gross=15,discountPercentage=0,discountFlat=0,planCode=17112}]
 "Bell Mobility" =       [{isBaseCost=true,featureName="Corp SmartShare Mob Int 17 36M",gross=17,discountPercentage=0,discountFlat=2}]
 "Rogers" =              [{isBaseCost=true,featureName="Pooled Data Plan",gross=20,discountPercentage=0,discountFlat=0}]
 [Sysco.Plans.Tablet]
 "AT&T Mobility" =       [{isBaseCost=true,featureName="Mobile Select Pooled 3GB for 4G LTE iPad w/Tethering",gross=40,discountPercentage=27,discountFlat=7}]
-"Verizon Wireless" =    [{isBaseCost=true,featureName="Mobile Broadband Tablet",gross=15,discountPercentage=0,discountFlat=0}]
+"Verizon Wireless" =    [{isBaseCost=true,featureName="Mobile Broadband Tablet",gross=15,discountPercentage=0,discountFlat=0,planCode=99645}]
 
 # ====================================================
 # ====================================================

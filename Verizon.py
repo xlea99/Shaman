@@ -4,9 +4,8 @@ import selenium.common.exceptions
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import Select
 import time
-import os
 import re
 
 # TODO dynamic checking for Verizon logging out. Cause yeah, it does that.
@@ -62,10 +61,10 @@ class VerizonDriver:
 
     # This helper method helps protect against loading screens. Must supply an element on the base page
     # that should be clickable WITHOUT a loading screen.
-    def waitForPageLoad(self,by : By, value : str,testClick = False,waitTime : int = 3):
+    def waitForPageLoad(self,by : By, value : str,testClick = False,waitTime : int = 3,timeout=60,raiseError=True):
         for i in range(waitTime):
             print(f"waiting {i}")
-            self.browser.waitForClickableElement(by=by, value=value,testClick=testClick,timeout=60)
+            self.browser.waitForClickableElement(by=by, value=value,testClick=testClick,timeout=timeout,raiseError=raiseError)
             time.sleep(1)
 
     # This method tests for and handles the "X users are still unregistered" popup that sometimes occurs on the
@@ -297,8 +296,10 @@ class VerizonDriver:
         viewCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@clickname='MB View Shopping Cart']")
         viewCartButton.click()
 
+        self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'device-shopping-cart-content-left')]//h1[contains(text(),'Shopping cart')]",testClick=True)
+
         clearCartButtonString = "//a[@id='dtm_clearcart']"
-        self.waitForPageLoad(by=By.XPATH,value=clearCartButtonString)
+        self.browser.waitForClickableElement(by=By.XPATH,value=clearCartButtonString)
         clearCartButton = self.browser.waitForClickableElement(by=By.XPATH,value=clearCartButtonString)
         clearCartButton.click()
 
@@ -389,6 +390,271 @@ class VerizonDriver:
         choosePlanHeaderString = "//div/div/div/h1[text()='Select your plan']"
         self.waitForPageLoad(by=By.XPATH,value=choosePlanHeaderString,testClick=True)
 
+    # Assumes we're on the plan selection page. Given a Plan ID and a plan type,
+    # selects it from this page.
+    def PlanSelection_SelectPlan(self,planID,planType):
+        targetPlanTypeTabString = f"//ul[@class='Tabs-list']/li[contains(@class,'Tab')]/button[@id='{planType}']"
+        targetPlanTypeTab = self.browser.waitForClickableElement(by=By.XPATH,value=targetPlanTypeTabString)
+        targetPlanTypeTab.click()
+
+        targetPlanCardString = f"//div[contains(@class,'plan-card')][@title='Plan ID - {planID}']/div[@class='plan-card-inner']//button[contains(text(),'Select plan')]"
+        targetPlanCard = self.browser.waitForClickableElement(by=By.XPATH,value=targetPlanCardString)
+        targetPlanCard.click()
+
+        self.browser.waitForClickableElement(by=By.XPATH,value="//div[contains(text(),'Continue to the next step.')]")
+    # Method to continue to the next page after the plan selection.
+    def PlanSelection_Continue(self):
+        continueButtonString = "//div/div/button[@id='stickybutton'][contains(text(),'Continue')]"
+        continueButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueButtonString)
+        continueButton.click()
+
+        deviceProtectionHeader = "//app-equipment-protection-landing-mobile-evolution//div[contains(text(),'Select your device protection')]"
+        self.waitForPageLoad(by=By.XPATH,value=deviceProtectionHeader,testClick=True)
+
+    # Assumes we're on the device protection page. Clicks on "decline". Note that this also serves
+    # as the "continue" button for this page.
+    def DeviceProtection_Decline(self):
+        declineDeviceProtectionString = "//button[contains(text(),'Decline device protection')]"
+        declineDeviceProtection = self.browser.waitForClickableElement(by=By.XPATH,value=declineDeviceProtectionString)
+        declineDeviceProtection.click()
+
+        numberAssignPageHeader = "//div/div/div/div[contains(text(),'Assign numbers and users to your new devices.')]"
+        self.waitForPageLoad(by=By.XPATH,value=numberAssignPageHeader,testClick=True)
+
+    # Assumes we're on the number selection page. Given an initial zip code, tests that zip code and sequential
+    # zip codes to determine the first available.
+    def NumberSelection_SelectAreaCode(self,zipCode):
+        zipCodeFormString = "//input[@id='zip']"
+        zipCodeForm = self.browser.waitForClickableElement(by=By.XPATH,value=zipCodeFormString)
+        areaCodeFormString = "//div[contains(@class,'area-dropdown')]"
+
+        zipCodeToTry = int(zipCode)
+        foundAreaCode = False
+        for i in range(20):
+            zipCodeForm.clear()
+            zipCodeForm.send_keys(zipCodeToTry)
+
+            areaCodeForm = self.browser.waitForClickableElement(by=By.XPATH,value=areaCodeFormString)
+            areaCodeForm.click()
+
+            self.browser.waitForClickableElement(by=By.XPATH,value="//i[contains(@class,'icon-up-caret')]")
+
+            firstAreaCodeResult = self.browser.elementExists(by=By.XPATH,value=f"{areaCodeFormString}//div/ul/li[@class='ng-star-inserted'][1]",timeout=2)
+            if(firstAreaCodeResult):
+                firstAreaCodeResult.click()
+                foundAreaCode = True
+                break
+            else:
+                noNumbersAvailable = self.browser.elementExists(by=By.XPATH,value="//div[contains(text(),'The city or zip code you entered has no numbers available')]")
+                if(noNumbersAvailable):
+                    zipCode += 10
+                    continue
+                else:
+                    raise ValueError("No zip codes found, but Verizon isn't raising the expected 'No zip codes found' error. Review order flow to ensure process hasn't changed.")
+        if(not foundAreaCode):
+            raise ValueError("Couldn't find a valid area code after 20 tries!")
+
+        assignNumbersButtonString = "//button[text()='Assign numbers to all']"
+        assignNumbersButton = self.browser.waitForClickableElement(by=By.XPATH,value=assignNumbersButtonString)
+        assignNumbersButton.click()
+
+        numberHasBeenAssignedHeaderString = "//div[contains(text(),'You assigned numbers to all your devices. Next, add user information.')]"
+        self.waitForPageLoad(by=By.XPATH,value=numberHasBeenAssignedHeaderString,testClick=True)
+    # Assumes a number has been selected, as navigates to the add user information page.
+    def NumberSelection_NavToAddUserInformation(self):
+        addUserInfoButtonString = "//button[text()='Add user information']"
+        addUserInfoButton = self.browser.waitForClickableElement(by=By.XPATH,value=addUserInfoButtonString)
+        addUserInfoButton.click()
+
+        userInfoHeaderString = "//div[contains(text(),'Add user information to your selected device.')]"
+        self.waitForPageLoad(by=By.XPATH,value=userInfoHeaderString,testClick=True)
+    # Assumes we're on the user information page. Enters in basic user information.
+    def UserInformation_EnterBasicInfo(self,firstName,lastName,email):
+        firstNameField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='firstName']")
+        firstNameField.clear()
+        firstNameField.send_keys(firstName)
+
+        lastNameField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='lastName']")
+        lastNameField.clear()
+        lastNameField.send_keys(lastName)
+
+        emailField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@type='email']")
+        emailField.clear()
+        emailField.send_keys(email)
+
+        time.sleep(1)
+        if(self.browser.elementExists(by=By.XPATH,value="//span[contains(text(),'Please enter a valid email address.')]")):
+            raise ValueError(f"Verizon believes that email '{email}' is invalid.")
+    # Assumes we're on the user information page. Enters in address information.
+    def UserInformation_EnterAddressInfo(self,address1,address2,city,stateAbbrev,zipCode):
+        editAddressButton = self.browser.waitForClickableElement(by=By.XPATH,value="//span[@class='edit-add-label']")
+        editAddressButton.click()
+
+        address1Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='addressLine1']")
+        address1Field.clear()
+        address1Field.send_keys(address1)
+
+        address2Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='addressLine2']")
+        address2Field.clear()
+        address2Field.send_keys(address2)
+
+        cityField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='city']")
+        cityField.clear()
+        cityField.send_keys(city)
+
+        stateFieldString = "//select[@formcontrolname='state']"
+        stateField = Select(self.browser.find_element(by=By.XPATH, value=stateFieldString))
+        stateField.select_by_visible_text(stateAbbrev)
+
+        zipCodeField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='zipCode']")
+        zipCodeField.clear()
+        zipCodeField.send_keys(zipCode)
+    # Saves the user information inputted, which takes us back to the NumberSelection
+    def UserInformation_SaveInfo(self):
+        saveButtonString = "//div/div/button[text()='Save']"
+        saveButton = self.browser.waitForClickableElement(by=By.XPATH,value=saveButtonString)
+        saveButton.click()
+
+        userInfoUpdatedSuccessfullyHeaderString = "//div[contains(@class,'colorBackgroundSuccess')]//div[contains(translate(text(), 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz'), 'user information')]"
+        self.waitForPageLoad(by=By.XPATH,value=userInfoUpdatedSuccessfullyHeaderString,testClick=True)
+    # Continues to the next screen from the Number Selection screen, assuming a number has been
+    # selected and all user inputted.
+    def NumberSelection_Continue(self):
+        continueButtonString = "//div[contains(@class,'AS-header')]/button[text()='Continue'][contains(@class,'continue-btn')]"
+        continueButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueButtonString)
+        continueButton.click()
+
+        shoppingCartHeaderString = "//div/div/h1[contains(text(),'Shopping cart')]"
+        self.waitForPageLoad(by=By.XPATH,value=shoppingCartHeaderString,testClick=True,waitTime=3,timeout=3,raiseError=False)
+
+        # Test if Verizon believes the address can't be validated.
+        if(self.browser.elementExists(by=By.XPATH,value="//div[contains(text(),'The address could not be validated. Please review and correct.')]")):
+            continueButton = self.browser.waitForClickableElement(by=By.XPATH, value=continueButtonString)
+            continueButton.click()
+            self.waitForPageLoad(by=By.XPATH, value=shoppingCartHeaderString,testClick=True)
+
+    # Assumes we're on the shopping cart overview screen. Simpl clicks "check out" to continue
+    # to check out screen.
+    def ShoppingCart_ContinueToCheckOut(self):
+        checkOutButtonString = "//div[contains(@class,'device-shopping-cart-content-right')]/div/button[contains(text(),'Check out')]"
+        checkOutButton = self.browser.waitForClickableElement(by=By.XPATH,value=checkOutButtonString)
+        checkOutButton.click()
+
+        checkoutHeaderString = "//div[@class='checkoutBox']//h1[text()='Checkout']"
+        self.waitForPageLoad(by=By.XPATH,value=checkoutHeaderString,testClick=True)
+
+    # Assumes we're on the checkout screen. Attempts to click on "add address" to add
+    # a full address info.
+    def Checkout_AddAddressInfo(self,company,attention,address1,city,stateAbbrev,zipCode,contactPhone,
+                                notificationEmails : list = None,address2 = ""):
+        addNewAddressButtonString = "//u[contains(text(),'Add address')]"
+        addNewAddressButton = self.browser.waitForClickableElement(by=By.XPATH,value=addNewAddressButtonString)
+        addNewAddressButton.click()
+
+        companyField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='firmName']")
+        companyField.clear()
+        companyField.send_keys(company)
+
+        attentionField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='attention']")
+        attentionField.clear()
+        attentionField.send_keys(attention)
+
+        address1Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='add1']")
+        address1Field.clear()
+        address1Field.send_keys(address1)
+
+        address2Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='add2']")
+        address2Field.clear()
+        address2Field.send_keys(address2)
+
+        cityField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='city']")
+        cityField.clear()
+        cityField.send_keys(city)
+
+        stateSelect = Select(self.browser.waitForClickableElement(by=By.XPATH,value="//select[@id='states']"))
+        stateSelect.select_by_visible_text(stateAbbrev)
+
+        contactPhoneField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@name='phoneNumber']")
+        contactPhoneField.clear()
+        contactPhoneField.send_keys(contactPhone)
+
+        # First, we remove all existing emails if present.
+        existingOldEmails = self.browser.find_elements(by=By.XPATH,value="//input[@type='email']/parent::div/following-sibling::div[@class='remove-btn']")
+        for existingOldEmail in existingOldEmails:
+            existingOldEmail.click()
+
+        # Now, we add all emails specified as arguments.
+        for newEmail in notificationEmails:
+            addNewNotifyButtonString = "//div[contains(@class,'add-notify')]/div[contains(text(),'Add new notification')]/parent::div"
+            addNewNotifyButton = self.browser.waitForClickableElement(by=By.XPATH,value=addNewNotifyButtonString)
+            allOldEmailFields = self.browser.find_elements(by=By.XPATH, value="//input[@type='email']")
+            allNewEmailFields = None
+            for i in range(5):
+                addNewNotifyButton.click()
+                allNewEmailFields = self.browser.find_elements(by=By.XPATH, value="//input[@type='email']")
+                if(len(allNewEmailFields) > len(allOldEmailFields)):
+                    break
+                else:
+                    time.sleep(1)
+                    continue
+
+            allNewEmailFields[-1].clear()
+            allNewEmailFields[-1].send_keys(newEmail)
+
+        zipCodeField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@name='zipCode']")
+        zipCodeField.clear()
+        zipCodeField.send_keys(zipCode)
+
+        checkoutHeaderString = "//div[@class='checkoutBox']//h1[text()='Checkout']"
+        self.waitForPageLoad(by=By.XPATH,value=checkoutHeaderString,testClick=True)
+
+        # Finally, we continue back to payment.
+        continueToPaymentButtonString = "//button[contains(text(),'Continue to Payment')]"
+        continueToPaymentButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueToPaymentButtonString)
+        continueToPaymentButton.click()
+
+        self.waitForPageLoad(by=By.XPATH,value="//div[@class='shipdisplay-method']/h4[text()='Shipping method']",waitTime=3,timeout=3,raiseError=False)
+        if(self.browser.elementExists(by=By.XPATH,value="//div[contains(@class,'error-notification')][contains(text(),'Address could not be validated. Please review and correct.')]")):
+            continueToPaymentButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueToPaymentButtonString)
+            continueToPaymentButton.click()
+#
+            self.waitForPageLoad(by=By.XPATH, value="//div[@class='shipdisplay-method']/h4[text()='Shipping method']")
+        else:
+            self.waitForPageLoad(by=By.XPATH, value="//div[@class='shipdisplay-method']/h4[text()='Shipping method']")
+
+        shippingAddressFullString = "//div[@class='shipdisplay-left']/p[contains(@class,'collapse-shipping')]"
+        shippingAddressFull = self.browser.waitForClickableElement(by=By.XPATH,value=shippingAddressFullString,testClick=True).text
+
+        if(address2 != ""):
+            expectedShippingAddressString = f"{company} ATTN: {attention}\n{address1},{address2}\n{city}, {stateAbbrev} - {zipCode}\nTel: {contactPhone}".lower()
+        else:
+            expectedShippingAddressString = f"{company} ATTN: {attention}\n{address1}\n{city}, {stateAbbrev} - {zipCode}\nTel: {contactPhone}".lower()
+
+        print(shippingAddressFull.lower())
+        print(expectedShippingAddressString)
+
+        if(shippingAddressFull.lower().strip() == expectedShippingAddressString.strip()):
+            return True
+        else:
+            return False
+    # Assumes address info has been filled, and places the order, returning the order info.
+    def Checkout_PlaceOrder(self):
+        # TODO only sysco support for rn
+        billToAccountButtonString = f"//label[contains(@class,'payment-radio-container')][contains(text(),'Bill to Account')]/span[contains(text(),'{b.clients['Sysco']['Accounts']['Verizon Wireless']}')]"
+        billToAccountButton = self.browser.waitForClickableElement(by=By.XPATH,value=billToAccountButtonString)
+        billToAccountButton.click()
+
+        submitOrderButtonString = "//app-order-total//button[text()='Submit Order']"
+        submitOrderButton = self.browser.waitForClickableElement(by=By.XPATH,value=submitOrderButtonString)
+
+        orderSummaryHeaderString = "//h2[text()='Order summary']"
+        self.waitForPageLoad(by=By.XPATH,value=orderSummaryHeaderString,testClick=True)
+
+        fullOrderInfoString = "//div[contains(@class,'order-number')]/parent::div"
+        return self.browser.waitForClickableElement(by=By.XPATH,value=fullOrderInfoString).text
+
+
+
 
     #endregion === Device Ordering ===
 
@@ -463,32 +729,3 @@ class LoadingScreen(VerizonError):
         super().__init__(f"Verizon MyBiz still stuck at loading while trying to click a new element.")
 
 
-br = Browser.Browser()
-v = VerizonDriver(br)
-v.logInToVerizon()
-v.emptyCart()
-
-device = "iPhone13_128GB"
-v.shopNewDevice()
-v.DeviceSelection_SearchForDevice(device)
-v.DeviceSelection_SelectDeviceQuickView(device)
-v.DeviceSelection_QuickView_Select2YearContract()
-v.DeviceSelection_QuickView_AddToCart()
-v.DeviceSelection_Continue()
-
-v.AccessorySelection_SearchForAccessory("iPhoneDefender")
-v.AccessorySelection_SelectAccessoryQuickView("iPhoneDefender")
-v.AccessorySelection_QuickView_AddToCart()
-v.AccessorySelection_QuickView_Close()
-
-v.AccessorySelection_SearchForAccessory("VerizonWallAdapter")
-v.AccessorySelection_SelectAccessoryQuickView("VerizonWallAdapter")
-v.AccessorySelection_QuickView_AddToCart()
-v.AccessorySelection_QuickView_Close()
-
-v.AccessorySelection_SearchForAccessory("SamsungVehicleCharger")
-v.AccessorySelection_SelectAccessoryQuickView("SamsungVehicleCharger")
-v.AccessorySelection_QuickView_AddToCart()
-v.AccessorySelection_QuickView_Close()
-
-v.AccessorySelection_Continue()
