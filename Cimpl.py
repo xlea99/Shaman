@@ -616,7 +616,6 @@ class CimplDriver:
 
         return returnDict
 
-
     # Front (Summary) page write methods
     def Workorders_WriteComment(self,comment):
         self.browser.switchToTab("Cimpl")
@@ -838,10 +837,10 @@ class CimplDriver:
             self.browser.driver.switch_to.default_content()
 
         # Finally, click apply.
-        applyButtonString = "/html/body/div[@class='application-content']/div/div/cimpl-landing/div/div[contains(@class,'pageMain')]/div[contains(@class,'mainContent')]/ng-transclude/div/workorder-details-page/cimpl-modal-popup/div/div/div/div[contains(@class,'d-modal-popup-content')]/div[contains(@class,'cimpl-modal-popup__footer')]/div/cimpl-button/button[contains(@id,'apply-action-button')]/div/span[contains(@class,'button-label')][text()='Apply']"
-        applyButtonElement = self.browser.find_element(by=By.XPATH,value=applyButtonString)
-        applyButtonElement.click()
-        self.waitForLoadingScreen()
+        #applyButtonString = "/html/body/div[@class='application-content']/div/div/cimpl-landing/div/div[contains(@class,'pageMain')]/div[contains(@class,'mainContent')]/ng-transclude/div/workorder-details-page/cimpl-modal-popup/div/div/div/div[contains(@class,'d-modal-popup-content')]/div[contains(@class,'cimpl-modal-popup__footer')]/div/cimpl-button/button[contains(@id,'apply-action-button')]/div/span[contains(@class,'button-label')][text()='Apply']"
+        #applyButtonElement = self.browser.find_element(by=By.XPATH,value=applyButtonString)
+        #applyButtonElement.click()
+        #self.waitForLoadingScreen()
 
 
 
@@ -882,9 +881,47 @@ def getUserID(actionsList : list):
         if(action.startswith("Assigned to Employee")):
             return action.split("Assigned to Employee - ")[1].split(" - ")[0]
 
-# This helper method returns the string of the device that was actually ordered in a Cimpl WO, in my custom
-# format.
-def getDeviceModelID(hardwareInfo : list):
+# This helper method takes a raw hardwareInfo list and classifies it in to the final deviceID and set of
+# accessoryIDs.
+def classifyHardwareInfo(hardwareInfo : list,carrier):
+    allAccessoryIDs = []
+    deviceID = None
     for hardware in hardwareInfo:
         if(hardware["Type"] == "Equipment"):
-            return b.equipment["CimplMappings"][hardware["Name"]]
+            try:
+                deviceID = b.equipment["CimplMappings"][hardware["Name"]]
+            except KeyError:
+                raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl device.")
+        elif(hardware["Type"] == "Accessory"):
+            try:
+                thisAccessory = b.accessories["CimplMappings"][hardware["Name"]]
+            except KeyError:
+                raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl accessory.")
+            if(type(thisAccessory) is str):
+                allAccessoryIDs.append(thisAccessory)
+            else:
+                allAccessoryIDs.extend(thisAccessory)
+
+    # Check to ensure no duplicate accessory types due to a Sysco user getting a bit over-excited
+    # with accessory the order page
+    allAccessoryIDs = set(allAccessoryIDs)
+
+    finalAccessoryIDs = set()
+    usedTypes = set()
+    for accessoryID in allAccessoryIDs:
+        if(b.accessories[accessoryID]["type"] not in usedTypes):
+            usedTypes.add(b.accessories[accessoryID]["type"])
+            finalAccessoryIDs.add(accessoryID)
+
+    if(carrier.lower() == "verizon wireless"):
+        if(b.config["cimpl"]["skipVehicleCharger"]):
+            for accessoryID in finalAccessoryIDs:
+                if(b.accessories[accessoryID]["type"] == "vehicleCharger"):
+                    finalAccessoryIDs.remove(accessoryID)
+                    break
+        if(b.config["cimpl"]["verizonSmartphoneBaseAccessory"] != ""):
+            if(b.equipment[deviceID]["subType"] == "Smart Phone"):
+                finalAccessoryIDs.add(b.config["cimpl"]["verizonSmartphoneBaseAccessory"])
+
+    return {"DeviceID" : deviceID, "AccessoryIDs" : finalAccessoryIDs}
+
