@@ -63,7 +63,6 @@ class VerizonDriver:
     # that should be clickable WITHOUT a loading screen.
     def waitForPageLoad(self,by : By, value : str,testClick = False,waitTime : int = 3,timeout=60,raiseError=True):
         for i in range(waitTime):
-            print(f"waiting {i}")
             self.browser.waitForClickableElement(by=by, value=value,testClick=testClick,timeout=timeout,raiseError=raiseError)
             time.sleep(1)
 
@@ -293,22 +292,24 @@ class VerizonDriver:
 
         miniCart = self.browser.waitForClickableElement(by=By.XPATH,value="//app-mini-cart/div/div/span")
         miniCart.click()
-        viewCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@clickname='MB View Shopping Cart']")
-        viewCartButton.click()
 
-        self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'device-shopping-cart-content-left')]//h1[contains(text(),'Shopping cart')]",testClick=True)
+        if (not self.browser.elementExists(by=By.XPATH,value="//div[contains(text(),'No items in the cart yet, please continue shopping.')]",timeout=2)):
+            viewCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@clickname='MB View Shopping Cart']")
+            viewCartButton.click()
 
-        clearCartButtonString = "//a[@id='dtm_clearcart']"
-        self.browser.waitForClickableElement(by=By.XPATH,value=clearCartButtonString)
-        clearCartButton = self.browser.waitForClickableElement(by=By.XPATH,value=clearCartButtonString)
-        clearCartButton.click()
+            self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'device-shopping-cart-content-left')]//h1[contains(text(),'Shopping cart')]",testClick=True)
 
-        confirmationClearButtonString = "//mat-dialog-container//button[text()='Clear']"
-        confirmationClearButton = self.browser.waitForClickableElement(by=By.XPATH,value=confirmationClearButtonString)
-        confirmationClearButton.click()
+            clearCartButtonString = "//a[@id='dtm_clearcart']"
+            self.browser.waitForClickableElement(by=By.XPATH,value=clearCartButtonString)
+            clearCartButton = self.browser.waitForClickableElement(by=By.XPATH,value=clearCartButtonString)
+            clearCartButton.click()
 
-        self.waitForPageLoad(by=By.XPATH,value="//h1[text()='Your cart is empty.']")
-        self.navToHomescreen()
+            confirmationClearButtonString = "//mat-dialog-container//button[text()='Clear']"
+            confirmationClearButton = self.browser.waitForClickableElement(by=By.XPATH,value=confirmationClearButtonString)
+            confirmationClearButton.click()
+
+            self.waitForPageLoad(by=By.XPATH,value="//h1[text()='Your cart is empty.']")
+            self.navToHomescreen()
 
     # Assumes we're on the device selection page. Given a Universal Device ID, searches for that
     # device (if supported) on Verizon.
@@ -321,10 +322,10 @@ class VerizonDriver:
         searchButton.click()
 
         # Now we test to ensure that the proper device card has fully loaded.
-        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings'][deviceID]['SKU']}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings'][deviceID]['CardName']}')]"
+        targetDeviceCard = f"//div/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings'][deviceID]['CardName']}')]"
         self.waitForPageLoad(by=By.XPATH,value=targetDeviceCard)
     def DeviceSelection_SelectDeviceQuickView(self,deviceID):
-        targetDeviceCard = f"//div[@id='{b.equipment['VerizonMappings'][deviceID]['SKU']}']/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings'][deviceID]['CardName']}')]"
+        targetDeviceCard = f"//div/div[contains(@class,'device-name')][contains(text(),'{b.equipment['VerizonMappings'][deviceID]['CardName']}')]"
         targetDeviceQuickViewButton = self.browser.waitForClickableElement(by=By.XPATH, value=f"{targetDeviceCard}/following-sibling::div/div[@class='quick-view']/button[contains(@class,'quick-view')]", timeout=15)
         targetDeviceQuickViewButton.click()
     # Assumes we're in the quick view menu for a device. Various options for this menu.
@@ -397,9 +398,12 @@ class VerizonDriver:
         targetPlanTypeTab = self.browser.waitForClickableElement(by=By.XPATH,value=targetPlanTypeTabString)
         targetPlanTypeTab.click()
 
+        choosePlanHeaderString = "//div/div/div/h1[text()='Select your plan']"
+        self.waitForPageLoad(by=By.XPATH,value=choosePlanHeaderString,testClick=True)
+
         targetPlanCardString = f"//div[contains(@class,'plan-card')][@title='Plan ID - {planID}']/div[@class='plan-card-inner']//button[contains(text(),'Select plan')]"
-        targetPlanCard = self.browser.waitForClickableElement(by=By.XPATH,value=targetPlanCardString)
-        targetPlanCard.click()
+        targetPlanCard = self.browser.waitForClickableElement(by=By.XPATH,value=targetPlanCardString,testClick=True)
+
 
         self.browser.waitForClickableElement(by=By.XPATH,value="//div[contains(text(),'Continue to the next step.')]")
     # Method to continue to the next page after the plan selection.
@@ -494,9 +498,10 @@ class VerizonDriver:
         address1Field.clear()
         address1Field.send_keys(address1)
 
-        address2Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='addressLine2']")
-        address2Field.clear()
-        address2Field.send_keys(address2)
+        if(address2 is not None and address2 != ""):
+            address2Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='addressLine2']")
+            address2Field.clear()
+            address2Field.send_keys(address2)
 
         cityField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@formcontrolname='city']")
         cityField.clear()
@@ -531,7 +536,7 @@ class VerizonDriver:
         if(self.browser.elementExists(by=By.XPATH,value="//div[contains(text(),'The address could not be validated. Please review and correct.')]")):
             continueButton = self.browser.waitForClickableElement(by=By.XPATH, value=continueButtonString)
             continueButton.click()
-            self.waitForPageLoad(by=By.XPATH, value=shoppingCartHeaderString,testClick=True)
+            self.waitForPageLoad(by=By.XPATH, value=shoppingCartHeaderString,testClick=True,waitTime=4)
 
     # Assumes we're on the shopping cart overview screen. Simpl clicks "check out" to continue
     # to check out screen.
@@ -563,9 +568,10 @@ class VerizonDriver:
         address1Field.clear()
         address1Field.send_keys(address1)
 
-        address2Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='add2']")
-        address2Field.clear()
-        address2Field.send_keys(address2)
+        if(address2 is not None and address2 != ""):
+            address2Field = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='add2']")
+            address2Field.clear()
+            address2Field.send_keys(address2)
 
         cityField = self.browser.waitForClickableElement(by=By.XPATH,value="//input[@id='city']")
         cityField.clear()
@@ -600,6 +606,7 @@ class VerizonDriver:
 
             allNewEmailFields[-1].clear()
             allNewEmailFields[-1].send_keys(newEmail)
+            print(f"(theoretically) just added this email: {newEmail}")
 
         zipCodeField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@name='zipCode']")
         zipCodeField.clear()
@@ -630,8 +637,6 @@ class VerizonDriver:
         else:
             expectedShippingAddressString = f"{company} ATTN: {attention}\n{address1}\n{city}, {stateAbbrev} - {zipCode}\nTel: {contactPhone}".lower()
 
-        print(shippingAddressFull.lower())
-        print(expectedShippingAddressString)
 
         if(shippingAddressFull.lower().strip() == expectedShippingAddressString.strip()):
             return True
@@ -646,6 +651,7 @@ class VerizonDriver:
 
         submitOrderButtonString = "//app-order-total//button[text()='Submit Order']"
         submitOrderButton = self.browser.waitForClickableElement(by=By.XPATH,value=submitOrderButtonString)
+        submitOrderButton.click()
 
         orderSummaryHeaderString = "//h2[text()='Order summary']"
         self.waitForPageLoad(by=By.XPATH,value=orderSummaryHeaderString,testClick=True)

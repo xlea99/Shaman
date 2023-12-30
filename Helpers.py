@@ -246,6 +246,8 @@ def placeVerizonNewInstall(drivers,deviceID : str,accessoryIDs : list,
     if(type(contactEmails) is str):
         contactEmails = [contactEmails]
 
+    print(f"CONTANCT EMAILS: {contactEmails}")
+
 
     verizonVerify(drivers)
     if(emptyCart):
@@ -266,12 +268,12 @@ def placeVerizonNewInstall(drivers,deviceID : str,accessoryIDs : list,
     drivers["Verizon"].AccessorySelection_Continue()
 
     deviceType = b.equipment[deviceID]["subType"]
-    drivers["Verizon"].PlanSelection_SelectPlan(planID=b.clients["Plans"][deviceType]["Verizon Wireless"]["planCode"], planType=b.clients["Plans"][deviceType]["Verizon Wireless"]["planType"])
+    drivers["Verizon"].PlanSelection_SelectPlan(planID=b.clients["Sysco"]["Plans"][deviceType]["Verizon Wireless"][0]["planCode"], planType=b.clients["Sysco"]["Plans"][deviceType]["Verizon Wireless"][0]["planType"])
     drivers["Verizon"].PlanSelection_Continue()
 
     drivers["Verizon"].DeviceProtection_Decline()
 
-    drivers["Verizon"].NumberSelection_SelectAreaCode(zipCode=60115)
+    drivers["Verizon"].NumberSelection_SelectAreaCode(zipCode=zipCode)
     drivers["Verizon"].NumberSelection_NavToAddUserInformation()
     drivers["Verizon"].UserInformation_EnterBasicInfo(firstName=firstName, lastName=lastName, email=userEmail)
     drivers["Verizon"].UserInformation_EnterAddressInfo(address1=address1, address2=address2, city=city, stateAbbrev=state,zipCode=zipCode)
@@ -312,7 +314,7 @@ def writeServiceToCimplWorkorder(drivers,serviceNum,carrier,installDate):
 
 # Given a workorderNumber, this method examines it, tries to figure out the type of workorder it is, and whether
 # it is valid to submit automatically through the respective carrier.
-def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True):
+def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNumber=None):
     cimplVerify(drivers)
     print(f"Cimpl WO {workorderNumber}: Beginning automation")
     workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
@@ -345,6 +347,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True):
     classifiedHardware = Cimpl.classifyHardwareInfo(workorder["HardwareInfo"],carrier=workorder["Carrier"])
     deviceID = classifiedHardware["DeviceID"]
     accessoryIDs = classifiedHardware["AccessoryIDs"]
+    print(accessoryIDs)
 
     if(workorder["Comment"] != ""):
         userInput = input(f"WARNING: There is a comment on this workorder:\n\"{workorder['Comment']}\"\n\n Press enter to continue ordering. Type anything to cancel.")
@@ -371,6 +374,11 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True):
     tmaVerify(drivers,"Sysco")
 
     print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
+    if(referenceNumber is not None):
+        cimplVerify(drivers)
+        drivers["Cimpl"].Workorders_NavToSummaryTab()
+        drivers["Cimpl"].Workorders_WriteReferenceNo(referenceNo=referenceNumber)
+        drivers["Cimpl"].Workorders_ApplyChanges()
 
     # If operation type is a New Install
     if(workorder["OperationType"] == "New Request"):
@@ -385,11 +393,24 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True):
 
     cimplVerify(drivers)
     drivers["Cimpl"].Workorders_NavToSummaryTab()
-    drivers["Cimpl"].Workorders_WriteNotes(subject="Order Placed",noteType="Information Only",status="Completed",content=orderNumber)
+    drivers["Cimpl"].Workorders_WriteNote(subject="Order Placed",noteType="Information Only",status="Completed",content=orderNumber)
 
     # Confirm workorder, if not already confirmed.
     if(workorder["Status"] == "Pending"):
-        drivers["Cimpl"].Workorders_SetStatus(status="Confirmed",)
+        if workorder["OperationType"] == "New Request":
+            if carrier == "BellMobility":
+                templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['BellMobility']['NewInstall'][deviceID]}"
+            else:
+                templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['NormalCarrier']['NewInstall'][deviceID]}"
+        else:
+            if carrier == "BellMobility":
+                templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['BellMobility']['Upgrade'][deviceID]}"
+            else:
+                templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['NormalCarrier']['Upgrade'][deviceID]}"
+        with open(templatePath, "r") as file:
+            emailContent = file.read()
+
+        drivers["Cimpl"].Workorders_SetStatus(status="Confirm",emailRecipients=thisPerson.info_Email,emailCCs="btnetworkservicesmobility@sysco.com",emailContent=emailContent)
         print(f"Cimpl WO {workorderNumber}: Added order number to workorder notes and confirmed request.")
 
     return True
@@ -481,9 +502,4 @@ def processPostOrderWorkorder(drivers,workorderNumber):
     return True
 
 _drivers = buildDrivers()
-#beans = processPreOrderWorkorder(_drivers,44187)
-beans = readCimplWorkorder(_drivers,44187)
-
-emailContentFile = open(f"{b.paths.emailTemplates}/iPhoneNewInstall.html","r")
-thisEmailContent = emailContentFile.read()
-_drivers["Cimpl"].Workorders_SetStatus(status="Confirm",emailRecipients="asomheil@uplandsoftware.com",emailCCs=["btnetworkservicesmobility@sysco.com"],emailContent=thisEmailContent)
+beans = processPreOrderWorkorder(_drivers,44188,referenceNumber="Alex")

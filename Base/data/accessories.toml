@@ -1,4 +1,4 @@
-title = "Equipment Information Data"
+title = "Accessory Information Data"
 
 [VerizonWallAdapter]
 type = "wallAdapter"
@@ -17,7 +17,7 @@ type = "case"
 
 
 [CimplMappings]
-"Otterbox Symmetry with MagSafe" = "iPhoneSymmetry"
+"Otterbox Symmetry with MagSafe" = "iPhoneDefender"
 "Otterbox Defender case for iPhone 13 128GB" = "iPhoneDefender"
 "Otterbox Defender for Samsung Galaxy S21 FE" = "SamsungDefender"
 "Car Charger for iPhone 13 128GB" = "SamsungVehicleCharger"
