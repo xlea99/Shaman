@@ -397,16 +397,18 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
     # Confirm workorder, if not already confirmed.
     if(workorder["Status"] == "Pending"):
-        if workorder["OperationType"] == "New Request":
+        if(workorder["OperationType"].lower() == "new request"):
             if carrier == "BellMobility":
                 templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['BellMobility']['NewInstall'][deviceID]}"
             else:
                 templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['NormalCarrier']['NewInstall'][deviceID]}"
-        else:
+        elif(workorder["OperationType"].lower() == "upgrade"):
             if carrier == "BellMobility":
                 templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['BellMobility']['Upgrade'][deviceID]}"
             else:
                 templatePath = f"{b.paths.emailTemplates}/{b.emailTemplates['NormalCarrier']['Upgrade'][deviceID]}"
+        else:
+            raise ValueError(f"Found incompatible order type after performing an order: '{workorder['OperationType']}'")
         with open(templatePath, "r") as file:
             emailContent = file.read()
 
@@ -502,4 +504,4 @@ def processPostOrderWorkorder(drivers,workorderNumber):
     return True
 
 _drivers = buildDrivers()
-beans = processPreOrderWorkorder(_drivers,44188,referenceNumber="Alex")
+beans = processPreOrderWorkorder(_drivers,44192,referenceNumber="Alex")

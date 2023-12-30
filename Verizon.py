@@ -5,6 +5,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select
+from selenium.webdriver.common.keys import Keys
 import time
 import re
 
@@ -69,15 +70,17 @@ class VerizonDriver:
     # This method tests for and handles the "X users are still unregistered" popup that sometimes occurs on the
     # Homescreen page.
     def testForUnregisteredPopup(self):
-        unregisteredUsersPopupString = "//app-notification-dialog//div[contains(text(),'users are still unregistered')]//parent::app-notification-dialog"
+        unregisteredUsersPopupString = "//app-notification-dialog//div[contains(text(),'users are still unregistered')]/parent::div/parent::app-notification-dialog"
         unregisteredUsersCloseButtonString = f"{unregisteredUsersPopupString}//i[contains(@class,'icon-close')]"
 
         unregisteredUsersCloseButton = self.browser.elementExists(by=By.XPATH,value=unregisteredUsersCloseButtonString,timeout=1.5)
         if(unregisteredUsersCloseButton):
+            print("tested, and FOUND!")
             unregisteredUsersCloseButton.click()
             self.browser.waitForNotClickableElement(by=By.XPATH,value=unregisteredUsersCloseButtonString,timeout=20)
             return True
         else:
+            print("tested, not found")
             return True
 
     #region === Site Navigation ===
@@ -285,6 +288,7 @@ class VerizonDriver:
 
         # Now we wait to ensure that we've fully navigated to the newDevice screen.
         self.waitForPageLoad(by=By.XPATH,value="//button[@id='grid-search-button']")
+
     # This method clears the full cart, from anywhere. It cancels out whatever was previously
     # happening, but ensures the cart is fully empty for future automation.
     def emptyCart(self):
@@ -310,6 +314,32 @@ class VerizonDriver:
 
             self.waitForPageLoad(by=By.XPATH,value="//h1[text()='Your cart is empty.']")
             self.navToHomescreen()
+
+    # This method pulls up the given serviceID in Verizon, from anywhere. It cancels out whatever
+    # was previously happening.
+    def pullUpLine(self,serviceID):
+        self.navToHomescreen()
+
+        serviceSearchBarString = "//input[@id='dtm_search']"
+        serviceSearchBar = self.browser.waitForClickableElement(by=By.XPATH,value=serviceSearchBarString)
+        serviceSearchBar.clear()
+        serviceSearchBar.send_keys(str(serviceID))
+        serviceSearchBar.send_keys(Keys.ENTER)
+
+        self.testForUnregisteredPopup()
+
+        upgradeDateHeaderString = "//sub[text()='Upgrade date']"
+        self.waitForPageLoad(by=By.XPATH,value=upgradeDateHeaderString,testClick=True,waitTime=3,timeout=3,raiseError=False)
+
+        # Test if Verizon can't find the line.
+        if(self.browser.elementExists(by=By.XPATH,value="//p[contains(text(),'No results found.')]")):
+            self.testForUnregisteredPopup()
+            exitButton = self.browser.waitForClickableElement(by=By.XPATH, value="//i[@id='icnClose']")
+            exitButton.click()
+            self.waitForPageLoad(by=By.XPATH, value="//h3[contains(text(),'Billing')]",testClick=True)
+            return False
+        else:
+            return True
 
     # Assumes we're on the device selection page. Given a Universal Device ID, searches for that
     # device (if supported) on Verizon.
@@ -735,3 +765,7 @@ class LoadingScreen(VerizonError):
         super().__init__(f"Verizon MyBiz still stuck at loading while trying to click a new element.")
 
 
+br = Browser.Browser()
+v = VerizonDriver(br)
+v.logInToVerizon()
+v.pullUpLine(8322899246)
