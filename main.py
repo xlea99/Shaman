@@ -25,12 +25,21 @@ d = h.buildDrivers()
 #endregion Setup
 
 
+# === CLOSE / BUILD TMA WORKORDER
+# To attempt to place the order for a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade,
+# for now), simply add the workorder number to the below list. If the program finds that it is suitable to place, it
+# will detect the order type, then attempt to place/document Verizon order
+preCimplWOs = []
+for WO in preCimplWOs:
+    h.processPreOrderWorkorder(d,WO)
+
+# === CLOSE / BUILD TMA WORKORDER
 # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
 # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
 # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-cimplWOs = [44018]
-for WO in cimplWOs:
-    h.processWorkorder(d,WO)
+postCimplWOs = []
+for WO in postCimplWOs:
+    h.processPostOrderWorkorder(d,WO)
 
 
 # To build only TMA new install for a specific service, such as a non-verizon or even non-Sysco service, add the

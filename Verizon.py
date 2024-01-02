@@ -275,6 +275,67 @@ class VerizonDriver:
 
     #endregion === Order Viewer ===
 
+    #region === Line Viewer ===
+
+    # This method pulls up the given serviceID in Verizon, from anywhere. It cancels out whatever
+    # was previously happening.
+    def pullUpLine(self,serviceID):
+        self.navToHomescreen()
+
+        serviceSearchBarString = "//input[@id='dtm_search']"
+        serviceSearchBar = self.browser.waitForClickableElement(by=By.XPATH,value=serviceSearchBarString)
+        serviceSearchBar.clear()
+        serviceSearchBar.send_keys(str(serviceID))
+        serviceSearchBar.send_keys(Keys.ENTER)
+
+        self.testForUnregisteredPopup()
+
+        upgradeDateHeaderString = "//sub[text()='Upgrade date']"
+        self.waitForPageLoad(by=By.XPATH,value=upgradeDateHeaderString,testClick=True,waitTime=3,timeout=3,raiseError=False)
+
+        # Test if Verizon can't find the line.
+        if(self.browser.elementExists(by=By.XPATH,value="//p[contains(text(),'No results found.')]")):
+            self.testForUnregisteredPopup()
+            exitButton = self.browser.waitForClickableElement(by=By.XPATH, value="//i[@id='icnClose']")
+            exitButton.click()
+            self.waitForPageLoad(by=By.XPATH, value="//h3[contains(text(),'Billing')]",testClick=True)
+            return False
+        else:
+            return True
+
+    # Assumes we're on the line viewer for a specific line, and clicks "Upgrade device" to begin
+    # an upgrade. Also handles ETF shenanigans, so that either way, this function either ends up
+    # at the Device Selection page or returns false for lines that can't use waivers.
+    def LineViewer_UpgradeLine(self):
+        def mtnPendingError():
+            mtnPendingErrorBoxString = "//app-modal-header/div[contains(text(),'The following wireless number is ineligible for this service.')]"
+            mtnPendingErrorBox = self.browser.elementExists(by=By.XPATH,value=mtnPendingErrorBoxString,timeout=3)
+            if(mtnPendingErrorBox):
+                pass
+                #TODO MTN THING see line 239.270.3941 if needed
+
+
+        # Do this if device is found as eligible for standard upgrade
+        upgradeDeviceEligibleButtonString = "//button[contains(text(),'Upgrade device')]"
+        upgradeDeviceEligibleButton = self.browser.elementExists(by=By.XPATH,value=upgradeDeviceEligibleButtonString,timeout=1.5)
+        if(upgradeDeviceEligibleButton):
+            upgradeDeviceEligibleButton.click()
+
+            self.waitForPageLoad(by=By.XPATH,value="//div[@id='page-header']//h1[contains(text(),'Shop Devices')]",testClick=True)
+        # Do this if device is found an ineligible for standard upgrade
+        else:
+            # Do this if device is found as eligible for standard upgrade
+            upgradeDeviceIneligibleButtonString = "//a[@type='button'][contains(text(),'Upgrade Options')]"
+            upgradeDeviceIneligibleButton = self.browser.elementExists(by=By.XPATH,value=upgradeDeviceEligibleButtonString,timeout=1.5)
+            if(upgradeDeviceIneligibleButton):
+                upgradeDeviceIneligibleButton.click()
+
+                self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'upgrade-title')]/div/h1[contains(text(),'Upgrade options')]")
+            else:
+                raise ValueError("Couldn't find ANY upgrade button, whether eligible or ineligible, on the line viewer page!")
+
+    #endregion === Line Viewer ===
+
     #region === Device Ordering ===
 
     # This method navigates to homescreen, then clicks "shop devices" to begin a new install
@@ -314,32 +375,6 @@ class VerizonDriver:
 
             self.waitForPageLoad(by=By.XPATH,value="//h1[text()='Your cart is empty.']")
             self.navToHomescreen()
-
-    # This method pulls up the given serviceID in Verizon, from anywhere. It cancels out whatever
-    # was previously happening.
-    def pullUpLine(self,serviceID):
-        self.navToHomescreen()
-
-        serviceSearchBarString = "//input[@id='dtm_search']"
-        serviceSearchBar = self.browser.waitForClickableElement(by=By.XPATH,value=serviceSearchBarString)
-        serviceSearchBar.clear()
-        serviceSearchBar.send_keys(str(serviceID))
-        serviceSearchBar.send_keys(Keys.ENTER)
-
-        self.testForUnregisteredPopup()
-
-        upgradeDateHeaderString = "//sub[text()='Upgrade date']"
-        self.waitForPageLoad(by=By.XPATH,value=upgradeDateHeaderString,testClick=True,waitTime=3,timeout=3,raiseError=False)
-
-        # Test if Verizon can't find the line.
-        if(self.browser.elementExists(by=By.XPATH,value="//p[contains(text(),'No results found.')]")):
-            self.testForUnregisteredPopup()
-            exitButton = self.browser.waitForClickableElement(by=By.XPATH, value="//i[@id='icnClose']")
-            exitButton.click()
-            self.waitForPageLoad(by=By.XPATH, value="//h3[contains(text(),'Billing')]",testClick=True)
-            return False
-        else:
-            return True
 
     # Assumes we're on the device selection page. Given a Universal Device ID, searches for that
     # device (if supported) on Verizon.
@@ -765,7 +800,7 @@ class LoadingScreen(VerizonError):
         super().__init__(f"Verizon MyBiz still stuck at loading while trying to click a new element.")
 
 
-br = Browser.Browser()
-v = VerizonDriver(br)
-v.logInToVerizon()
-v.pullUpLine(8322899246)
+#br = Browser.Browser()
+#v = VerizonDriver(br)
+#v.logInToVerizon()
+#v.pullUpLine(8322899246)
