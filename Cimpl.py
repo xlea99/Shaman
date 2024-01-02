@@ -148,7 +148,7 @@ class CimplDriver:
             if(not self.browser.elementExists(by=By.XPATH,value=f"{menuString}[contains(@class,'cimpl-header__icon-transform')]")):
                 self.waitForLoadingScreen()
                 self.browser.waitForClickableElement(by=By.XPATH, value=menuString)
-                self.browser.simpleSafeClick(by=By.XPATH,value=menuString)
+                self.browser.simpleSafeClick(by=By.XPATH,element=menuString)
                 self.waitForLoadingScreen()
 
 
