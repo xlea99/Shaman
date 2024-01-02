@@ -106,12 +106,20 @@ model = "IPAD PRO 11 128GB"
 "IPAD PRO 11 128GB" = "iPad11_128GB"
 "Mifi Orbic 5G UW" = "Orbic"
 
+
 [VerizonMappings]
-[VerizonMappings.SearchTerms]
-"iPhone13_128GB" = "iPhone 13"
+[VerizonMappings.iPhone13_128GB]
+SearchTerm = "13"
+CardName = "Apple iPhone 13"
 
-[VerizonMappings.DeviceCardName]
-"iPhone13_128GB" = "Apple iPhone 13"
+[VerizonMappings.GalaxyS21_128GB]
+SearchTerm = "S21"
+CardName = "Samsung Galaxy S21 FE 5G"
 
-[VerizonMappings.DeviceSKU]
-"iPhone13_128GB" = "MLA23LL/A"
+[VerizonMappings.Orbic]
+SearchTerm = "Orbic"
+CardName = "Orbic Speed 5G UW"
+
+[VerizonMappings.iPad11_128GB]
+SearchTerm = "iPad 11"
+CardName = "Apple iPad Pro 11-inch (4th Generation)"

@@ -1,0 +1,49 @@
+title = "Accessory Information Data"
+
+[VerizonWallAdapter]
+type = "wallAdapter"
+[SamsungVehicleCharger]
+type = "vehicleCharger"
+[iPhoneDefender]
+type = "case"
+[iPhoneSymmetry]
+type = "case"
+[iPhoneCommuter]
+type = "case"
+[SamsungDefender]
+type = "case"
+[MagicKeyboard]
+type = "case"
+
+
+[CimplMappings]
+"Otterbox Symmetry with MagSafe" = "iPhoneDefender"
+"Otterbox Defender case for iPhone 13 128GB" = "iPhoneDefender"
+"Otterbox Defender for Samsung Galaxy S21 FE" = "SamsungDefender"
+"Car Charger for iPhone 13 128GB" = "SamsungVehicleCharger"
+"Car charger for Samsung Galaxy S21 FE 5G" = "SamsungVehicleCharger"
+"Apple Magic Keyboard case" = "MagicKeyboard"
+
+[VerizonMappings]
+[VerizonMappings.VerizonWallAdapter]
+SearchTerm = "20w"
+CardName = "Wall Adapter 20W USB-C"
+[VerizonMappings.SamsungVehicleCharger]
+SearchTerm = "40w car charger duo"
+CardName = "40W Car Charger Duo"
+
+[VerizonMappings.iPhoneDefender]
+SearchTerm = "Defender"
+CardName = "Defender Series Pro Case for iPhone 15, iPhone 14, and iPhone 13"
+[VerizonMappings.iPhoneSymmetry]
+SearchTerm = "Symmetry"
+CardName = "Symmetry Series Case with MagSafe for iPhone 15, iPhone 14, and iPhone 13"
+[VerizonMappings.iPhoneCommuter]
+SearchTerm = "Commuter"
+CardName = "Commuter Series Case for iPhone 15, iPhone 14, and iPhone 13"
+[VerizonMappings.SamsungDefender]
+SearchTerm = "Defender"
+CardName = "Defender Series Pro Case for Galaxy S21 FE 5G"
+[VerizonMappings.MagicKeyboard]
+SearchTerm = "Magic"
+CardName = "Magic Keyboard for iPad Pro 11-inch (4th Gen)/(3rd Gen) and iPad Air (4th, 5th Gen)"

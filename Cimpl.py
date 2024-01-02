@@ -490,6 +490,28 @@ class CimplDriver:
                 nextArrowButton = self.browser.find_element(by=By.XPATH, value=nextArrowButtonString)
 
         return allNotes
+    def Workorders_ReadShippingAddress(self):
+        prefix = "//cimpl-collapsible-box[@header='Main Shipping Address']//workorder-summary-address/div/cimpl-form[not(contains(@class,'ng-hide'))]"
+
+
+        address1 = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.addressLine1']").text
+        address2 = self.browser.elementExists(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.addressLine2']")
+        postalCodeLine = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.postalCodeLine']").text
+        country = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.country']").text
+
+        city, state, zipCode = postalCodeLine.split(",")
+
+        returnDict = {"Address1" : address1.strip(),
+                      "City" : city.strip(),
+                      "State" : state.strip(),
+                      "ZipCode" : zipCode.strip(),
+                      "Country" : country.strip()}
+        if(address2):
+            returnDict["Address2"] = address2.text.strip()
+        else:
+            returnDict["Address2"] = None
+
+        return returnDict
     # Back (Details) page read methods
     def Workorders_ReadServiceID(self):
         self.browser.switchToTab("Cimpl")
@@ -582,6 +604,7 @@ class CimplDriver:
         returnDict["WorkorderOwner"] = self.Workorders_ReadWorkorderOwner()
         returnDict["Requestor"] = self.Workorders_ReadRequester()
         returnDict["Notes"] = self.Workorders_ReadNotes()
+        returnDict["Shipping"] = self.Workorders_ReadShippingAddress()
 
         # Read detail info
         self.Workorders_NavToDetailsTab()
@@ -592,7 +615,6 @@ class CimplDriver:
         returnDict["Actions"] = self.Workorders_ReadActions()
 
         return returnDict
-
 
     # Front (Summary) page write methods
     def Workorders_WriteComment(self,comment):
@@ -815,10 +837,10 @@ class CimplDriver:
             self.browser.driver.switch_to.default_content()
 
         # Finally, click apply.
-        applyButtonString = "/html/body/div[@class='application-content']/div/div/cimpl-landing/div/div[contains(@class,'pageMain')]/div[contains(@class,'mainContent')]/ng-transclude/div/workorder-details-page/cimpl-modal-popup/div/div/div/div[contains(@class,'d-modal-popup-content')]/div[contains(@class,'cimpl-modal-popup__footer')]/div/cimpl-button/button[contains(@id,'apply-action-button')]/div/span[contains(@class,'button-label')][text()='Apply']"
-        applyButtonElement = self.browser.find_element(by=By.XPATH,value=applyButtonString)
-        applyButtonElement.click()
-        self.waitForLoadingScreen()
+        #applyButtonString = "/html/body/div[@class='application-content']/div/div/cimpl-landing/div/div[contains(@class,'pageMain')]/div[contains(@class,'mainContent')]/ng-transclude/div/workorder-details-page/cimpl-modal-popup/div/div/div/div[contains(@class,'d-modal-popup-content')]/div[contains(@class,'cimpl-modal-popup__footer')]/div/cimpl-button/button[contains(@id,'apply-action-button')]/div/span[contains(@class,'button-label')][text()='Apply']"
+        #applyButtonElement = self.browser.find_element(by=By.XPATH,value=applyButtonString)
+        #applyButtonElement.click()
+        #self.waitForLoadingScreen()
 
 
 
@@ -859,9 +881,47 @@ def getUserID(actionsList : list):
         if(action.startswith("Assigned to Employee")):
             return action.split("Assigned to Employee - ")[1].split(" - ")[0]
 
-# This helper method returns the string of the device that was actually ordered in a Cimpl WO, in my custom
-# format.
-def getDeviceModelID(hardwareInfo : list):
+# This helper method takes a raw hardwareInfo list and classifies it in to the final deviceID and set of
+# accessoryIDs.
+def classifyHardwareInfo(hardwareInfo : list,carrier):
+    allAccessoryIDs = []
+    deviceID = None
     for hardware in hardwareInfo:
         if(hardware["Type"] == "Equipment"):
-            return b.equipment["CimplMappings"][hardware["Name"]]
+            try:
+                deviceID = b.equipment["CimplMappings"][hardware["Name"]]
+            except KeyError:
+                raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl device.")
+        elif(hardware["Type"] == "Accessory"):
+            try:
+                thisAccessory = b.accessories["CimplMappings"][hardware["Name"]]
+            except KeyError:
+                raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl accessory.")
+            if(type(thisAccessory) is str):
+                allAccessoryIDs.append(thisAccessory)
+            else:
+                allAccessoryIDs.extend(thisAccessory)
+
+    # Check to ensure no duplicate accessory types due to a Sysco user getting a bit over-excited
+    # with accessory the order page
+    allAccessoryIDs = set(allAccessoryIDs)
+
+    finalAccessoryIDs = set()
+    usedTypes = set()
+    for accessoryID in allAccessoryIDs:
+        if(b.accessories[accessoryID]["type"] not in usedTypes):
+            usedTypes.add(b.accessories[accessoryID]["type"])
+            finalAccessoryIDs.add(accessoryID)
+
+    if(carrier.lower() == "verizon wireless"):
+        if(b.config["cimpl"]["skipVehicleCharger"]):
+            for accessoryID in finalAccessoryIDs:
+                if(b.accessories[accessoryID]["type"] == "vehicleCharger"):
+                    finalAccessoryIDs.remove(accessoryID)
+                    break
+        if(b.config["cimpl"]["verizonSmartphoneBaseAccessory"] != ""):
+            if(b.equipment[deviceID]["subType"] == "Smart Phone"):
+                finalAccessoryIDs.add(b.config["cimpl"]["verizonSmartphoneBaseAccessory"])
+
+    return {"DeviceID" : deviceID, "AccessoryIDs" : finalAccessoryIDs}
+
