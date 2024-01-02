@@ -147,8 +147,8 @@ class CimplDriver:
             # In case the menu was already open when we got here, we click it again to close it.
             if(not self.browser.elementExists(by=By.XPATH,value=f"{menuString}[contains(@class,'cimpl-header__icon-transform')]")):
                 self.waitForLoadingScreen()
-                menuButton = self.browser.waitForClickableElement(by=By.XPATH, value=menuString)
-                menuButton.click()
+                self.browser.waitForClickableElement(by=By.XPATH, value=menuString)
+                self.browser.simpleSafeClick(by=By.XPATH,value=menuString)
                 self.waitForLoadingScreen()
 
 
