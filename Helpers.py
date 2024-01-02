@@ -467,7 +467,7 @@ def processPostOrderWorkorder(drivers,workorderNumber):
 
     # Get device model ID from Cimpl
     print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
-    deviceID = Cimpl.classifyHardwareInfo(workorder["HardwareInfo"],workorder["Carrer"])["DeviceID"]
+    deviceID = Cimpl.classifyHardwareInfo(workorder["HardwareInfo"],workorder["Carrier"])["DeviceID"]
 
     # If operation type is a New Install
     if(workorder["OperationType"] == "New Request"):
