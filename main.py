@@ -37,7 +37,7 @@ for WO in preCimplWOs:
 # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
 # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
 # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-postCimplWOs = []
+postCimplWOs = [44036,44037,44040,44041,44096,44098,44099,44112,44113,44115,44116,44117,44118,44119,44143,44144,44145,44146,44147,44149,44150,44178,44184,44187,44188,44192]
 for WO in postCimplWOs:
     h.processPostOrderWorkorder(d,WO)
 
@@ -45,7 +45,9 @@ for WO in postCimplWOs:
 # To build only TMA new install for a specific service, such as a non-verizon or even non-Sysco service, add the
 # following line as shown below:
 #
-# h.TMANewInstall(d,client="",netID="",serviceNum="",installDate="",device=(device from above),imei="",carrier="")
+# h.TMANewInstall(d,client="Sysco",netID="",serviceNum="",installDate="",device=,imei="",carrier="")
 #
 # You can add as many of these as you want in succession, and the Shaman should work through each one iteratively.
 # Note that these are NOT mutually exclusive with processing full Cimpl WOs - you can do both in one simultaneous run.
+#h.TMANewInstall(d,client="Sysco",netID="amat2087",serviceNum="4372271037",installDate="12/26/2023",device=iphone11,imei="351109227314782",carrier="Rogers")
+
