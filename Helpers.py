@@ -7,6 +7,7 @@ import Baka
 from datetime import datetime
 
 
+
 # This method builds our set of drivers/tabs that will be used.
 def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True,buildBaka=True):
     browserDriver = Browser.Browser()
@@ -284,6 +285,7 @@ def placeVerizonNewInstall(drivers,deviceID : str,accessoryIDs : list,
                                                contactPhone="7084341121", notificationEmails=contactEmails)
 
     if(reviewMode):
+        b.playsoundAsync(f"{b.paths.media}/shaman_order_ready.mp3")
         userInput = input("Please review order details, and press enter to confirm. Type anything else to cancel.")
         if(userInput != ""):
             print("Request cancelled.")
@@ -331,6 +333,7 @@ def placeVerizonUpgrade(drivers,serviceID,deviceID : str,accessoryIDs : list,
                                                contactPhone="7084341121", notificationEmails=contactEmails)
 
     if(reviewMode):
+        b.playsoundAsync(f"{b.paths.media}/shaman_order_ready.mp3")
         userInput = input("Please review order details, and press enter to confirm. Type anything else to cancel.")
         if(userInput != ""):
             print("Request cancelled.")
@@ -392,12 +395,14 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
     accessoryIDs = classifiedHardware["AccessoryIDs"]
 
     if(workorder["Comment"] != ""):
+        b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
         userInput = input(f"WARNING: There is a comment on this workorder:\n\"{workorder['Comment']}\"\n\n Press enter to continue ordering. Type anything to cancel.")
         if(userInput != ""):
             return False
     cimplVerify(drivers)
 
     if(len(workorder["Notes"]) > 0):
+        b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
         userInput = input("WARNING: There are existing notes on this workorder. Please review, then press enter to continue. Type anything to cancel.")
         if(userInput != ""):
             return False
@@ -411,6 +416,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
     if(workorder["OperationType"] == "New Request"):
         if(len(thisPerson.info_LinkedServices) > 0):
+            b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
             userInput = input(f"WARNING: User '{userID}' already has linked services. Press enter to continue. Type anything to cancel.")
             if(userInput != ""):
                 return False
