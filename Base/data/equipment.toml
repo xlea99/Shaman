@@ -110,16 +110,20 @@ model = "IPAD PRO 11 128GB"
 [VerizonMappings]
 [VerizonMappings.iPhone13_128GB]
 SearchTerm = "13"
-CardName = "Apple iPhone 13"
+NewInstallCardName = "Apple iPhone 13"
+UpgradeCardName = "iPhone 13"
 
 [VerizonMappings.GalaxyS21_128GB]
 SearchTerm = "S21"
-CardName = "Samsung Galaxy S21 FE 5G"
+NewInstallCardName = "Samsung Galaxy S21 FE 5G"
+UpgradeCardName = "Galaxy S21 FE 5G"
 
 [VerizonMappings.Orbic]
 SearchTerm = "Orbic"
-CardName = "Orbic Speed 5G UW"
+NewInstallCardName = "Orbic Speed 5G UW"
+UpgradeCardName = "Speed 5G UW"
 
 [VerizonMappings.iPad11_128GB]
 SearchTerm = "iPad 11"
-CardName = "Apple iPad Pro 11-inch (4th Generation)"
+NewInstallCardName = "Apple iPad Pro 11-inch (4th Generation)"
+UpgradeCardName = "iPad Pro 11-inch (4th Generation)"

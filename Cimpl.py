@@ -87,10 +87,10 @@ class CimplDriver:
             self.browser.implicitly_wait(10)
             self.waitForLoadingScreen()
 
-            usernameInput = self.browser.find_element(by=By.XPATH, value="//input[@id='username']")
+            usernameInput = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@id='username']")
             usernameInput.send_keys(b.config["authentication"]["cimplUser"])
 
-            continueButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+            continueButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@type='submit']")
             continueButton.click()
             self.waitForLoadingScreen()
 
@@ -493,7 +493,6 @@ class CimplDriver:
     def Workorders_ReadShippingAddress(self):
         prefix = "//cimpl-collapsible-box[@header='Main Shipping Address']//workorder-summary-address/div/cimpl-form[not(contains(@class,'ng-hide'))]"
 
-
         address1 = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.addressLine1']").text
         address2 = self.browser.elementExists(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.addressLine2']")
         postalCodeLine = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.postalCodeLine']").text
@@ -883,6 +882,7 @@ def getUserID(actionsList : list):
 
 # This helper method takes a raw hardwareInfo list and classifies it in to the final deviceID and set of
 # accessoryIDs.
+# TODO Add system for accessory backups i.e. when one accessory isn't available, go to another.
 def classifyHardwareInfo(hardwareInfo : list,carrier):
     allAccessoryIDs = []
     deviceID = None

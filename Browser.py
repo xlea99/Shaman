@@ -5,6 +5,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.firefox.service import Service
+from selenium.webdriver.common.action_chains import ActionChains
 import time
 from urllib.parse import urlparse
 
@@ -250,8 +251,9 @@ class Browser:
                     thisElement.click()
                 else:
                     element.click()
-                break
+                return True
             except:
+                print("GOTCHA")
                 time.sleep(0.5)
 
         # Final attempt, this one will raise error if it fails.
@@ -264,22 +266,35 @@ class Browser:
     # This method waits for the element given by value to be clickable, then simply returns the
     # element. Test click actually attempts to click the element for better testing, but of course,
     # might end up clicking the element.
-    def waitForClickableElement(self, by, value: str, timeout=10, testClick=False,raiseError=True):
+    # TODO tidy upt his bad boy between testclick, testhover, and default
+    def waitForClickableElement(self, by, value: str, timeout=10, testClick=False,raiseError=True,testHover=False):
         endTime = time.time() + timeout
         while True:
             try:
                 element = WebDriverWait(self.driver, timeout).until(
                     EC.element_to_be_clickable((by, value))
                 )
-                if testClick:
+                if(testClick):
                     try:
                         element.click()  # Attempt to click the element
                         return element  # Return the element if click is successful
                     except selenium.common.exceptions.ElementClickInterceptedException:
                         # If click fails, check if timeout has been reached
-                        if time.time() > endTime:
+                        if(time.time() > endTime):
                             if(raiseError):
                                 raise selenium.common.exceptions.TimeoutException("Element not clickable after timeout (with testClick)")
+                            else:
+                                return False
+                        time.sleep(0.5)  # Wait for a short while before retrying
+                elif(testHover):
+                    try:
+                        hoverAction = ActionChains(self.driver)
+                        hoverAction.move_to_element(element)
+                        hoverAction.perform()
+                    except selenium.common.exceptions.MoveTargetOutOfBoundsException:
+                        if (time.time() > endTime):
+                            if (raiseError):
+                                raise selenium.common.exceptions.TimeoutException("Element not hoverable after timeout (with testHover)")
                             else:
                                 return False
                         time.sleep(0.5)  # Wait for a short while before retrying

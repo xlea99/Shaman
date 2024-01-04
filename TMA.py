@@ -706,10 +706,13 @@ class TMADriver():
                     time.sleep(5)
                 elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
                     pass
+            # TODO glue
+            time.sleep(3)
             searchBar = self.browser.find_element(by=By.XPATH,value=searchBarString)
             searchBar.clear()
             searchBar.send_keys(str(locationData.entryID))
             time.sleep(2)
+            searchBar = self.browser.find_element(by=By.XPATH, value=searchBarString)
             searchBar.send_keys(u'\ue007')
             targetServiceIDField = f"//input[contains(@id,'txtServiceId')][@value='{b.convertServiceIDFormat(locationData.entryID,'dashed')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'dotted')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'raw')}']"
             resultString = f"//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(text(),'{b.convertServiceIDFormat(locationData.entryID,'dashed')} (')]"
@@ -2410,6 +2413,7 @@ class TMADriver():
                 self.browser.find_element(by=By.CSS_SELECTOR,value=nextButtonString).click()
 
         # If we got here, that means we've now found our element, so we can click on it.
+        # TODO rarely, this click doesn't succeed. WHY????
         self.browser.safeClick(by=By.XPATH, element=targetSiteElement,repeat=True,repeatUntilElementDoesNotExist=targetSiteElement)
 
         # At this point, what will pop up next is completely and utterly unpredictable. To remedy this,
