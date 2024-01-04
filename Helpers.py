@@ -7,6 +7,7 @@ import Baka
 from datetime import datetime
 
 
+
 # This method builds our set of drivers/tabs that will be used.
 def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True,buildBaka=True):
     browserDriver = Browser.Browser()
@@ -246,19 +247,16 @@ def placeVerizonNewInstall(drivers,deviceID : str,accessoryIDs : list,
     if(type(contactEmails) is str):
         contactEmails = [contactEmails]
 
-    print(f"CONTANCT EMAILS: {contactEmails}")
-
-
     verizonVerify(drivers)
     if(emptyCart):
         drivers["Verizon"].emptyCart()
 
     drivers["Verizon"].shopNewDevice()
-    drivers["Verizon"].DeviceSelection_SearchForDevice(deviceID)
-    drivers["Verizon"].DeviceSelection_SelectDeviceQuickView(deviceID)
-    drivers["Verizon"].DeviceSelection_QuickView_Select2YearContract()
-    drivers["Verizon"].DeviceSelection_QuickView_AddToCart()
-    drivers["Verizon"].DeviceSelection_Continue()
+    drivers["Verizon"].DeviceSelection_SearchForDevice(deviceID,orderPath="NewInstall")
+    drivers["Verizon"].DeviceSelection_SelectDeviceQuickView(deviceID,orderPath="NewInstall")
+    drivers["Verizon"].DeviceSelection_QuickView_Select2YearContract(orderPath="NewInstall")
+    drivers["Verizon"].DeviceSelection_QuickView_AddToCart(orderPath="NewInstall")
+    drivers["Verizon"].DeviceSelection_Continue(orderPath="NewInstall")
 
     for accessoryID in accessoryIDs:
         drivers["Verizon"].AccessorySelection_SearchForAccessory(accessoryID)
@@ -269,9 +267,9 @@ def placeVerizonNewInstall(drivers,deviceID : str,accessoryIDs : list,
 
     deviceType = b.equipment[deviceID]["subType"]
     drivers["Verizon"].PlanSelection_SelectPlan(planID=b.clients["Sysco"]["Plans"][deviceType]["Verizon Wireless"][0]["planCode"], planType=b.clients["Sysco"]["Plans"][deviceType]["Verizon Wireless"][0]["planType"])
-    drivers["Verizon"].PlanSelection_Continue()
+    drivers["Verizon"].PlanSelection_Continue(orderPath="NewInstall")
 
-    drivers["Verizon"].DeviceProtection_Decline()
+    drivers["Verizon"].DeviceProtection_Decline(orderPath="NewInstall")
 
     drivers["Verizon"].NumberSelection_SelectAreaCode(zipCode=zipCode)
     drivers["Verizon"].NumberSelection_NavToAddUserInformation()
@@ -287,12 +285,60 @@ def placeVerizonNewInstall(drivers,deviceID : str,accessoryIDs : list,
                                                contactPhone="7084341121", notificationEmails=contactEmails)
 
     if(reviewMode):
+        b.playsoundAsync(f"{b.paths.media}/shaman_order_ready.mp3")
         userInput = input("Please review order details, and press enter to confirm. Type anything else to cancel.")
         if(userInput != ""):
             print("Request cancelled.")
             return False
     return drivers["Verizon"].Checkout_PlaceOrder()
+# Places an entire Verizon new install.
+def placeVerizonUpgrade(drivers,serviceID,deviceID : str,accessoryIDs : list,
+                           firstName,lastName,
+                           address1,city,state,zipCode,contactEmails : str | list,address2="",reviewMode = True,emptyCart=True):
 
+    state = b.convertStateFormat(stateString=state,targetFormat="abbreviation")
+    if(type(contactEmails) is str):
+        contactEmails = [contactEmails]
+
+    verizonVerify(drivers)
+    if(emptyCart):
+        drivers["Verizon"].emptyCart()
+
+    drivers["Verizon"].pullUpLine(b.convertServiceIDFormat(serviceID=serviceID,targetFormat="raw"))
+    upgradeReturnCode = drivers["Verizon"].LineViewer_UpgradeLine()
+    if(upgradeReturnCode == "MTNPending"):
+        return "MTNPending"
+    elif(upgradeReturnCode == "NotETFEligible"):
+        return "NotETFEligible"
+
+    drivers["Verizon"].DeviceSelection_SearchForDevice(deviceID,orderPath="Upgrade")
+    drivers["Verizon"].DeviceSelection_SelectDeviceQuickView(deviceID,orderPath="Upgrade")
+    drivers["Verizon"].DeviceSelection_QuickView_Select2YearContract(orderPath="Upgrade")
+    drivers["Verizon"].DeviceSelection_QuickView_AddToCart(orderPath="Upgrade")
+    drivers["Verizon"].DeviceSelection_Continue(orderPath="Upgrade")
+
+    drivers["Verizon"].DeviceProtection_Decline(orderPath="Upgrade")
+
+    for accessoryID in accessoryIDs:
+        drivers["Verizon"].AccessorySelection_SearchForAccessory(accessoryID)
+        drivers["Verizon"].AccessorySelection_SelectAccessoryQuickView(accessoryID)
+        drivers["Verizon"].AccessorySelection_QuickView_AddToCart()
+        drivers["Verizon"].AccessorySelection_QuickView_Close()
+    drivers["Verizon"].AccessorySelection_Continue(orderPath="Upgrade")
+
+    drivers["Verizon"].ShoppingCart_ContinueToCheckOut()
+
+    drivers["Verizon"].Checkout_AddAddressInfo(company="Sysco", attention=f"{firstName} {lastName}",
+                                               address1=address1, address2=address2, city=city, stateAbbrev=state,zipCode=zipCode,
+                                               contactPhone="7084341121", notificationEmails=contactEmails)
+
+    if(reviewMode):
+        b.playsoundAsync(f"{b.paths.media}/shaman_order_ready.mp3")
+        userInput = input("Please review order details, and press enter to confirm. Type anything else to cancel.")
+        if(userInput != ""):
+            print("Request cancelled.")
+            return False
+    return drivers["Verizon"].Checkout_PlaceOrder()
 
 # Adds service information to Cimpl (service num, install date, account) and applies it.
 def writeServiceToCimplWorkorder(drivers,serviceNum,carrier,installDate):
@@ -320,7 +366,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
     workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
 
     # Test to ensure the operation type is valid
-    if(workorder["OperationType"] not in ("New Request")):
+    if(workorder["OperationType"] not in ("New Request","Upgrade")):
         print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order type '{workorder['OperationType']}' is not understood by the Shaman.")
         return False
 
@@ -347,15 +393,16 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
     classifiedHardware = Cimpl.classifyHardwareInfo(workorder["HardwareInfo"],carrier=workorder["Carrier"])
     deviceID = classifiedHardware["DeviceID"]
     accessoryIDs = classifiedHardware["AccessoryIDs"]
-    print(accessoryIDs)
 
     if(workorder["Comment"] != ""):
+        b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
         userInput = input(f"WARNING: There is a comment on this workorder:\n\"{workorder['Comment']}\"\n\n Press enter to continue ordering. Type anything to cancel.")
         if(userInput != ""):
             return False
     cimplVerify(drivers)
 
     if(len(workorder["Notes"]) > 0):
+        b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
         userInput = input("WARNING: There are existing notes on this workorder. Please review, then press enter to continue. Type anything to cancel.")
         if(userInput != ""):
             return False
@@ -363,15 +410,21 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
     # TODO maybe shipment address validation?
 
-    tmaVerify(drivers,"Sysco")
-    drivers["TMA"].navToLocation(client="Sysco",entryType="People",entryID=userID)
+    tmaVerify(drivers, "Sysco")
+    drivers["TMA"].navToLocation(client="Sysco", entryType="People", entryID=userID)
     thisPerson = drivers["TMA"].People_ReadAllInformation()
 
-    if(len(thisPerson.info_LinkedServices) > 0):
-        userInput = input(f"WARNING: User '{userID}' already has linked services. Press enter to continue. Type anything to cancel.")
-        if(userInput != ""):
-            return False
-    tmaVerify(drivers,"Sysco")
+    if(workorder["OperationType"] == "New Request"):
+        if(len(thisPerson.info_LinkedServices) > 0):
+            b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+            userInput = input(f"WARNING: User '{userID}' already has linked services. Press enter to continue. Type anything to cancel.")
+            if(userInput != ""):
+                return False
+        tmaVerify(drivers,"Sysco")
+    elif(workorder["OperationType"] == "Upgrade"):
+        # TODO We just navigate here to raise errors in case the line is inactive. Maybe come up with better system?
+        tmaVerify(drivers, "Sysco")
+        drivers["TMA"].navToLocation(client="Sysco", entryType="Service", entryID=workorder["ServiceID"])
 
     print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
     if(referenceNumber is not None):
@@ -388,6 +441,13 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
                                             address1=workorder["Shipping"]["Address1"],address2=workorder["Shipping"]["Address2"],city=workorder["Shipping"]["City"],
                                             state=workorder["Shipping"]["State"],zipCode=workorder["Shipping"]["ZipCode"],reviewMode=reviewMode,contactEmails=thisPerson.info_Email)
         print(f"Cimpl WO {workorderNumber}: Finished ordering new device and service for user {userID}")
+    elif(workorder["OperationType"] == "Upgrade"):
+        print(f"Cimpl WO {workorderNumber}: Ordering upgrade ({deviceID}) and service for user {userID} with service {workorder['ServiceID']}")
+        orderNumber = placeVerizonUpgrade(drivers=drivers,deviceID=deviceID,serviceID=workorder['ServiceID'],accessoryIDs=accessoryIDs,
+                                            firstName=thisPerson.info_FirstName,lastName=thisPerson.info_LastName,
+                                            address1=workorder["Shipping"]["Address1"],address2=workorder["Shipping"]["Address2"],city=workorder["Shipping"]["City"],
+                                            state=workorder["Shipping"]["State"],zipCode=workorder["Shipping"]["ZipCode"],reviewMode=reviewMode,contactEmails=thisPerson.info_Email)
+        print(f"Cimpl WO {workorderNumber}: Finished ordering upgrade for user {userID} on line {workorder['ServiceID']}")
     else:
         raise ValueError(f"Incorrect operation type for preprocess of workorder: '{workorder['OperationType']}'")
 
@@ -502,6 +562,3 @@ def processPostOrderWorkorder(drivers,workorderNumber):
     drivers["Cimpl"].Workorders_SetStatus(status="Complete")
     print(f"Cimpl WO {workorderNumber}: Finished all Cimpl work")
     return True
-
-#_drivers = buildDrivers()
-#beans = processPreOrderWorkorder(_drivers,44192,referenceNumber="Alex")

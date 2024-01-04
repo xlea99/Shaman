@@ -4,6 +4,8 @@ import tomli
 import os
 import sqlite3
 import re
+from playsound import playsound
+import threading
 
 # region === Config and Pathing Setup ===
 
@@ -44,6 +46,9 @@ class Paths:
         # Path to Selenium directory
         self.seleniumPath = f"{self.base}/selenium"
         createAndCheckAccess(self.seleniumPath)
+
+        self.media = f"{self.base}/media"
+        createAndCheckAccess(self.media)
 paths = Paths()
 
 with open(f"{paths.data}/clients.toml", "rb") as f:
@@ -303,5 +308,11 @@ def findAndReplaceDelimiterVariables(s : str,delimiter : str = "$", replacement 
     matchPositions = findDelimiterVariables(s = s, delimiter = delimiter)
     return replaceDelimiterVariables(s = s,matchPositions = matchPositions,replacement = replacement)
 
-#endregion === Misc Functions ===
+# This method simply plays a target sound asynchronously (meaning, on a separate thread.)
+def playsoundAsync(soundFilePath):
+    def sound_player(_soundFilePath):
+        playsound(_soundFilePath, block=True)
 
+    threading.Thread(target=sound_player, args=(soundFilePath,)).start()
+
+#endregion === Misc Functions ===
