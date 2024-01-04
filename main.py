@@ -6,6 +6,8 @@ import TMA
 import Cimpl
 import Helpers as h
 
+#TODO Fix "resume service" erroring out. Look at 832.493.9831 for testing.
+
 try:
     #region Setup
     iphone11 = "iPhone11_64GB"
@@ -30,7 +32,7 @@ try:
     # To attempt to place the order for a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade,
     # for now), simply add the workorder number to the below list. If the program finds that it is suitable to place, it
     # will detect the order type, then attempt to place/document Verizon order
-    preCimplWOs = [44245,44247,44250,44254,44255,44257,44258,44259]
+    preCimplWOs = [44231,44225,44224]
     for WO in preCimplWOs:
         h.processPreOrderWorkorder(d,WO,referenceNumber="Alex")
 

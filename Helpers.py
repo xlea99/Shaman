@@ -267,7 +267,7 @@ def placeVerizonNewInstall(drivers,deviceID : str,accessoryIDs : list,
 
     deviceType = b.equipment[deviceID]["subType"]
     drivers["Verizon"].PlanSelection_SelectPlan(planID=b.clients["Sysco"]["Plans"][deviceType]["Verizon Wireless"][0]["planCode"], planType=b.clients["Sysco"]["Plans"][deviceType]["Verizon Wireless"][0]["planType"])
-    drivers["Verizon"].PlanSelection_Continue(orderPath="NewInstall")
+    drivers["Verizon"].PlanSelection_Continue()
 
     drivers["Verizon"].DeviceProtection_Decline(orderPath="NewInstall")
 
@@ -452,6 +452,8 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
         raise ValueError(f"Incorrect operation type for preprocess of workorder: '{workorder['OperationType']}'")
 
     cimplVerify(drivers)
+    if(orderNumber is False):
+        return False
     drivers["Cimpl"].Workorders_NavToSummaryTab()
     drivers["Cimpl"].Workorders_WriteNote(subject="Order Placed",noteType="Information Only",status="Completed",content=orderNumber)
 

@@ -19,7 +19,7 @@ type = "case"
 
 
 [CimplMappings]
-"Otterbox Symmetry with MagSafe" = "iPhoneDefender"
+"Otterbox Symmetry with MagSafe" = "iPhoneDefenderXT"
 "Otterbox Defender case for iPhone 13 128GB" = "iPhoneDefenderXT"
 "Otterbox Defender for Samsung Galaxy S21 FE" = "SamsungDefender"
 "Car Charger for iPhone 13 128GB" = "SamsungVehicleCharger"

@@ -253,7 +253,6 @@ class Browser:
                     element.click()
                 return True
             except:
-                print("GOTCHA")
                 time.sleep(0.5)
 
         # Final attempt, this one will raise error if it fails.

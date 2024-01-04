@@ -48,15 +48,44 @@ class VerizonDriver:
 
             usernameField = self.browser.find_element(by=By.XPATH,value="//label[text()='User ID']/following-sibling::input")
             usernameField.send_keys(b.config["authentication"]["verizonUser"])
-            passwordField = self.browser.find_element(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
-            passwordField.send_keys(b.config["authentication"]["verizonPass"])
 
-            logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-            logInButton.click()
+            # Test if this is the new login or old login screen.
+            passwordField = self.browser.elementExists(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
+            if(passwordField):
+                passwordField.send_keys(b.config["authentication"]["verizonPass"])
 
-            # Wait for shop new device button to confirm page load.
-            self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]")
-            self.testForUnregisteredPopup()
+                logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+                logInButton.click()
+
+                # Wait for shop new device button to confirm page load.
+                self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]")
+                self.testForUnregisteredPopup()
+            else:
+                continueButtonString = "//button[contains(@class,'continue_btn')][contains(text(),'Continue')]"
+                continueButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueButtonString)
+                continueButton.click()
+
+                self.waitForPageLoad(by=By.XPATH,value="//h3[contains(text(),'How do you want to log in?')]",testClick=True)
+
+                logInWithPasswordOptionString = "//a[contains(text(),'Log in with my password')]"
+                logInWithPasswordOption = self.browser.waitForClickableElement(by=By.XPATH,value=logInWithPasswordOptionString)
+                logInWithPasswordOption.click()
+
+                self.waitForPageLoad(by=By.XPATH,value="//h3[text()='Log in']")
+
+                passwordField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@type='password']")
+                passwordField.clear()
+                passwordField.send_keys(b.config["authentication"]["verizonPass"])
+
+                logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+                logInButton.click()
+
+                # Wait for shop new device button to confirm page load.
+                self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]")
+                self.testForUnregisteredPopup()
+
+
+
 
 
 
@@ -384,7 +413,7 @@ class VerizonDriver:
         shopDevicesButton.click()
 
         # Now we wait to ensure that we've fully navigated to the newDevice screen.
-        self.waitForPageLoad(by=By.XPATH,value="//button[@id='grid-search-button']")
+        self.waitForPageLoad(by=By.XPATH,value="//h2[contains(text(),'Shop Devices')]",testClick=True)
 
     # This method clears the full cart, from anywhere. It cancels out whatever was previously
     # happening, but ensures the cart is fully empty for future automation.
@@ -395,7 +424,7 @@ class VerizonDriver:
         miniCart.click()
 
         if (not self.browser.elementExists(by=By.XPATH,value="//div[contains(text(),'No items in the cart yet, please continue shopping.')]",timeout=2)):
-            viewCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@clickname='MB View Shopping Cart']")
+            viewCartButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@clickname='MB View Shopping Cart']",timeout=60)
             viewCartButton.click()
 
             self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'device-shopping-cart-content-left')]//h1[contains(text(),'Shopping cart')]",testClick=True)
@@ -506,9 +535,11 @@ class VerizonDriver:
         targetAccessoryCard = f"//app-accessory-tile/div/div/div[contains(@class,'product-name')][contains(text(),'{b.accessories['VerizonMappings'][accessoryID]['CardName']}')]"
         self.waitForPageLoad(by=By.XPATH,value=targetAccessoryCard)
     def AccessorySelection_SelectAccessoryQuickView(self,accessoryID):
-        targetAccessoryCard = f"//app-accessory-tile/div/div/div[contains(@class,'product-name')][contains(text(),'{b.accessories['VerizonMappings'][accessoryID]['CardName']}')]"
-        targetAccessoryQuickViewButton = self.browser.waitForClickableElement(by=By.XPATH, value=f"{targetAccessoryCard}/parent::div/following-sibling::div/button[contains(@class,'quick-view-btn')]", timeout=15)
-        targetAccessoryQuickViewButton.click()
+        targetAccessoryCardString = f"//app-accessory-tile/div/div/div[contains(@class,'product-name')][contains(text(),'{b.accessories['VerizonMappings'][accessoryID]['CardName']}')]"
+        targetAccessoryCard = self.browser.find_element(by=By.XPATH,value=targetAccessoryCardString,timeout=5)
+        self.browser.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", targetAccessoryCard)
+        targetAccessoryQuickViewButton = self.browser.waitForClickableElement(by=By.XPATH, value=f"{targetAccessoryCardString}/parent::div/following-sibling::div/button[contains(@class,'quick-view-btn')]", timeout=15)
+        self.browser.simpleSafeClick(element=targetAccessoryQuickViewButton,timeout=20)
 
         productNameHeaderString = "//div[@class='product-name']/h2/span"
         self.waitForPageLoad(by=By.XPATH,value=productNameHeaderString,testClick=True)
@@ -548,8 +579,15 @@ class VerizonDriver:
         choosePlanHeaderString = "//div/div/div/h1[text()='Select your plan']"
         self.waitForPageLoad(by=By.XPATH,value=choosePlanHeaderString,testClick=True)
 
+        needHelpChoosingPlanBoxString = "//div[@aria-label='Click for assistance via chat.']//img[@title='dismiss chat']"
+        needHelpChoosingPlanBox = self.browser.elementExists(by=By.XPATH, value=needHelpChoosingPlanBoxString,timeout=5)
+        if (needHelpChoosingPlanBox):
+            needHelpChoosingPlanBox.click()
+            time.sleep(1)
         targetPlanCardString = f"//div[contains(@class,'plan-card')][@title='Plan ID - {planID}']/div[@class='plan-card-inner']//button[contains(text(),'Select plan')]"
-        self.browser.simpleSafeClick(by=By.XPATH,element=targetPlanCardString,timeout=30)
+        targetPlanCard = self.browser.find_element(by=By.XPATH,value=targetPlanCardString)
+        self.browser.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", targetPlanCard)
+        self.browser.simpleSafeClick(element=targetPlanCard,timeout=5)
 
 
         self.browser.waitForClickableElement(by=By.XPATH,value="//div[contains(text(),'Continue to the next step.')]")
@@ -598,7 +636,7 @@ class VerizonDriver:
 
             self.browser.waitForClickableElement(by=By.XPATH,value="//i[contains(@class,'icon-up-caret')]")
 
-            firstAreaCodeResult = self.browser.elementExists(by=By.XPATH,value=f"{areaCodeFormString}//div/ul/li[@class='ng-star-inserted'][1]",timeout=2)
+            firstAreaCodeResult = self.browser.elementExists(by=By.XPATH,value=f"{areaCodeFormString}//div/ul/li[@class='ng-star-inserted'][1]",timeout=20)
             if(firstAreaCodeResult):
                 firstAreaCodeResult.click()
                 foundAreaCode = True
@@ -698,7 +736,7 @@ class VerizonDriver:
     def ShoppingCart_ContinueToCheckOut(self):
         checkOutButtonString = "//div[contains(@class,'device-shopping-cart-content-right')]/div/button[contains(text(),'Check out')]"
         checkOutButton = self.browser.waitForClickableElement(by=By.XPATH,value=checkOutButtonString)
-        checkOutButton.click()
+        self.browser.simpleSafeClick(element=checkOutButton)
 
         checkoutHeaderString = "//div[@class='checkoutBox']//h1[text()='Checkout']"
         self.waitForPageLoad(by=By.XPATH,value=checkoutHeaderString,testClick=True)

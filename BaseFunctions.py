@@ -5,7 +5,10 @@ import os
 import sqlite3
 import re
 from playsound import playsound
+import pygame
 import threading
+
+pygame.mixer.init()
 
 # region === Config and Pathing Setup ===
 
@@ -308,11 +311,21 @@ def findAndReplaceDelimiterVariables(s : str,delimiter : str = "$", replacement 
     matchPositions = findDelimiterVariables(s = s, delimiter = delimiter)
     return replaceDelimiterVariables(s = s,matchPositions = matchPositions,replacement = replacement)
 
+
+# Global lock to prevent simultaneous plays
+playsoundAsyncLock = threading.Lock()
 # This method simply plays a target sound asynchronously (meaning, on a separate thread.)
 def playsoundAsync(soundFilePath):
-    def sound_player(_soundFilePath):
-        playsound(_soundFilePath, block=True)
+    def sound_player(path):
+        # Load the sound file
+        sound = pygame.mixer.Sound(path)
+        # Play the sound asynchronously
+        sound.play()
+        # Wait for the sound to finish playing
+        while pygame.mixer.get_busy():
+            pygame.time.delay(100)
 
+    # Start a new thread to play the sound
     threading.Thread(target=sound_player, args=(soundFilePath,)).start()
 
 #endregion === Misc Functions ===
