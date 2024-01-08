@@ -621,7 +621,7 @@ class TMADriver():
     # This method intelligently searches for and opens an entry as specified by a locationData. Method is able to be called from anywhere as long as TMA is
     # currently logged in, and locationData is valid.
     # TODO This function has some reliability issues. Sometimes, the result is clicked too quickly OR the page is read too quickly before the result page can load.
-    def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData : TMALocation = None, timeout=20):
+    def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData : TMALocation = None, timeout=60):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
         entryID = entryID.strip("'")
@@ -685,7 +685,7 @@ class TMADriver():
             searchBar.send_keys(str(locationData.entryID))
             time.sleep(2)
             searchBar.send_keys(u'\ue007')
-            resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(text(),'" + locationData.entryID + " (')]"
+            resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td/a[starts-with(text(),'" + locationData.entryID + " (')]"
             resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
             resultItem.click()
         elif(locationData.entryType == "Service"):
@@ -706,19 +706,27 @@ class TMADriver():
                     time.sleep(5)
                 elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
                     pass
-            # TODO glue
-            time.sleep(3)
-            searchBar = self.browser.find_element(by=By.XPATH,value=searchBarString)
-            searchBar.clear()
-            searchBar.send_keys(str(locationData.entryID))
-            time.sleep(2)
-            searchBar = self.browser.find_element(by=By.XPATH, value=searchBarString)
-            searchBar.send_keys(u'\ue007')
-            targetServiceIDField = f"//input[contains(@id,'txtServiceId')][@value='{b.convertServiceIDFormat(locationData.entryID,'dashed')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'dotted')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'raw')}']"
-            resultString = f"//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(text(),'{b.convertServiceIDFormat(locationData.entryID,'dashed')} (')]"
-            resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
-            self.browser.safeClick(by=None,element=resultItem,repeat=True,repeatUntilElementDoesNotExist=targetServiceIDField)
-            time.sleep(3)
+            # TODO glue. XPATHS are WAY too long and convoluted, i think.
+            for i in range(5):
+                try:
+                    time.sleep(3)
+                    searchBar = self.browser.find_element(by=By.XPATH,value=searchBarString)
+                    searchBar.clear()
+                    searchBar.send_keys(str(locationData.entryID))
+                    time.sleep(2)
+                    searchBar = self.browser.find_element(by=By.XPATH, value=searchBarString)
+                    searchBar.send_keys(u'\ue007')
+                    targetServiceIDField = f"//input[contains(@id,'txtServiceId')][@value='{b.convertServiceIDFormat(locationData.entryID,'dashed')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'dotted')}' or @value='{b.convertServiceIDFormat(locationData.entryID,'raw')}']"
+                    resultString = f"//div[contains(@id,'UpdatePanelResults')]//tr[contains(@class,'sgvitems')]//a[starts-with(text(),'{b.convertServiceIDFormat(locationData.entryID,'dashed')}')]"
+                    resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
+                    self.browser.safeClick(by=None,element=resultItem,repeat=True,repeatUntilElementDoesNotExist=targetServiceIDField)
+                    time.sleep(3)
+                    break
+                except Exception as e:
+                    if(i == 4):
+                        raise e
+                    else:
+                        time.sleep(2)
         elif(locationData.entryType == "People"):
             peopleOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='people']")
             peopleOption.click()
@@ -737,16 +745,26 @@ class TMADriver():
                     time.sleep(5)
                 elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
                     pass
-            searchBar = self.browser.find_element(by=By.XPATH,value=searchBarString)
-            searchBar.clear()
-            searchBar.send_keys(str(locationData.entryID))
-            time.sleep(2)
-            searchBar = self.browser.find_element(by=By.XPATH,value=searchBarString)
-            searchBar.send_keys(u'\ue007')
-            caseAdjustedPeopleID = locationData.entryID.lower()
-            resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + caseAdjustedPeopleID + " ')]"
-            resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
-            resultItem.click()
+
+            #TODO you guessed it. Glue.
+            for i in range(5):
+                try:
+                    searchBar = self.browser.find_element(by=By.XPATH,value=searchBarString)
+                    searchBar.clear()
+                    searchBar.send_keys(str(locationData.entryID))
+                    time.sleep(2)
+                    searchBar = self.browser.find_element(by=By.XPATH,value=searchBarString)
+                    searchBar.send_keys(u'\ue007')
+                    caseAdjustedPeopleID = locationData.entryID.lower()
+                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + caseAdjustedPeopleID + " ')]"
+                    resultItem = self.browser.find_element(by=By.XPATH,value=resultString,timeout=30)
+                    resultItem.click()
+                    break
+                except Exception as e:
+                    if(i == 4):
+                        raise e
+                    else:
+                        time.sleep(2)
         elif(locationData.entryType == "Order"):
             ordersOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='orders']")
             ordersOption.click()
@@ -759,17 +777,17 @@ class TMADriver():
                     orderNumber = locationData.entryID[1]
                     orderNumber = orderNumber.lower()
                     orderNumberIndex = 1
-                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/ " + orderNumber + " (')]"
+                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'/ " + orderNumber + " (')]"
                 else:
                     orderNumber = locationData.entryID[2]
                     orderNumber = orderNumber.lower()
                     orderNumberIndex = 2
-                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + orderNumber + " ')]"
+                    resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td/a[contains(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),': " + orderNumber + " ')]"
             else:
                 orderNumber = locationData.entryID[0]
                 orderNumber = orderNumber.lower()
                 orderNumberIndex = 0
-                resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[@class='sgvitems item']/td/a[starts-with(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'" + orderNumber + ": ')]"
+                resultString = "//div[contains(@id,'UpdatePanelResults')]/fieldset/div/div/table/tbody/tr[contains(@class,'sgvitems')]/td/a[starts-with(translate(text(),'ABCDEFGHIJKLMNOPQRSTUVWXYZ','abcdefghijklmnopqrstuvwxyz'),'" + orderNumber + ": ')]"
             searchBar.send_keys(str(orderNumber))
             time.sleep(2)
             searchBar.send_keys(u'\ue007')
@@ -1890,23 +1908,23 @@ class TMADriver():
         peopleObject.location = self.currentLocation
 
         firstNameString = "//div/div/fieldset/ol/li/span[contains(@id,'Detail_txtFirstName__label')]/following-sibling::span"
-        peopleObject.info_FirstName = self.browser.find_element(by=By.XPATH, value=firstNameString).text
+        peopleObject.info_FirstName = self.browser.find_element(by=By.XPATH, value=firstNameString,timeout=10).text
         lastNameString = "//div/div/fieldset/ol/li/span[contains(@id,'Detail_txtLastName__label')]/following-sibling::span"
-        peopleObject.info_LastName = self.browser.find_element(by=By.XPATH, value=lastNameString).text
+        peopleObject.info_LastName = self.browser.find_element(by=By.XPATH, value=lastNameString,timeout=10).text
         employeeIDString = "//div/div/fieldset/ol/li/span[contains(@id,'Detail_lblEmployeeID__label')]/following-sibling::span"
-        peopleObject.info_EmployeeID = self.browser.find_element(by=By.XPATH, value=employeeIDString).text
+        peopleObject.info_EmployeeID = self.browser.find_element(by=By.XPATH, value=employeeIDString,timeout=10).text
         emailString = "//div/div/fieldset/ol/li/span[contains(@id,'Detail_txtEmail__label')]/following-sibling::span"
-        peopleObject.info_Email = self.browser.find_element(by=By.XPATH, value=emailString).text
+        peopleObject.info_Email = self.browser.find_element(by=By.XPATH, value=emailString,timeout=10).text
         employeeStatusString = "//div/div/fieldset/ol/li/span[contains(@id,'Detail_ddlpeopleStatus__label')]/following-sibling::span"
-        employeeStatus = self.browser.find_element(by=By.XPATH, value=employeeStatusString).text
+        employeeStatus = self.browser.find_element(by=By.XPATH, value=employeeStatusString,timeout=10).text
         if (employeeStatus == "Active"):
             peopleObject.info_IsTerminated = False
         else:
             peopleObject.info_IsTerminated = True
         OpCoString = "//div/div/fieldset/ol/li/span[contains(@id,'Detail_lblLocationCode1__label')]/following-sibling::span"
-        peopleObject.info_OpCo = self.browser.find_element(by=By.XPATH, value=OpCoString).text
+        peopleObject.info_OpCo = self.browser.find_element(by=By.XPATH, value=OpCoString,timeout=10).text
         employeeTitleString = "//div/div/fieldset/ol/li/span[contains(@id,'Detail_txtTitle__label')]/following-sibling::span"
-        peopleObject.info_EmployeeTitle = self.browser.find_element(by=By.XPATH, value=employeeTitleString).text
+        peopleObject.info_EmployeeTitle = self.browser.find_element(by=By.XPATH, value=employeeTitleString,timeout=10).text
 
         b.log.info("Successfully read.")
         return peopleObject
