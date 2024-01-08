@@ -53,17 +53,13 @@ class VerizonDriver:
             passwordField = self.browser.elementExists(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
             if(passwordField):
                 passwordField.send_keys(b.config["authentication"]["verizonPass"])
-
-                logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-                logInButton.click()
+                passwordField.send_keys(Keys.ENTER)
 
                 # Wait for shop new device button to confirm page load.
                 self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]")
                 self.testForUnregisteredPopup()
             else:
-                continueButtonString = "//button[contains(@class,'continue_btn')][contains(text(),'Continue')]"
-                continueButton = self.browser.waitForClickableElement(by=By.XPATH,value=continueButtonString)
-                continueButton.click()
+                usernameField.send_keys(Keys.ENTER)
 
                 self.waitForPageLoad(by=By.XPATH,value="//h3[contains(text(),'How do you want to log in?')]",testClick=True)
 
@@ -632,7 +628,7 @@ class VerizonDriver:
                 zipCodeForm.send_keys(str(zipCodeToTry))
 
             areaCodeForm = self.browser.waitForClickableElement(by=By.XPATH,value=areaCodeFormString)
-            areaCodeForm.click()
+            self.browser.simpleSafeClick(element=areaCodeForm)
 
             self.browser.waitForClickableElement(by=By.XPATH,value="//i[contains(@class,'icon-up-caret')]")
 
