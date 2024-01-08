@@ -486,7 +486,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
     if(subjectLine is not None):
         drivers["Cimpl"].Workorders_NavToSummaryTab()
-        subjectLine.replace("%D",datetime.now().strftime('%m/%d/%Y'))
+        subjectLine = subjectLine.replace("%D",datetime.now().strftime('%m/%d/%Y'))
         drivers["Cimpl"].Workorders_WriteSubject(subject=subjectLine)
         drivers["Cimpl"].Workorders_ApplyChanges()
 
