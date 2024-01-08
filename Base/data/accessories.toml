@@ -12,6 +12,10 @@ type = "case"
 type = "case"
 [iPhoneCommuter]
 type = "case"
+[iPhoneGuardian]
+type = "case"
+[iPhonePresidio]
+type = "case"
 [SamsungDefender]
 type = "case"
 [MagicKeyboard]
@@ -19,9 +23,9 @@ type = "case"
 
 
 [CimplMappings]
-"Otterbox Symmetry with MagSafe" = "iPhoneDefenderXT"
-"Otterbox Defender case for iPhone 13 128GB" = "iPhoneDefenderXT"
-"Otterbox Defender case for iPhone 11" = "iPhoneDefenderXT"
+"Otterbox Symmetry with MagSafe" = "iPhonePresidio"
+"Otterbox Defender case for iPhone 13 128GB" = "iPhonePresidio"
+"Otterbox Defender case for iPhone 11" = "iPhonePresidio"
 "Otterbox Defender for Samsung Galaxy S21 FE" = "SamsungDefender"
 "Car Charger for iPhone 13 128GB" = "SamsungVehicleCharger"
 "Car charger for Samsung Galaxy S21 FE 5G" = "SamsungVehicleCharger"
@@ -48,6 +52,12 @@ CardName = "Symmetry Series Case with MagSafe for iPhone 15, iPhone 14, and iPho
 [VerizonMappings.iPhoneCommuter]
 SearchTerm = "Commuter"
 CardName = "Commuter Series Case for iPhone 15, iPhone 14, and iPhone 13"
+[VerizonMappings.iPhoneGuardian]
+SearchTerm = "Guardian"
+CardName = "Guardian Case with MagSafe for iPhone 15, iPhone 14, and iPhone 13"
+[VerizonMappings.iPhonePresidio]
+SearchTerm = "Presidio"
+CardName = "Presidio2 Grip Case with MagSafe for iPhone 15, iPhone 14, and iPhone 13"
 [VerizonMappings.SamsungDefender]
 SearchTerm = "Defender"
 CardName = "Defender Series Pro Case for Galaxy S21 FE 5G"
