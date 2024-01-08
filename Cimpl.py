@@ -603,7 +603,10 @@ class CimplDriver:
         returnDict["WorkorderOwner"] = self.Workorders_ReadWorkorderOwner()
         returnDict["Requestor"] = self.Workorders_ReadRequester()
         returnDict["Notes"] = self.Workorders_ReadNotes()
-        returnDict["Shipping"] = self.Workorders_ReadShippingAddress()
+        if(returnDict["OperationType"] in ["New Request","Upgrade"]):
+            returnDict["Shipping"] = self.Workorders_ReadShippingAddress()
+        else:
+            returnDict["Shipping"] = None
 
         # Read detail info
         self.Workorders_NavToDetailsTab()

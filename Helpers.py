@@ -360,7 +360,7 @@ def writeServiceToCimplWorkorder(drivers,serviceNum,carrier,installDate):
 
 # Given a workorderNumber, this method examines it, tries to figure out the type of workorder it is, and whether
 # it is valid to submit automatically through the respective carrier.
-def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNumber=None,noteOrderDate=True):
+def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNumber=None,subjectLine : str = None):
     cimplVerify(drivers)
     print(f"Cimpl WO {workorderNumber}: Beginning automation")
     workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
@@ -477,9 +477,10 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
         drivers["Cimpl"].Workorders_SetStatus(status="Confirm",emailRecipients=thisPerson.info_Email,emailCCs="btnetworkservicesmobility@sysco.com",emailContent=emailContent)
         print(f"Cimpl WO {workorderNumber}: Added order number to workorder notes and confirmed request.")
 
-    if(noteOrderDate):
+    if(subjectLine is not None):
         drivers["Cimpl"].Workorders_NavToSummaryTab()
-        drivers["Cimpl"].Workorders_WriteSubject(subject=f"Order Placed {datetime.now().strftime('%#m/%#d/%Y')}")
+        subjectLine.replace("%D",datetime.now().strftime('%#m/%#d/%Y'))
+        drivers["Cimpl"].Workorders_WriteSubject(subject=subjectLine)
         drivers["Cimpl"].Workorders_ApplyChanges()
 
     return True
