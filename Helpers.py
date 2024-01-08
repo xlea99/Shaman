@@ -479,7 +479,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
     if(noteOrderDate):
         drivers["Cimpl"].Workorders_NavToSummaryTab()
-        drivers["Cimpl"].Workorders_WriteSubject(subject=datetime.now().strftime("%#m/%#d/%Y"))
+        drivers["Cimpl"].Workorders_WriteSubject(subject=f"Order Placed {datetime.now().strftime('%#m/%#d/%Y')}")
         drivers["Cimpl"].Workorders_ApplyChanges()
 
     return True
