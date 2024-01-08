@@ -454,6 +454,13 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
     cimplVerify(drivers)
     if(orderNumber is False):
         return False
+    elif(orderNumber == "MTNPending"):
+        print(f"Cimpl WO {workorderNumber}: Couldn't upgrade line {workorder['ServiceID']} due to 'MTN Pending' error on Verizon.")
+        return False
+    elif(orderNumber == "NotETFEligible"):
+        print(f"Cimpl WO {workorderNumber}: Couldn't upgrade line {workorder['ServiceID']} because it is too early to upgrade with ETF waiver.")
+        return False
+
     drivers["Cimpl"].Workorders_NavToSummaryTab()
     drivers["Cimpl"].Workorders_WriteNote(subject="Order Placed",noteType="Information Only",status="Completed",content=orderNumber)
 
@@ -479,7 +486,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
     if(subjectLine is not None):
         drivers["Cimpl"].Workorders_NavToSummaryTab()
-        subjectLine.replace("%D",datetime.now().strftime('%#m/%#d/%Y'))
+        subjectLine = subjectLine.replace("%D",datetime.now().strftime('%m/%d/%Y'))
         drivers["Cimpl"].Workorders_WriteSubject(subject=subjectLine)
         drivers["Cimpl"].Workorders_ApplyChanges()
 
