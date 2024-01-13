@@ -16,16 +16,16 @@ from selenium.webdriver.support.ui import Select
 class TMALocation:
 
     # Basic init method initializes a few used variables.
-    def __init__(self):
-        # This variable simply denotes whether or not the TMA object is currently
+    def __init__(self,isLoggedIn=True,client=None,entryType=None,entryID=None,activeInfoTab=None,activeLinkTab=None):
+        # This variable simply denotes whether the TMA object is currently
         # logged in to TMA or not.
-        self.isLoggedIn = False
+        self.isLoggedIn = isLoggedIn
 
         # This is the current client that is being operated under. At the moment,
         # the only supported clients are Sysco and (to a lesser extent) LYB. However,
         # a placeholder title "DOMAIN" serves to show that no client is currently
         # being operated on.
-        self.client = None
+        self.client = client
 
         # This shows what type of entry we're currently working under. Possibilities include:
         # -Services
@@ -37,7 +37,7 @@ class TMALocation:
         # -LoginPage
         # -DomainPage
         # -ClientHomePage
-        self.entryType = None
+        self.entryType = entryType
 
         # This is a unique, identifiable ID that separates this entry from all others in TMA.
         # For different type of entries, the actual ID will be different. Examples:
@@ -46,14 +46,14 @@ class TMALocation:
         # -People (Network ID)
         # -Interactions (Interaction Number)
         # -Always will be RegularEquipment
-        self.entryID = None
+        self.entryID = entryID
 
         # The currently active info (Line Info, Assignments, Links, History) tab.
-        self.activeInfoTab = None
+        self.activeInfoTab = activeInfoTab
         # The currently active link (Services, People, Interactions, Orders) tab.
-        self.activeLinkTab = None
+        self.activeLinkTab = activeLinkTab
 
-        self.isInactive = None
+        # Simple raw url of this location.
         self.rawURL = None
 
     # Equal operator == method compares the values of each important data point.
@@ -63,10 +63,6 @@ class TMALocation:
                         self.client == otherLocationData.client and
                         self.entryType == otherLocationData.entryType and
                         self.entryID == otherLocationData.entryID)
-                        #TODO Theoretically, it shouldn't make sense to test inactivity. However, if I'm wrong
-                        # about this, we'll need to adjust the navToLocation comparison which sometimes gets
-                        # data from readPage's "simpleRead" that lacks accurate inactivity information.
-                        #self.isInactive == otherLocationData.isInactive)
             b.log.debug(f"Tested equality between {self} and {otherLocationData} : {isEqual}")
             return isEqual
         else:
@@ -78,7 +74,7 @@ class TMALocation:
         returnString = ""
 
         if (self.isLoggedIn):
-            returnString += f"* Client({self.client}) | EType({self.entryType}) | EID({self.entryID}) | IsInactive({self.isInactive})"
+            returnString += f"* Client({self.client}) | EType({self.entryType}) | EID({self.entryID}) | ITab({self.activeInfoTab}) | LTab({self.activeLinkTab})"
         else:
             returnString += "? "
             if (self.entryType == "LoginPage"):
@@ -95,18 +91,6 @@ class TMALocation:
                         return returnString
                     returnString += i
                 returnString += ")"
-        return returnString
-
-    # Gets a fancier, sexier version of the __str__ method.
-    def getFancyString(self):
-        returnString = ""
-
-        returnString += "Is Logged In: " + str(self.isLoggedIn)
-        returnString += "\nClient: " + str(self.client)
-        returnString += "\nEntry Type: " + str(self.entryType)
-        returnString += "\nEntry ID: " + str(self.entryID)
-        returnString += "\nIs Inactive: " + str(self.isInactive)
-
         return returnString
 
 # These classes serve as simple structs for representing singular object in TMA such as a people object, service object,
@@ -439,7 +423,7 @@ class TMADriver():
                 headerText = self.browser.find_element(by=By.XPATH, value=clientNameHeaderPath).text
                 clientName = headerText.split("-")[1].strip()
                 if (clientName == ""):
-                    locationData.client = "DOMAIN"
+                    locationData.client = None
                     locationData.entryType = "DomainPage"
                     locationData.isInactive = None
                     locationData.entryID = None
@@ -493,8 +477,7 @@ class TMADriver():
                         locationData.entryID = "RegularEquipment"
                     elif ("Client/ClientHome" in locationData.rawURL):
                         locationData.entryType = "ClientHomePage"
-                        # EntryID for ClientHome is always 0.
-                        locationData.entryID = 0
+                        locationData.entryID = None
                     # ----------------------------------------------------------
                     # ----------------------------------------------------------
                     # ----------------------------------------------------------
@@ -522,14 +505,22 @@ class TMADriver():
         b.log.debug(f"Read this page: ({locationData})")
         return locationData
     # This method simply waits (until timeout time has passed) for the page with the given navigation
-    # data to load.
-    def waitForPageLoad(self,location : TMALocation, timeout=60):
-
-
+    # data to load. FuzzyPageDetection means that this method will ignore info and link tabs.
+    def waitForPageLoad(self,location : TMALocation, timeout=60, fuzzyPageDetection=False):
+        while True:
+            newLocationData = self.readPage(storeAsCurrent=False)
+            print(f"COMPARING [[[{location}]]] to [[[{newLocationData}]]]")
+            if(newLocationData == location and ((newLocationData.activeLinkTab == location.activeLinkTab and newLocationData.activeInfoTab == location.activeInfoTab) or fuzzyPageDetection)):
+                print("Successfully found the location specified.")
+                return True
+            else:
+                time.sleep(1)
+                timeout -= 1
+                if(timeout == 0):
+                    raise ValueError(f"TMA.waitForPageLoad never loaded the targeted page:\n{location}")
 
     # This method simply navigates to a specific client's home page, from the Domain. If not on DomainPage,
     # it simply warns and does nothing.
-    # TODO Lmao make this function work better. You can literally just pull the clienthomeurl from the elemtn, don't need external dict
     def navToClientHome(self,clientName):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
@@ -542,42 +533,24 @@ class TMADriver():
 
         self.browser.get(clientHomeURL)
 
-        time.sleep(1)
-
         # Tries to verify that the clientHomepage has been reached 5 times.
-        for i in range(5):
-            self.readPage()
-            if(self.currentLocation.client == clientName):
-                if(self.currentLocation.entryType == "ClientHomePage"):
-                    b.log.info(f"Successfully navToClientHome'd '{clientName}'")
-                    return True
-                else:
-                    b.log.warning(f"Successfully navigated to client '{clientName}', but got a different page than ClientHomePage!")
-                    return True
-            time.sleep(1)
-
-        b.log.error(f"Could not navigate to ClientHomePage for '{clientName}' for an unknown reason!")
+        targetLocation = TMALocation(client=clientName,entryType="ClientHomePage")
+        self.waitForPageLoad(location=targetLocation)
     # This method return TMA to the homepage from wherever it currently is, as long as TMA is logged in.
     def navToDomain(self):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
         self.readPage()
-        if(self.currentLocation.isLoggedIn == False):
+        # TODO is shit like this really helpful?
+        if(not self.currentLocation.isLoggedIn):
             b.log.error("Could not execute navToDomain, as TMA is not currently logged in!")
             return False
-
 
         TMAHeader = self.browser.find_element(by=By.XPATH,value="//form[@name='aspnetForm']/div[@id='container-main']/div[@id='container-top']/div[@id='header-left']/a[@id='ctl00_lnkDomainHome'][contains(@href,'Default.aspx')]")
         TMAHeader.click()
 
-        for i in range(5):
-            self.readPage()
-            if(self.currentLocation.entryType == "DomainPage"):
-                b.log.info("Successfully ran navToDomain.")
-                return True
-            time.sleep(1)
-
-        b.log.error("Could not navigate to DomainPage for an unknown reason!")
+        targetLocation = TMALocation(entryType="DomainPage")
+        self.waitForPageLoad(location=targetLocation)
     # This method intelligently searches for and opens an entry as specified by a locationData. Method is able to be called from anywhere as long as TMA is
     # currently logged in, and locationData is valid.
     # TODO This function has some reliability issues. Sometimes, the result is clicked too quickly OR the page is read too quickly before the result page can load.
@@ -786,7 +759,7 @@ class TMADriver():
         # Now we test to see whether or not we made it to the correct page.
         correctPageFound = False
         for i in range(timeout):
-            self.readPage(simpleRead=True)
+            self.readPage()
             if (self.currentLocation == copyOfTargetLocation):
                 correctPageFound = True
                 break
@@ -2629,3 +2602,5 @@ def genTMAOrderNotes(orderType,carrier=None,portalOrderNum=None,orderDate=None,u
 br = Browser.Browser()
 t = TMADriver(br)
 t.logInToTMA()
+t.navToClientHome("Sysco")
+t.navToDomain()
