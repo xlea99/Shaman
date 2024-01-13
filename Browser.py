@@ -262,6 +262,16 @@ class Browser:
         else:
             element.click()
 
+
+    # Helper method to safely click elements that often need to be clicked multiple times to work.
+    #def repeatClick(self,by=None,element=None,timeout=30,clickDelay=0):
+    #    while True:
+
+
+
+
+
+
     # This method waits for the element given by value to be clickable, then simply returns the
     # element. Test click actually attempts to click the element for better testing, but of course,
     # might end up clicking the element.
