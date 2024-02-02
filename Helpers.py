@@ -92,7 +92,7 @@ def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrie
     serviceNum = b.convertServiceIDFormat(serviceID=serviceNum,targetFormat="dashed")
 
 
-    drivers["TMA"].navToLocation(client="Sysco", entryType="People", entryID=netID.strip())
+    drivers["TMA"].navToLocation(TMA.TMALocation(client="Sysco",entryType="People",entryID=netID.strip()))
     targetUser = TMA.People(locationData=drivers["TMA"].currentLocation)
     targetUser.info_Client = "Sysco"
     drivers["TMA"].People_ReadBasicInfo(targetUser)
@@ -210,7 +210,7 @@ def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
         return "WrongDevice"
 
     # First, we navigate to the service that's been upgraded.
-    drivers["TMA"].navToLocation(client="Sysco", entryType="Service", entryID=serviceNum.strip())
+    drivers["TMA"].navToLocation(TMA.TMALocation(client="Sysco", entryType="Service", entryID=serviceNum.strip()))
 
 
     # First thing to update in the upgrade elib and expiration dates.
@@ -411,7 +411,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
     # TODO maybe shipment address validation?
 
     tmaVerify(drivers, "Sysco")
-    drivers["TMA"].navToLocation(client="Sysco", entryType="People", entryID=userID)
+    drivers["TMA"].navToLocation(TMA.TMALocation(client="Sysco", entryType="People", entryID=userID))
     thisPerson = drivers["TMA"].People_ReadAllInformation()
 
     if(workorder["OperationType"] == "New Request"):
@@ -424,7 +424,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
     elif(workorder["OperationType"] == "Upgrade"):
         # TODO We just navigate here to raise errors in case the line is inactive. Maybe come up with better system?
         tmaVerify(drivers, "Sysco")
-        drivers["TMA"].navToLocation(client="Sysco", entryType="Service", entryID=workorder["ServiceID"])
+        drivers["TMA"].navToLocation(TMA.TMALocation(client="Sysco", entryType="Service", entryID=workorder["ServiceID"]))
 
     print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
     if(referenceNumber is not None):

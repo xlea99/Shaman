@@ -55,9 +55,6 @@ class VerizonDriver:
                 passwordField.send_keys(b.config["authentication"]["verizonPass"])
                 passwordField.send_keys(Keys.ENTER)
 
-                # Wait for shop new device button to confirm page load.
-                self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]")
-                self.testForUnregisteredPopup()
             else:
                 usernameField.send_keys(Keys.ENTER)
 
@@ -72,14 +69,26 @@ class VerizonDriver:
                 passwordField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@type='password']")
                 passwordField.clear()
                 passwordField.send_keys(b.config["authentication"]["verizonPass"])
+                passwordField.send_keys(Keys.ENTER)
 
-                logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-                logInButton.click()
+                #logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+                #logInButton.click()
 
+
+            try:
                 # Wait for shop new device button to confirm page load.
-                self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]")
+                self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]",timeout=15)
                 self.testForUnregisteredPopup()
-
+            except Exception as e:
+                if (self.browser.elementExists(by=By.XPATH,value="//h3[contains(text(),'How would you like to verify your account?')]",timeout=5)):
+                    b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+                    userInput = input("VERIZON WIRELESS: Requesting one time code. Please enter 2FA code, then enter once complete to continue. Enter anything else to cancel.")
+                    if (userInput != ""):
+                        return False
+                    self.waitForPageLoad(by=By.XPATH, value="//span[contains(text(),'Shop Devices')]", timeout=15)
+                    self.testForUnregisteredPopup()
+                else:
+                    raise e
 
 
 
@@ -559,7 +568,7 @@ class VerizonDriver:
         continueButton.click()
 
         if(orderPath == "NewInstall"):
-            choosePlanHeaderString = "//div/div/div/h1[text()='Select your plan']"
+            choosePlanHeaderString = "//div/div/div/h1[contains(text(),'Select your new plans')]"
             self.waitForPageLoad(by=By.XPATH,value=choosePlanHeaderString,testClick=True)
         else:
             shoppingCartHeaderString = "//div/div/h1[contains(text(),'Shopping cart')]"

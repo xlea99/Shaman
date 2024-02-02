@@ -717,6 +717,8 @@ class CimplDriver:
         # We now click, to make sure the html is updated with the actual date we wrote.
         serviceInformationHeader = self.browser.find_element(by=By.XPATH,value="//div[contains(@ng-bind,'vm.labels.serviceInformation')][text()='Service Information']")
         self.waitForLoadingScreen()
+        #TODO glue glue glue glue glue
+        time.sleep(3)
         serviceInformationHeader.click()
 
     # Methods for navigating the workorder

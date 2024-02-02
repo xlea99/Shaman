@@ -16,16 +16,16 @@ from selenium.webdriver.support.ui import Select
 class TMALocation:
 
     # Basic init method initializes a few used variables.
-    def __init__(self):
-        # This variable simply denotes whether or not the TMA object is currently
+    def __init__(self,isLoggedIn=True,client=None,entryType=None,entryID=None,activeInfoTab=None,activeLinkTab=None):
+        # This variable simply denotes whether the TMA object is currently
         # logged in to TMA or not.
-        self.isLoggedIn = False
+        self.isLoggedIn = isLoggedIn
 
         # This is the current client that is being operated under. At the moment,
         # the only supported clients are Sysco and (to a lesser extent) LYB. However,
         # a placeholder title "DOMAIN" serves to show that no client is currently
         # being operated on.
-        self.client = None
+        self.client = client
 
         # This shows what type of entry we're currently working under. Possibilities include:
         # -Services
@@ -37,7 +37,7 @@ class TMALocation:
         # -LoginPage
         # -DomainPage
         # -ClientHomePage
-        self.entryType = None
+        self.entryType = entryType
 
         # This is a unique, identifiable ID that separates this entry from all others in TMA.
         # For different type of entries, the actual ID will be different. Examples:
@@ -46,9 +46,14 @@ class TMALocation:
         # -People (Network ID)
         # -Interactions (Interaction Number)
         # -Always will be RegularEquipment
-        self.entryID = None
+        self.entryID = entryID
 
-        self.isInactive = None
+        # The currently active info (Line Info, Assignments, Links, History) tab.
+        self.activeInfoTab = activeInfoTab
+        # The currently active link (Services, People, Interactions, Orders) tab.
+        self.activeLinkTab = activeLinkTab
+
+        # Simple raw url of this location.
         self.rawURL = None
 
     # Equal operator == method compares the values of each important data point.
@@ -58,10 +63,6 @@ class TMALocation:
                         self.client == otherLocationData.client and
                         self.entryType == otherLocationData.entryType and
                         self.entryID == otherLocationData.entryID)
-                        #TODO Theoretically, it shouldn't make sense to test inactivity. However, if I'm wrong
-                        # about this, we'll need to adjust the navToLocation comparison which sometimes gets
-                        # data from readPage's "simpleRead" that lacks accurate inactivity information.
-                        #self.isInactive == otherLocationData.isInactive)
             b.log.debug(f"Tested equality between {self} and {otherLocationData} : {isEqual}")
             return isEqual
         else:
@@ -73,7 +74,7 @@ class TMALocation:
         returnString = ""
 
         if (self.isLoggedIn):
-            returnString += f"* Client({self.client}) | EType({self.entryType}) | EID({self.entryID}) | IsInactive({self.isInactive})"
+            returnString += f"* Client({self.client}) | EType({self.entryType}) | EID({self.entryID}) | ITab({self.activeInfoTab}) | LTab({self.activeLinkTab})"
         else:
             returnString += "? "
             if (self.entryType == "LoginPage"):
@@ -90,18 +91,6 @@ class TMALocation:
                         return returnString
                     returnString += i
                 returnString += ")"
-        return returnString
-
-    # Gets a fancier, sexier version of the __str__ method.
-    def getFancyString(self):
-        returnString = ""
-
-        returnString += "Is Logged In: " + str(self.isLoggedIn)
-        returnString += "\nClient: " + str(self.client)
-        returnString += "\nEntry Type: " + str(self.entryType)
-        returnString += "\nEntry ID: " + str(self.entryID)
-        returnString += "\nIs Inactive: " + str(self.isInactive)
-
         return returnString
 
 # These classes serve as simple structs for representing singular object in TMA such as a people object, service object,
@@ -321,13 +310,6 @@ class Assignment:
 
 # How many TMA Location Datas will be stored at maximum, to conserve the TMA object from endlessly inflating.
 MAXIMUM_STORED_HISTORY = 20
-# This is a dictionary of verified clientHome pages. Using the
-# goToClientHome method, the browser can access ATI, LYB, and Sysco client
-# home pages.
-CLIENT_DICT = {
-    "ATI": "417469544D415F76333030",
-    "Sysco": "537973636F544D415F76333030"
-}
 
 class TMADriver():
 
@@ -423,10 +405,7 @@ class TMADriver():
     # This method reads the current open page in TMA, and generates a new (or overrides a provided)
     # TMALocation to be returned for navigational use. Default behavior is to store this new location
     # data as the current location.
-    #TODO Decide if the concept of "simple read" is a long term solution.
-    # Simple read means that the read will NOT interact with any page at all, but some various info might
-    # not be read.
-    def readPage(self,storeAsCurrent = True,readAttempts=3,simpleRead=False):
+    def readPage(self,storeAsCurrent = True):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
         locationData = TMALocation()
 
@@ -440,138 +419,108 @@ class TMADriver():
                 # ----------------------------------------------------------
                 # Here we test what client we're on right now.
                 # ----------------------------------------------------------
-                headerText = self.browser.find_element(by=By.XPATH, value="//div[@id='container-main']/div[@id='container-top']/div[@id='header-left']/a[@id='ctl00_lnkDomainHome'][starts-with(text(),'ICOMM TMA v4.0 -')]/parent::div").text
-                clientName = headerText.split("-")[1]
-                if (len(clientName) == 0):
-                    locationData.client = "DOMAIN"
-                else:
-                    locationData.client = clientName.strip()
-                # ----------------------------------------------------------
-                # ----------------------------------------------------------
-                # ----------------------------------------------------------
-
-                # Test whether we're on the DomainPage, or on a specific page.
-                if (locationData.client != "DOMAIN"):
-                    try:
-                        # ----------------------------------------------------------
-                        # Here we test for what entry type we're on right now, the
-                        # associated "EntryID", and whether or not it is considered
-                        # "inactive".
-                        # ----------------------------------------------------------
-                        if ("Client/People/" in locationData.rawURL):
-                            locationData.entryType = "People"
-                            # TODO implement dynamic support for other clients than just Sysco
-                            # We pull the Sysco Network ID as our EntryID for People.
-                            networkIDXPATH = "/html/body/form/div[3]/div[3]/div[2]/div/div[2]/div[4]/fieldset/ol[1]/li[2]/span[2]"
-                            networkID = self.browser.find_element(by=By.XPATH, value=networkIDXPATH,timeout=1).text
-                            locationData.entryID = networkID
-                            # We also have to check whether this person is considered "Terminated"
-                            # TODO implement navigation to correct linked tab.
-                            employmentStatusSearchString = "//div/div/div/div/fieldset/ol/li/span[contains(@id,'Detail_ddlpeopleStatus___gvctl00')][text()='Status:']/following-sibling::span"
-                            employmentStatus = self.browser.find_element(by=By.XPATH, value=employmentStatusSearchString,timeout=1)
-                            employmentStatusResultString = employmentStatus.text
-                            if (employmentStatusResultString == "Active"):
-                                locationData.isInactive = False
-                            else:
-                                locationData.isInactive = True
-                        elif ("Client/Services/" in locationData.rawURL):
-                            locationData.entryType = "Service"
-                            # We pull the service number as our EntryID for Service.
-                            serviceNumber = self.browser.find_element(by=By.CSS_SELECTOR, value="#ctl00_MainPanel_Detail_txtServiceId",timeout=1).get_attribute("value")
-                            locationData.entryID = serviceNumber.strip()
-                            # We also have to check whether this service is considered "Inactive"
-                            currentTab = self.Service_GetCurrentServiceTab()
-                            if(simpleRead):
-                                locationData.isInactive = False
-                            else:
-                                if(currentTab != "Line Info"):
-                                    self.Service_NavToServiceTab("Line Info")
-                                inactiveBoxString = "//div/div/div/div/ol/li/input[contains(@id,'Detail_chkInactive_ctl01')][@type='checkbox']"
-                                inactiveBox = self.browser.find_element(by=By.XPATH, value=inactiveBoxString,timeout=1)
-                                isInactiveString = str(inactiveBox.get_attribute("CHECKED"))
-                                if (isInactiveString == "true"):
-                                    locationData.isInactive = True
-                                else:
-                                    locationData.isInactive = False
-                                if(currentTab != "Line Info"):
-                                    self.Service_NavToServiceTab(currentTab)
-                        elif ("Client/Interactions/" in locationData.rawURL):
-                            locationData.entryType = "Interaction"
-                            # Here, we pull the Interaction Number as our EntryID.
-                            intNumCSS = "span.BigBlueFont:nth-child(2)"
-                            if (self.browser.elementExists(by=By.CSS_SELECTOR, value=intNumCSS)):
-                                interactionNumber = self.browser.find_element(by=By.CSS_SELECTOR, value=intNumCSS,timeout=1).text
-                                locationData.entryID = interactionNumber
-                            else:
-                                locationData.entryID = "InteractionSearch"
-                            # Interactions can never be considered Inactive.
-                            locationData.isInactive = False
-                        elif ("Client/Orders/" in locationData.rawURL):
-                            locationData.entryType = "Order"
-                            # Orders are special in that their entryID should consist of three
-                            # separate parts - the TMAOrderNumber, ticketOrderNumber, and
-                            # vendorOrderNumber.
-                            vendorOrderLocation = "//div/fieldset/ol/li/input[contains(@id,'ICOMMTextbox10')]"
-                            vendorOrderNumber = self.browser.find_element(by=By.XPATH, value=vendorOrderLocation,timeout=1).get_attribute("value")
-
-                            TMAOrderLocation = "//div/fieldset/ol/li/span[contains(@id,'txtOrder__label')]/following-sibling::span"
-                            TMAOrderNumber = self.browser.find_element(by=By.XPATH, value=TMAOrderLocation,timeout=1).text
-
-                            ticketOrderLocation = "//div/fieldset/ol/li/input[contains(@id,'ICOMMTextbox9')]"
-                            ticketOrderNumber = self.browser.find_element(by=By.XPATH, value=ticketOrderLocation,timeout=1).get_attribute("value")
-
-                            locationData.entryID = [TMAOrderNumber, ticketOrderNumber, vendorOrderNumber]
-
-                            # Orders are never considered Inactive.
-                            locationData.isInactive = False
-                        elif ("Client/Equipment/" in locationData.rawURL):
-                            locationData.entryType = "Equipment"
-                            locationData.entryID = "RegularEquipment"
-                            # Equipment is never considered Inactive
-                            locationData.isInactive = False
-                        elif ("Client/ClientHome" in locationData.rawURL):
-                            locationData.entryType = "ClientHomePage"
-                            # EntryID for ClientHome is always 0.
-                            locationData.entryID = 0
-                            locationData.isInactive = False
-                        # ----------------------------------------------------------
-                        # ----------------------------------------------------------
-                        # ----------------------------------------------------------
-                    except (selenium.common.exceptions.NoSuchElementException,selenium.common.exceptions.StaleElementReferenceException):
-                        if(readAttempts > 0):
-                            print("oopsie!")
-                            return self.readPage(storeAsCurrent=storeAsCurrent,readAttempts=readAttempts-1)
-                        else:
-                            #TODO proper error
-                            raise ValueError("Failed to read!! :(")
-                # This means we're just on the DomainPage.
-                else:
+                clientNameHeaderPath = "//a[contains(@id,'lnkDomainHome')]/parent::div"
+                headerText = self.browser.find_element(by=By.XPATH, value=clientNameHeaderPath).text
+                clientName = headerText.split("-")[1].strip()
+                if (clientName == ""):
+                    locationData.client = None
                     locationData.entryType = "DomainPage"
-                    locationData.isInactive = "Null"
-                    locationData.entryID = "Null"
+                    #locationData.isInactive = None
+                    locationData.entryID = None
+                else:
+                    locationData.client = clientName
+                    # ----------------------------------------------------------
+                    # Here we test for what entry type we're on right now, the
+                    # associated "EntryID", and whether it is considered
+                    # "inactive".
+                    # ----------------------------------------------------------
+                    if ("Client/People/" in locationData.rawURL):
+                        locationData.entryType = "People"
+                        # TODO implement dynamic support for other clients than just Sysco
+                        # We pull the Sysco Network ID as our EntryID for People.
+                        networkIDString = "//span[contains(@id,'lblEmployeeID')]/following-sibling::span"
+                        networkID = self.browser.find_element(by=By.XPATH, value=networkIDString).text
+                        locationData.entryID = networkID
+                    elif ("Client/Services/" in locationData.rawURL):
+                        locationData.entryType = "Service"
+                        # We pull the service number as our EntryID for Service.
+                        serviceNumberPath = "//input[contains(@id,'txtServiceId')]"
+                        serviceNumber = self.browser.find_element(by=By.XPATH, value=serviceNumberPath,timeout=1).get_attribute("value")
+                        locationData.entryID = b.convertServiceIDFormat(serviceID=serviceNumber,targetFormat="dashed")
+                    elif ("Client/Interactions/" in locationData.rawURL):
+                        locationData.entryType = "Interaction"
+                        # Here, we pull the Interaction Number as our EntryID.
+                        interactionNumberPath = "//span[contains(@id,'txtInteraction')]/following-sibling::span"
+                        if (self.browser.elementExists(by=By.CSS_SELECTOR, value=interactionNumberPath)):
+                            interactionNumber = self.browser.find_element(by=By.CSS_SELECTOR, value=interactionNumberPath,timeout=1).text
+                            locationData.entryID = interactionNumber
+                        else:
+                            locationData.entryID = "InteractionSearch"
+                    elif ("Client/Orders/" in locationData.rawURL):
+                        locationData.entryType = "Order"
+                        # Orders are special in that their entryID should consist of three
+                        # separate parts - the TMAOrderNumber, ticketOrderNumber, and
+                        # vendorOrderNumber.
+                        vendorOrderPath = "//span[text()='Vendor Order #:']/following-sibling::input"
+                        vendorOrderNumber = self.browser.find_element(by=By.XPATH, value=vendorOrderPath).get_attribute("value")
+
+                        TMAOrderPath = "//span[text()='Order #:']/following-sibling::span"
+                        TMAOrderNumber = self.browser.find_element(by=By.XPATH, value=TMAOrderPath).text
+
+                        ticketOrderPath = "//span[text()='Remedy Ticket']/following-sibling::input"
+                        ticketOrderNumber = self.browser.find_element(by=By.XPATH, value=ticketOrderPath).get_attribute("value")
+
+                        # TODO use a dict instead for ease of use
+                        locationData.entryID = [TMAOrderNumber, ticketOrderNumber, vendorOrderNumber]
+                    elif ("Client/Equipment/" in locationData.rawURL):
+                        locationData.entryType = "Equipment"
+                        locationData.entryID = "RegularEquipment"
+                    elif ("Client/ClientHome" in locationData.rawURL):
+                        locationData.entryType = "ClientHomePage"
+                        locationData.entryID = None
+                    # ----------------------------------------------------------
+                    # ----------------------------------------------------------
+                    # ----------------------------------------------------------
+                # ----------------------------------------------------------
+                # ----------------------------------------------------------
+                # ----------------------------------------------------------
             # This means we're not logged in to TMA.
             else:
                 locationData.isLoggedIn = False
-                locationData.client = "Null"
+                locationData.client = None
                 locationData.entryType = "LoginPage"
-                locationData.isInactive = "Null"
-                locationData.entryID = "Null"
+                #locationData.isInactive = None
+                locationData.entryID = None
         # This means we're not even on a TMA page.
         else:
             locationData.isLoggedIn = False
-            locationData.client = "Null"
-            locationData.entryType = "Null"
-            locationData.isInactive = "Null"
-            locationData.entryID = "Null"
+            locationData.client = None
+            locationData.entryType = None
+            #locationData.isInactive = None
+            locationData.entryID = None
 
         if(storeAsCurrent):
             self.currentLocation = locationData
 
         b.log.debug(f"Read this page: ({locationData})")
         return locationData
+    # This method simply waits (until timeout time has passed) for the page with the given navigation
+    # data to load. FuzzyPageDetection means that this method will ignore info and link tabs.
+    def waitForPageLoad(self,location : TMALocation, timeout=60, fuzzyPageDetection=False):
+        while True:
+            newLocationData = self.readPage(storeAsCurrent=False)
+            print(f"COMPARING [[[{location}]]] to [[[{newLocationData}]]]")
+            if(newLocationData == location and ((newLocationData.activeLinkTab == location.activeLinkTab and newLocationData.activeInfoTab == location.activeInfoTab) or fuzzyPageDetection)):
+                print("Successfully found the location specified.")
+                return True
+            else:
+                time.sleep(1)
+                timeout -= 1
+                if(timeout == 0):
+                    raise ValueError(f"TMA.waitForPageLoad never loaded the targeted page:\n{location}")
+
     # This method simply navigates to a specific client's home page, from the Domain. If not on DomainPage,
     # it simply warns and does nothing.
-    # TODO Lmao make this function work better. You can literally just pull the clienthomeurl from the elemtn, don't need external dict
     def navToClientHome(self,clientName):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
@@ -579,86 +528,34 @@ class TMADriver():
             b.log.error(f"Could not navToClientHome '{clientName}', as TMA is not currently logged in.")
             return False
 
-        clientHomeUrl = f"https://tma4.icomm.co/tma/Authenticated/Client/ClientHome.aspx?436C69656E744442={CLIENT_DICT.get(clientName)}"
-        self.browser.get(clientHomeUrl)
+        targetClientHomeLink = self.browser.find_element(by=By.XPATH,value=f"//a[text()='{clientName}']")
+        clientHomeURL = targetClientHomeLink.get_attribute("href")
 
-        time.sleep(1)
+        self.browser.get(clientHomeURL)
 
         # Tries to verify that the clientHomepage has been reached 5 times.
-        for i in range(5):
-            self.readPage()
-            if(self.currentLocation.client == clientName):
-                if(self.currentLocation.entryType == "ClientHomePage"):
-                    b.log.info(f"Successfully navToClientHome'd '{clientName}'")
-                    return True
-                else:
-                    b.log.warning(f"Successfully navigated to client '{clientName}', but got a different page than ClientHomePage!")
-                    return True
-            time.sleep(1)
-
-        b.log.error(f"Could not navigate to ClientHomePage for '{clientName}' for an unknown reason!")
+        targetLocation = TMALocation(client=clientName,entryType="ClientHomePage")
+        self.waitForPageLoad(location=targetLocation)
     # This method return TMA to the homepage from wherever it currently is, as long as TMA is logged in.
     def navToDomain(self):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
         self.readPage()
-        if(self.currentLocation.isLoggedIn == False):
+        # TODO is shit like this really helpful?
+        if(not self.currentLocation.isLoggedIn):
             b.log.error("Could not execute navToDomain, as TMA is not currently logged in!")
             return False
-
 
         TMAHeader = self.browser.find_element(by=By.XPATH,value="//form[@name='aspnetForm']/div[@id='container-main']/div[@id='container-top']/div[@id='header-left']/a[@id='ctl00_lnkDomainHome'][contains(@href,'Default.aspx')]")
         TMAHeader.click()
 
-        for i in range(5):
-            self.readPage()
-            if(self.currentLocation.entryType == "DomainPage"):
-                b.log.info("Successfully ran navToDomain.")
-                return True
-            time.sleep(1)
-
-        b.log.error("Could not navigate to DomainPage for an unknown reason!")
+        targetLocation = TMALocation(entryType="DomainPage")
+        self.waitForPageLoad(location=targetLocation)
     # This method intelligently searches for and opens an entry as specified by a locationData. Method is able to be called from anywhere as long as TMA is
     # currently logged in, and locationData is valid.
     # TODO This function has some reliability issues. Sometimes, the result is clicked too quickly OR the page is read too quickly before the result page can load.
-    def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData : TMALocation = None, timeout=60):
+    def navToLocation(self,locationData : TMALocation = None, timeout=60):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
-
-        entryID = entryID.strip("'")
-        # First, if the function wasn't already provided with built locationData, we need to build it
-        # off of the variables that WERE provided for future use.
-        if(locationData is None):
-            locationData = TMALocation()
-            locationData.isLoggedIn = True
-
-            # This means the function is supposed to target the DomainPage.
-            if(client is None):
-                locationData.client = "DOMAIN"
-                locationData.entryType = "DomainPage"
-                locationData.entryID = "Null"
-                locationData.isInactive = False
-            else:
-                locationData.client = client
-                # This means the function is supposed to target the ClientHomePage of
-                # the given client.
-                if(entryType is None):
-                    locationData.entryType = "ClientHomePage"
-                    locationData.entryID = "Null"
-                    locationData.isInactive = False
-                else:
-                    locationData.entryType = entryType
-                    if(entryType == "DomainPage"):
-                        locationData.client = "DOMAIN"
-                        locationData.entryType = "DomainPage"
-                        locationData.entryID = "Null"
-                        locationData.isInactive = False
-                    elif(entryType == "ClientHomePage"):
-                        locationData.entryType = "ClientHomePage"
-                        locationData.entryID = "Null"
-                        locationData.isInactive = False
-                    else:
-                        locationData.entryID = entryID
-                        locationData.isInactive = isInactive
 
         copyOfTargetLocation = copy.copy(locationData)
 
@@ -692,20 +589,15 @@ class TMADriver():
             servicesOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='services']")
             servicesOption.click()
             time.sleep(2)
-            if(locationData.isInactive == True):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if(str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif(str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    pass
-            elif(locationData.isInactive == False):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    pass
+
+            # TODO right now, this ALWAYS sets inactive to false. Come back here if we need to actually
+            # account for inactive users.
+            inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
+            if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
+                inactiveCheckbox.click()
+                time.sleep(5)
+            elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
+                pass
             # TODO glue. XPATHS are WAY too long and convoluted, i think.
             for i in range(5):
                 try:
@@ -731,20 +623,15 @@ class TMADriver():
             peopleOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='people']")
             peopleOption.click()
             time.sleep(2)
-            if (locationData.isInactive == True):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    pass
-            elif (locationData.isInactive == False):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    pass
+
+            #TODO right now, this ALWAYS sets inactive to false. Come back here if we need to actually
+            # account for inactive users.
+            inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
+            if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
+                inactiveCheckbox.click()
+                time.sleep(5)
+            elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
+                pass
 
             #TODO you guessed it. Glue.
             for i in range(5):
@@ -823,22 +710,7 @@ class TMADriver():
             b.log.error(f"Can not search for entryType: {locationData.entryType}")
             return False
 
-        # Now we test to see whether or not we made it to the correct page.
-        correctPageFound = False
-        for i in range(timeout):
-            self.readPage(simpleRead=True)
-            if (self.currentLocation == copyOfTargetLocation):
-                correctPageFound = True
-                break
-            else:
-                time.sleep(1)
-                continue
-
-        if(correctPageFound):
-            return True
-        else:
-            b.log.warning(f"Executed navToLocation trying to find: '{copyOfTargetLocation}' but ended up at: '{self.currentLocation}'!")
-            return False
+        self.waitForPageLoad(location=locationData,fuzzyPageDetection=True)
 
     # endregion =====================General Site Navigation ============================
 
@@ -1485,7 +1357,7 @@ class TMADriver():
         targetTab = f"//div[contains(@id,'divTabButtons')][@class='tabButtons']/input[contains(@name,'{serviceTabDictionary[serviceTab.lower()]}')][translate(@value, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', 'abcdefghijklmnopqrstuvwxyz')='{serviceTab.lower()}']"
         serviceTabTestFor = f"{targetTab}[@class='selected']"
 
-        if (self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=serviceTabTestFor)):
+        if (self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=serviceTabTestFor,clickDelay=5)):
             b.log.info(f"Successfully navigated to serviceTab '{serviceTab}'.")
             return True
         else:
@@ -1501,7 +1373,7 @@ class TMADriver():
 
         targetTab = f"//table[contains(@id,'Detail_ucassociations_link_gvTable2')]/tbody/tr[contains(@class,'gridviewbuttons')]/td/span[contains(text(),'{linkedTabName.lower()}')]"
         targetTabTestFor = f"//span[contains(text(),'{linkedTabName.lower()}')]/parent::td/parent::tr[contains(@class,'gridviewbuttonsSelected')]"
-        self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=targetTabTestFor)
+        self.browser.safeClick(by=By.XPATH, element=targetTab, repeat=True, repeatUntilNewElementExists=targetTabTestFor,clickDelay=5)
         b.log.info(f"Successfully navigated to linkedTab '{linkedTabName}'")
     # This method navigates TMA from a service to its linked equipment. Method
     # assumes that there is only one linked equipment.
@@ -2664,3 +2536,10 @@ def genTMAOrderNotes(orderType,carrier=None,portalOrderNum=None,orderDate=None,u
     resultString += f"TRACKING: {tracking}"
 
     return resultString
+
+
+#br = Browser.Browser()
+#t = TMADriver(br)
+#t.logInToTMA()
+#t.navToClientHome("Sysco")
+#t.navToDomain()
