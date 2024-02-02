@@ -17,7 +17,7 @@ try:
     # To attempt to place the order for a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade,
     # for now), simply add the workorder number to the below list. If the program finds that it is suitable to place, it
     # will detect the order type, then attempt to place/document Verizon order
-    preCimplWOs = [44358,44359,44360,44361,44362,44363,44364,44365]
+    preCimplWOs = []
     for WO in preCimplWOs:
         h.processPreOrderWorkorder(d,WO,referenceNumber="Alex",subjectLine="Order date %D")
 
@@ -25,7 +25,7 @@ try:
     # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
     # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
     # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-    postCimplWOs = []
+    postCimplWOs = [44487,44488,44491,44493,44494,44495,44518,44519,44520,44521,44523,44524]
     for WO in postCimplWOs:
         h.processPostOrderWorkorder(d,WO)
 

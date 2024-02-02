@@ -425,7 +425,7 @@ class TMADriver():
                 if (clientName == ""):
                     locationData.client = None
                     locationData.entryType = "DomainPage"
-                    locationData.isInactive = None
+                    #locationData.isInactive = None
                     locationData.entryID = None
                 else:
                     locationData.client = clientName
@@ -489,14 +489,14 @@ class TMADriver():
                 locationData.isLoggedIn = False
                 locationData.client = None
                 locationData.entryType = "LoginPage"
-                locationData.isInactive = None
+                #locationData.isInactive = None
                 locationData.entryID = None
         # This means we're not even on a TMA page.
         else:
             locationData.isLoggedIn = False
             locationData.client = None
             locationData.entryType = None
-            locationData.isInactive = None
+            #locationData.isInactive = None
             locationData.entryID = None
 
         if(storeAsCurrent):
@@ -554,44 +554,8 @@ class TMADriver():
     # This method intelligently searches for and opens an entry as specified by a locationData. Method is able to be called from anywhere as long as TMA is
     # currently logged in, and locationData is valid.
     # TODO This function has some reliability issues. Sometimes, the result is clicked too quickly OR the page is read too quickly before the result page can load.
-    def navToLocation(self,client = None, entryType = None, entryID = None, isInactive = False,locationData : TMALocation = None, timeout=60):
+    def navToLocation(self,locationData : TMALocation = None, timeout=60):
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
-
-        entryID = entryID.strip("'")
-        # First, if the function wasn't already provided with built locationData, we need to build it
-        # off of the variables that WERE provided for future use.
-        if(locationData is None):
-            locationData = TMALocation()
-            locationData.isLoggedIn = True
-
-            # This means the function is supposed to target the DomainPage.
-            if(client is None):
-                locationData.client = "DOMAIN"
-                locationData.entryType = "DomainPage"
-                locationData.entryID = "Null"
-                locationData.isInactive = False
-            else:
-                locationData.client = client
-                # This means the function is supposed to target the ClientHomePage of
-                # the given client.
-                if(entryType is None):
-                    locationData.entryType = "ClientHomePage"
-                    locationData.entryID = "Null"
-                    locationData.isInactive = False
-                else:
-                    locationData.entryType = entryType
-                    if(entryType == "DomainPage"):
-                        locationData.client = "DOMAIN"
-                        locationData.entryType = "DomainPage"
-                        locationData.entryID = "Null"
-                        locationData.isInactive = False
-                    elif(entryType == "ClientHomePage"):
-                        locationData.entryType = "ClientHomePage"
-                        locationData.entryID = "Null"
-                        locationData.isInactive = False
-                    else:
-                        locationData.entryID = entryID
-                        locationData.isInactive = isInactive
 
         copyOfTargetLocation = copy.copy(locationData)
 
@@ -625,20 +589,15 @@ class TMADriver():
             servicesOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='services']")
             servicesOption.click()
             time.sleep(2)
-            if(locationData.isInactive == True):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if(str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif(str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    pass
-            elif(locationData.isInactive == False):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    pass
+
+            # TODO right now, this ALWAYS sets inactive to false. Come back here if we need to actually
+            # account for inactive users.
+            inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
+            if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
+                inactiveCheckbox.click()
+                time.sleep(5)
+            elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
+                pass
             # TODO glue. XPATHS are WAY too long and convoluted, i think.
             for i in range(5):
                 try:
@@ -664,20 +623,15 @@ class TMADriver():
             peopleOption = self.browser.find_element(by=By.XPATH,value=selectionMenuString + "[@value='people']")
             peopleOption.click()
             time.sleep(2)
-            if (locationData.isInactive == True):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    pass
-            elif (locationData.isInactive == False):
-                inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
-                if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
-                    inactiveCheckbox.click()
-                    time.sleep(5)
-                elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
-                    pass
+
+            #TODO right now, this ALWAYS sets inactive to false. Come back here if we need to actually
+            # account for inactive users.
+            inactiveCheckbox = self.browser.find_element(by=By.XPATH,value=inactiveCheckboxString)
+            if (str(inactiveCheckbox.get_attribute("CHECKED")) == "true"):
+                inactiveCheckbox.click()
+                time.sleep(5)
+            elif (str(inactiveCheckbox.get_attribute("CHECKED")) == "None"):
+                pass
 
             #TODO you guessed it. Glue.
             for i in range(5):
@@ -756,22 +710,7 @@ class TMADriver():
             b.log.error(f"Can not search for entryType: {locationData.entryType}")
             return False
 
-        # Now we test to see whether or not we made it to the correct page.
-        correctPageFound = False
-        for i in range(timeout):
-            self.readPage()
-            if (self.currentLocation == copyOfTargetLocation):
-                correctPageFound = True
-                break
-            else:
-                time.sleep(1)
-                continue
-
-        if(correctPageFound):
-            return True
-        else:
-            b.log.warning(f"Executed navToLocation trying to find: '{copyOfTargetLocation}' but ended up at: '{self.currentLocation}'!")
-            return False
+        self.waitForPageLoad(location=locationData,fuzzyPageDetection=True)
 
     # endregion =====================General Site Navigation ============================
 
@@ -2599,8 +2538,8 @@ def genTMAOrderNotes(orderType,carrier=None,portalOrderNum=None,orderDate=None,u
     return resultString
 
 
-br = Browser.Browser()
-t = TMADriver(br)
-t.logInToTMA()
-t.navToClientHome("Sysco")
-t.navToDomain()
+#br = Browser.Browser()
+#t = TMADriver(br)
+#t.logInToTMA()
+#t.navToClientHome("Sysco")
+#t.navToDomain()
