@@ -59,10 +59,15 @@ class TMALocation:
     # Equal operator == method compares the values of each important data point.
     def __eq__(self, otherLocationData):
         if(isinstance(otherLocationData,TMALocation)):
-            isEqual =  (self.isLoggedIn == otherLocationData.isLoggedIn and
-                        self.client == otherLocationData.client and
-                        self.entryType == otherLocationData.entryType and
-                        self.entryID == otherLocationData.entryID)
+            isEqual = False
+            if(self.isLoggedIn == otherLocationData.isLoggedIn and self.client == otherLocationData.client and self.entryType == otherLocationData.entryType):
+                if(self.entryType == "Service"):
+                    if(b.convertServiceIDFormat(self.entryID,"raw") == b.convertServiceIDFormat(otherLocationData.entryID,"raw")):
+                        isEqual = True
+                else:
+                    if(self.entryID == otherLocationData.entryID):
+                        isEqual = True
+
             b.log.debug(f"Tested equality between {self} and {otherLocationData} : {isEqual}")
             return isEqual
         else:
@@ -509,9 +514,9 @@ class TMADriver():
     def waitForPageLoad(self,location : TMALocation, timeout=60, fuzzyPageDetection=False):
         while True:
             newLocationData = self.readPage(storeAsCurrent=False)
-            print(f"COMPARING [[[{location}]]] to [[[{newLocationData}]]]")
+            #print(f"COMPARING [[[{location}]]] to [[[{newLocationData}]]]")
             if(newLocationData == location and ((newLocationData.activeLinkTab == location.activeLinkTab and newLocationData.activeInfoTab == location.activeInfoTab) or fuzzyPageDetection)):
-                print("Successfully found the location specified.")
+                #print("Successfully found the location specified.")
                 return True
             else:
                 time.sleep(1)
@@ -1988,8 +1993,38 @@ class TMADriver():
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
         self.People_NavToLinkedTab("services")
-        openServiceButton = f"//table/tbody/tr/td/table/tbody/tr[contains(@class,'sgvitems')]/td[text() = '{serviceID}']/parent::tr/td/a[contains(@id,'lnkDetail')]"
-        targetAddress = self.browser.find_element(by=By.XPATH, value=openServiceButton).get_attribute("href")
+        openServiceButtonPath  = f"//table/tbody/tr/td/table/tbody/tr[contains(@class,'sgvitems')]/td[text() = '{serviceID}']/parent::tr/td/a[contains(@id,'lnkDetail')]"
+
+        # Try to find the created service, including support for flipping through pages.
+        while True:
+            openServiceButton = self.browser.find_element(by=By.XPATH, value=openServiceButtonPath,ignoreErrors=True)
+            if(openServiceButton is None):
+                nextPageButtonPath = "//input[contains(@id,'btnNext')][contains(@id,'Detail')]"
+                nextPageButton = self.browser.find_element(by=By.XPATH,value=nextPageButtonPath)
+                if(nextPageButton.get_attribute("disabled") != "true"):
+                    pageCounterPath = "//span[contains(@id,'lblPages')][contains(@id,'Detail')]"
+                    currentPageCounterText = self.browser.find_element(by=By.XPATH,value=pageCounterPath).text
+                    nextPageButton.click()
+
+                    #TODO kinda gluey, basically we're comparing the page number counters until we notice a change to
+                    # attempt another check. Good or nah?
+                    flippedPage = False
+                    for i in range(30):
+                        newPageCounterText = self.browser.find_element(by=By.XPATH, value=pageCounterPath).text
+                        if(newPageCounterText != currentPageCounterText):
+                            flippedPage = True
+                            break
+                        else:
+                            time.sleep(1)
+
+                    if(flippedPage):
+                        continue
+                    else:
+                        raise ValueError("TMA took far too long to load a page change while searching for created service.")
+            else:
+                break
+
+        targetAddress = openServiceButton.get_attribute("href")
         self.browser.get(targetAddress)
         time.sleep(3)
         self.readPage()
