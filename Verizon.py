@@ -34,7 +34,7 @@ class VerizonDriver:
 
     # This method sets the page to the Verizon log in screen, then goes through the process of
     # logging in.
-    def logInToVerizon(self):
+    def logInToVerizon(self,manual=False):
         self.browser.switchToTab("Verizon")
 
         # Test if already signed in.
@@ -42,37 +42,44 @@ class VerizonDriver:
             return True
         else:
             self.browser.get("https://mblogin.verizonwireless.com/account/business/login/unifiedlogin")
-            self.browser.implicitly_wait(10)
-
-            # TODO Manage 2FA and alternate login instances HERE
-
-            usernameField = self.browser.find_element(by=By.XPATH,value="//label[text()='User ID']/following-sibling::input")
-            usernameField.send_keys(b.config["authentication"]["verizonUser"])
-
-            # Test if this is the new login or old login screen.
-            passwordField = self.browser.elementExists(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
-            if(passwordField):
-                passwordField.send_keys(b.config["authentication"]["verizonPass"])
-                passwordField.send_keys(Keys.ENTER)
-
+            if(manual):
+                userResponse = input("Press enter once logged in to Verizon. Press any other key to cancel.")
+                if(userResponse != ""):
+                    return False
             else:
-                usernameField.send_keys(Keys.ENTER)
 
-                self.waitForPageLoad(by=By.XPATH,value="//h3[contains(text(),'How do you want to log in?')]",testClick=True)
 
-                logInWithPasswordOptionString = "//a[contains(text(),'Log in with my password')]"
-                logInWithPasswordOption = self.browser.waitForClickableElement(by=By.XPATH,value=logInWithPasswordOptionString)
-                logInWithPasswordOption.click()
 
-                self.waitForPageLoad(by=By.XPATH,value="//h3[text()='Log in']")
+                # TODO Manage 2FA and alternate login instances HERE
 
-                passwordField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@type='password']")
-                passwordField.clear()
-                passwordField.send_keys(b.config["authentication"]["verizonPass"])
-                passwordField.send_keys(Keys.ENTER)
+                self.browser.implicitly_wait(10)
+                usernameField = self.browser.find_element(by=By.XPATH,value="//label[text()='User ID']/following-sibling::input")
+                usernameField.send_keys(b.config["authentication"]["verizonUser"])
 
-                #logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-                #logInButton.click()
+                # Test if this is the new login or old login screen.
+                passwordField = self.browser.elementExists(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
+                if(passwordField):
+                    passwordField.send_keys(b.config["authentication"]["verizonPass"])
+                    passwordField.send_keys(Keys.ENTER)
+
+                else:
+                    usernameField.send_keys(Keys.ENTER)
+
+                    self.waitForPageLoad(by=By.XPATH,value="//h3[contains(text(),'How do you want to log in?')]",testClick=True)
+
+                    logInWithPasswordOptionString = "//a[contains(text(),'Log in with my password')]"
+                    logInWithPasswordOption = self.browser.waitForClickableElement(by=By.XPATH,value=logInWithPasswordOptionString)
+                    logInWithPasswordOption.click()
+
+                    self.waitForPageLoad(by=By.XPATH,value="//h3[text()='Log in']")
+
+                    passwordField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@type='password']")
+                    passwordField.clear()
+                    passwordField.send_keys(b.config["authentication"]["verizonPass"])
+                    passwordField.send_keys(Keys.ENTER)
+
+                    #logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+                    #logInButton.click()
 
 
             try:
@@ -142,9 +149,8 @@ class VerizonDriver:
             except selenium.common.exceptions.NoSuchElementException:
                 viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'ordersPosition')]",timeout=15)
             viewOrdersLink.click()
-            if(not self.browser.elementExists(by=By.XPATH,value="//app-view-orders",timeout=30)):
-                # TODO proper error reporting maybe?
-                raise ValueError("Couldn't navigate successfully to Verizon view-orders screen.")
+
+            self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'container view-orders-conatiner')]//h2[contains(text(),'Orders')]",testClick=True)
             self.OrderViewer_WaitForLoadingScreen()
 
     #endregion === Site Navigation ===

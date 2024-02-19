@@ -15,17 +15,17 @@ try:
 
     # === CLOSE / BUILD TMA WORKORDER
     # To attempt to place the order for a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade,
-    # for now), simply add the workorder number to the below list. If the program finds that it is suitable to place, it
+    # for now), simply add the workorder number to the below list. If the program finds that it is suitable to place, itd
     # will detect the order type, then attempt to place/document Verizon order
     preCimplWOs = []
     for WO in preCimplWOs:
-        h.processPreOrderWorkorder(d,WO,referenceNumber="Alex",subjectLine="Order date %D")
+        h.processPreOrderWorkorder(d,WO,referenceNumber="Alex",subjectLine="Waiting for Confirmation %D")
 
     # === CLOSE / BUILD TMA WORKORDER
     # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
     # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
     # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-    postCimplWOs = [44487,44488,44491,44493,44494,44495,44518,44519,44520,44521,44523,44524]
+    postCimplWOs = [44692,44695,44696]
     for WO in postCimplWOs:
         h.processPostOrderWorkorder(d,WO)
 

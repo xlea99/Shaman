@@ -23,13 +23,17 @@ type = "case"
 
 
 [CimplMappings]
-"Otterbox Symmetry with MagSafe" = "iPhonePresidio"
-"Otterbox Defender case for iPhone 13 128GB" = "iPhonePresidio"
-"Otterbox Defender case for iPhone 11" = "iPhonePresidio"
+"Apple iPhone 11 Accessory Bundle (Car charger & Otterbox Defender case)" = "iPhoneDefender"
+"Otterbox Symmetry with MagSafe" = "iPhoneDefender"
+"Otterbox Defender case for iPhone 13 128GB" = "iPhoneDefender"
+"Otterbox Defender case for iPhone 11" = "iPhoneDefender"
 "Otterbox Defender for Samsung Galaxy S21 FE" = "SamsungDefender"
+"Case for Samsung Galaxy S20 FE 5G" = "SamsungDefender"
 "Car Charger for iPhone 13 128GB" = "SamsungVehicleCharger"
 "Car charger for Samsung Galaxy S21 FE 5G" = "SamsungVehicleCharger"
+"Car Charger for Samsung Galaxy S20 FE 5G" = "SamsungVehicleCharger"
 "Car charger for iPhone 11" = "SamsungVehicleCharger"
+"IPhone XR Car charger" = "SamsungVehicleCharger"
 "Apple Magic Keyboard case" = "MagicKeyboard"
 
 [VerizonMappings]
