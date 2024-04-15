@@ -56,6 +56,12 @@ mainType = "Wireless"
 subType = "Smart Phone"
 make = "Samsung"
 model = "Galaxy S21 FE 5G 128GB"
+[GalaxyS23_128GB]
+serviceType = "Android"
+mainType = "Wireless"
+subType = "Smart Phone"
+make = "Samsung"
+model = "Galaxy S23 FE 128GB"
 [GalaxyA54_128GB]
 serviceType = "Android"
 mainType = "Wireless"
@@ -96,15 +102,19 @@ make = "Apple"
 model = "IPAD PRO 11 128GB"
 
 
+
 [CimplMappings]
 "iPhone 12 64GB" = "iPhone13_128GB"
 "iPhone 13 128GB" = "iPhone13_128GB"
 "Bell iPhone 11 64GB" = "iPhone11_64GB"
 "Rogers iPhone 11 64GB" = "iPhone11_64GB"
 "Samsung Galaxy S21 FE 5G 128GB" = "GalaxyS21_128GB"
+"Samsung Galaxy S23 FE 128GB" = "GalaxyS23_128GB"
+"Samsung Galaxy S23FE 5G 128GB" = "GalaxyS23_128GB"
 "BELL - Samsung Galaxy A53" = "GalaxyA54_128GB"
 "IPAD PRO 11 128GB" = "iPad11_128GB"
 "Mifi Orbic 5G UW" = "Orbic"
+"MiFi Xpro 5G" = "Inseego"
 
 
 [VerizonMappings]

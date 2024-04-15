@@ -2,15 +2,15 @@ title = "Shaman Config"
 
 
 [paths]
-base = "C:/Crap/Coding/Python/Shaman/Base"    # Folder for runtime program files.
+base = "D:/Coding/Shaman/Base"    # Folder for runtime program files.
 downloads = "/downloads"                    # Where runtime downloads are stored and accessed
 logs = "/logs"                              # Where log files are stored
 data = "/data"                              # Where program data is stored
 
 [authentication]
-tmaUser = "asomheil@icomm.co"                   # TMA Username
-tmaPass = "P@ssw0rd"                            # TMA Password
-cimplUser = "Alex.somheil@uplandsoftware.com"   # Cimpl Username
+tmaUser = "dkowalczyk@icomm.co"                   # TMA Username
+tmaPass = "k5170800"                            # TMA Password
+cimplUser = "dkowalczyk@uplandsoftware.com"   # Cimpl Username
 cimplPass = "Make!tCimpl"                       # Cimpl Password
 verizonUser = "SYSCOVECFV"                       # Verizon MyBiz Username
 verizonPass = "Tibbleton10!"                      # Verizon MyBiz Password

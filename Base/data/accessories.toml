@@ -36,6 +36,11 @@ type = "case"
 "Car charger for iPhone 11" = "SamsungVehicleCharger"
 "IPhone XR Car charger" = "SamsungVehicleCharger"
 "Apple Magic Keyboard case" = "MagicKeyboard"
+"Car Charger Samsung Galaxy S23 FE 128GB" = "SamsungVehicleCharger"
+"Otterbox Defender case - Samsung Galaxy S23 FE" = "SamsungDefender"
+"USB-C Quick Car Charger for Verizon MIFI" = "SamsungVehicleCharger"
+"Otterbox Defender Case Samsung Galaxy S23FE 5G" = "SamsungDefender"
+"Car charger for Samsung Galaxy S23FE 5G" = "SamsungVehicleCharger"
 
 [VerizonMappings]
 [VerizonMappings.VerizonWallAdapter]
