@@ -19,13 +19,13 @@ try:
     # will detect the order type, then attempt to place/document Verizon order
     preCimplWOs = []
     for WO in preCimplWOs:
-        h.processPreOrderWorkorder(d,WO,referenceNumber="Alex",subjectLine="Waiting for Confirmation %D")
+        h.processPreOrderWorkorder(d,WO,referenceNumber="dan",subjectLine="Order date %D")
 
     # === CLOSE / BUILD TMA WORKORDER
     # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
     # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
     # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-    postCimplWOs = [44700,44701,44702,44703,44743,44747,44749,44750,44775,44777,44778,44780,44781,44783,44798,44801,44802,44804,44806,44814,44815,44817,44820,44822,44823,44825,]
+    postCimplWOs = [45808,45811,45814,45815,45828,45829,45830,45833,45834,45835,45836]
     for WO in postCimplWOs:
         h.processPostOrderWorkorder(d,WO)
 
@@ -37,11 +37,9 @@ try:
     #
     # You can add as many of these as you want in succession, and the Shaman should work through each one iteratively.
     # Note that these are NOT mutually exclusive with processing full Cimpl WOs - you can do both in one simultaneous run.
-    #h.TMANewInstall(d,client="Sys  co",netID="amat2087",serviceNum="4372271037",installDate="12/26/2023",device="iPhone13_128GB",imei="351109227314782",carrier="Rogers")
-
-
-
-
+    #h.TMANewInstall(d,client="Sysco",netID="lmon9797",serviceNum="848-358-1331",installDate="4/4/2024",device="GalaxyS23_128GB",imei="351139212973243",carrier="Verizon Wireless")
+    #h.TMANewInstall(d,client="Sysco",netID="rbra8180",serviceNum="908-524-9236",installDate="4/4/2024",device="iPhone13_128GB",imei="357573496930020",carrier="Verizon Wireless")
+    #h.TMANewInstall(d,client="Sysco",netID="thay9537",serviceNum="629-395-9585",installDate="4/4/2024",device="iPhone13_128GB",imei="357573496624185",carrier="Verizon Wireless")
 
 except Exception as e:
     b.playsoundAsync(f"{b.paths.media}/shaman_error.mp3")

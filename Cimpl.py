@@ -66,6 +66,7 @@ class CimplDriver:
             targetSelectionElement = self.browser.find_element(by=By.XPATH,value=f"{selectionListPrefix}/li[starts-with(@class,'k-item')][text()='{selectionString}']")
             # We also check to make sure this element isn't already selected, in case our earlier check didn't catch it.
             if("k-state-selected" not in targetSelectionElement.get_attribute("class")):
+                self.browser.driver.execute_script("arguments[0].scrollIntoView(true);", targetSelectionElement)
                 targetSelectionElement.click()
                 self.waitForLoadingScreen()
                 return True
@@ -94,11 +95,11 @@ class CimplDriver:
             continueButton.click()
             self.waitForLoadingScreen()
 
-            selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
-            selectionDropdown.send_keys("Sysco")
-            syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
-            syscoSelection.click()
-            self.waitForLoadingScreen()
+            #selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
+            #selectionDropdown.send_keys("Sysco")
+            #syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
+            #syscoSelection.click()
+            #self.waitForLoadingScreen()
 
             passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
             passwordInput.send_keys(b.config["authentication"]["cimplPass"])
@@ -147,7 +148,7 @@ class CimplDriver:
             # In case the menu was already open when we got here, we click it again to close it.
             if(not self.browser.elementExists(by=By.XPATH,value=f"{menuString}[contains(@class,'cimpl-header__icon-transform')]")):
                 self.waitForLoadingScreen()
-                self.browser.waitForClickableElement(by=By.XPATH, value=menuString)
+                self.browser.waitForClickableElement(by=By.XPATH, value=menuString, timeout=120)
                 self.browser.simpleSafeClick(by=By.XPATH,element=menuString)
                 self.waitForLoadingScreen()
 
@@ -871,7 +872,7 @@ def findPlacedOrderNumber(noteList : list,carrier : str):
         thisDate = datetime.strptime(note["CreatedDate"], '%m/%d/%Y %I:%M %p')
 
         subject = note["Subject"].strip().lower()
-        if(subject == "order placed" or subject == "order number"):
+        if(subject == "order placed" or subject == "order number" or subject == "new order number"):
             match = targetOrderPattern.search(note["Content"])
             if match:
                 if(targetOrderDate is None or thisDate > targetOrderDate):
