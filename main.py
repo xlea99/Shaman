@@ -13,7 +13,7 @@ try:
     d = h.buildDrivers()
 
 
-    # === CLOSE / BUILD TMA WORKORDER
+    # === PLACE ORDER
     # To attempt to place the order for a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade,
     # for now), simply add the workorder number to the below list. If the program finds that it is suitable to place, itd
     # will detect the order type, then attempt to place/document Verizon order
@@ -25,7 +25,7 @@ try:
     # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
     # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
     # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-    postCimplWOs = [44700,44701,44702,44703,44743,44747,44749,44750,44775,44777,44778,44780,44781,44783,44798,44801,44802,44804,44806,44814,44815,44817,44820,44822,44823,44825,]
+    postCimplWOs = []
     for WO in postCimplWOs:
         h.processPostOrderWorkorder(d,WO)
 

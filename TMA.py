@@ -1993,7 +1993,7 @@ class TMADriver():
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
         self.People_NavToLinkedTab("services")
-        openServiceButtonPath  = f"//table/tbody/tr/td/table/tbody/tr[contains(@class,'sgvitems')]/td[text() = '{serviceID}']/parent::tr/td/a[contains(@id,'lnkDetail')]"
+        openServiceButtonPath = f"//td[text() = '{serviceID}']/parent::tr/td/a[contains(@id,'lnkDetail')]"
 
         # Try to find the created service, including support for flipping through pages.
         while True:
