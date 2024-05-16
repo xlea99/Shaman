@@ -30,6 +30,7 @@ type = "case"
 "IPhone XR Accessory Bundle (Otterbox defender and Lightning Veh. Charger)" = "iPhoneDefender"
 "Otterbox Defender for Samsung Galaxy S21 FE" = "SamsungDefender"
 "Case for Samsung Galaxy S20 FE 5G" = "SamsungDefender"
+"Otterbox Symmetry Case Samsung Galasxy S23 FE 5G" = "SamsungDefender"
 "Car Charger for iPhone 13 128GB" = "SamsungVehicleCharger"
 "Car charger for Samsung Galaxy S21 FE 5G" = "SamsungVehicleCharger"
 "Car Charger for Samsung Galaxy S20 FE 5G" = "SamsungVehicleCharger"
@@ -41,6 +42,8 @@ type = "case"
 "USB-C Quick Car Charger for Verizon MIFI" = "SamsungVehicleCharger"
 "Otterbox Defender Case Samsung Galaxy S23FE 5G" = "SamsungDefender"
 "Car charger for Samsung Galaxy S23FE 5G" = "SamsungVehicleCharger"
+"Samsung 10e Accessory Bundle (Otterbox Defender + Vehicle charger)" = "SamsungDefender"
+
 
 [VerizonMappings]
 [VerizonMappings.VerizonWallAdapter]

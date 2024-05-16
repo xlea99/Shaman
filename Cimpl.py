@@ -872,7 +872,7 @@ def findPlacedOrderNumber(noteList : list,carrier : str):
         thisDate = datetime.strptime(note["CreatedDate"], '%m/%d/%Y %I:%M %p')
 
         subject = note["Subject"].strip().lower()
-        if(subject == "order placed" or subject == "order number" or subject == "new order number"):
+        if(subject == "order placed" or subject == "order number" or subject == "new order number" or subject == "order re-placed" or subject == "order replaced"):
             match = targetOrderPattern.search(note["Content"])
             if match:
                 if(targetOrderDate is None or thisDate > targetOrderDate):

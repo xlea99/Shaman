@@ -347,7 +347,7 @@ class Browser:
                 WebDriverWait(self.driver, timeout).until(EC.element_to_be_clickable((by, value)))
                 b.log.debug(f"findElement successfully found value '{value}' by '{by}'.")
                 return self.driver.find_element(by=by, value=value)
-            except (TimeoutError):
+            except (TimeoutError,selenium.common.exceptions.TimeoutException):
                 b.log.warning(f"findElements could not find value '{value}' by '{by}', but errors were suppressed.")
                 return None
         else:
