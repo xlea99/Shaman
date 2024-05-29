@@ -1993,10 +1993,12 @@ class TMADriver():
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
         self.People_NavToLinkedTab("services")
-        openServiceButtonPath = f"//td[text() = '{serviceID}']/parent::tr/td/a[contains(@id,'lnkDetail')]"
 
-        # Try to find the created service, including support for flipping through pages.
-        while True:
+        openServiceButtonPath = f"//tbody/tr[contains(@class,'sgvitems')]/td[text()='{serviceID}']/parent::tr/td/a[contains(@id,'lnkDetail')]"
+        print(f"BEANS: {openServiceButtonPath}")
+
+        # Try to find the created service, including support for flipping through pages (max 50)
+        for i in range(50):
             openServiceButton = self.browser.find_element(by=By.XPATH, value=openServiceButtonPath,ignoreErrors=True)
             if(openServiceButton is None):
                 nextPageButtonPath = "//input[contains(@id,'btnNext')][contains(@id,'Detail')]"
