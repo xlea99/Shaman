@@ -25,8 +25,7 @@ try:
     # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
     # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
     # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-    postCimplWOs = [46372,46373,46375,46376,46377,46379,46380,46381,46414,46415,46416,46418,46419,46420,
-                    46421,46422,46423,46424,46425,46426,46427,46428]
+    postCimplWOs = [46445,46446,46447,46448,46449,46450,46451,46452,46485]
     for WO in postCimplWOs:
         h.processPostOrderWorkorder(d,WO)
 
