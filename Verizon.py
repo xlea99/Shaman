@@ -47,40 +47,25 @@ class VerizonDriver:
                 if(userResponse != ""):
                     return False
             else:
-
-
-
                 # TODO Manage 2FA and alternate login instances HERE
 
                 self.browser.implicitly_wait(10)
                 usernameField = self.browser.find_element(by=By.XPATH,value="//label[text()='User ID']/following-sibling::input")
                 usernameField.send_keys(b.config["authentication"]["verizonUser"])
+                usernameField.send_keys(Keys.ENTER)
 
-                # Test if this is the new login or old login screen.
-                passwordField = self.browser.elementExists(by=By.XPATH,value="//label[text()='Password']/following-sibling::input")
-                if(passwordField):
-                    passwordField.send_keys(b.config["authentication"]["verizonPass"])
-                    passwordField.send_keys(Keys.ENTER)
+                self.waitForPageLoad(by=By.XPATH,value="//h3[contains(text(),'How do you want to log in?')]",testClick=True)
 
-                else:
-                    usernameField.send_keys(Keys.ENTER)
+                logInWithPasswordOptionString = "//a[contains(text(),'Log in with my password')]"
+                logInWithPasswordOption = self.browser.waitForClickableElement(by=By.XPATH,value=logInWithPasswordOptionString)
+                logInWithPasswordOption.click()
 
-                    self.waitForPageLoad(by=By.XPATH,value="//h3[contains(text(),'How do you want to log in?')]",testClick=True)
+                self.waitForPageLoad(by=By.XPATH,value="//h3[text()='Log in']")
 
-                    logInWithPasswordOptionString = "//a[contains(text(),'Log in with my password')]"
-                    logInWithPasswordOption = self.browser.waitForClickableElement(by=By.XPATH,value=logInWithPasswordOptionString)
-                    logInWithPasswordOption.click()
-
-                    self.waitForPageLoad(by=By.XPATH,value="//h3[text()='Log in']")
-
-                    passwordField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@type='password']")
-                    passwordField.clear()
-                    passwordField.send_keys(b.config["authentication"]["verizonPass"])
-                    passwordField.send_keys(Keys.ENTER)
-
-                    #logInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-                    #logInButton.click()
-
+                passwordField = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@type='password']")
+                passwordField.clear()
+                passwordField.send_keys(b.config["authentication"]["verizonPass"])
+                passwordField.send_keys(Keys.ENTER)
 
             try:
                 # Wait for shop new device button to confirm page load.
@@ -96,10 +81,6 @@ class VerizonDriver:
                     self.testForUnregisteredPopup()
                 else:
                     raise e
-
-
-
-
 
 
     # This helper method helps protect against loading screens. Must supply an element on the base page

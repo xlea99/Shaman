@@ -44,7 +44,12 @@ def cimplVerify(drivers):
     drivers["Cimpl"].logInToCimpl()
 def verizonVerify(drivers): #TODO WAYYYY down the line, but client support
     drivers["Browser"].switchToTab("Verizon")
-    drivers["Verizon"].logInToVerizon(manual=True)
+    try:
+        drivers["Verizon"].logInToVerizon(manual=False)
+    except Exception as e:
+        b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+        drivers["Verizon"].logInToVerizon(manual=True)
+
 def bakaVerify(drivers):
     drivers["Browser"].switchToTab("Baka")
     drivers["Baka"].logInToBaka()
