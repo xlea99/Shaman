@@ -1993,6 +1993,7 @@ class TMADriver():
         self.browser.switchToTab(self.currentTMATab[0],self.currentTMATab[1])
 
         self.People_NavToLinkedTab("services")
+
         openServiceButtonPath = f"//tbody/tr[contains(@class,'sgvitems')]/td[text()='{serviceID}']/parent::tr/td/a[contains(@id,'lnkDetail')]"
         print(f"BEANS: {openServiceButtonPath}")
 
