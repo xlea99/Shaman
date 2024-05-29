@@ -902,7 +902,9 @@ def classifyHardwareInfo(hardwareInfo : list,carrier):
             try:
                 thisAccessory = b.accessories["CimplMappings"][hardware["Name"]]
             except KeyError:
-                raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl accessory.")
+                #TODO TEMP - get rid of if i ever implement real ordering
+                thisAccessory = "SamsungVehicleCharger"
+                #raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl accessory.")
             if(type(thisAccessory) is str):
                 allAccessoryIDs.append(thisAccessory)
             else:
