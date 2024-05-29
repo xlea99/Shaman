@@ -19,16 +19,14 @@ try:
     # will detect the order type, then attempt to place/document Verizon order
     preCimplWOs = []
     for WO in preCimplWOs:
-        h.processPreOrderWorkorder(d,WO,referenceNumber="dan",subjectLine="Order date %D")
+        h.processPreOrderWorkorder(d,WO,referenceNumber="Alex",subjectLine="Order date %D")
 
     # === CLOSE / BUILD TMA WORKORDER
     # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
     # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
     # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-    postCimplWOs = [46118,46119,46120,46121,46122,46123,46125,46128,46129,46134,46151,46152,46153,46152,
-                    46155,46157,46159,46161,46162,46163,46164,46180,46181,46211,46212,46213,46214,46215,46216,
-                    46218,46219,46246,46247,46248,46249,46252,46253,46254,46255,46256,46275,46279,46296,46297,
-                    46298,46299,46300,46301,46302,46303,46304]
+    postCimplWOs = [46372,46373,46375,46376,46377,46379,46380,46381,46414,46415,46416,46418,46419,46420,
+                    46421,46422,46423,46424,46425,46426,46427,46428]
     for WO in postCimplWOs:
         h.processPostOrderWorkorder(d,WO)
 
@@ -43,7 +41,6 @@ try:
     #h.TMANewInstall(d,client="Sysco",netID="lmon9797",serviceNum="848-358-1331",installDate="4/4/2024",device="GalaxyS23_128GB",imei="351139212973243",carrier="Verizon Wireless")
     #h.TMANewInstall(d,client="Sysco",netID="rbra8180",serviceNum="908-524-9236",installDate="4/4/2024",device="iPhone13_128GB",imei="357573496930020",carrier="Verizon Wireless")
     #h.TMANewInstall(d,client="Sysco",netID="thay9537",serviceNum="629-395-9585",installDate="4/4/2024",device="iPhone13_128GB",imei="357573496624185",carrier="Verizon Wireless")
-
 
 
 
