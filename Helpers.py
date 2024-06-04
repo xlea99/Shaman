@@ -547,7 +547,21 @@ def processPostOrderWorkorder(drivers,workorderNumber):
 
     # Get device model ID from Cimpl
     print(f"Cimpl WO {workorderNumber}: Determined as valid WO for Shaman rituals")
-    deviceID = Cimpl.classifyHardwareInfo(workorder["HardwareInfo"],workorder["Carrier"])["DeviceID"]
+    hardwareInfo = Cimpl.classifyHardwareInfo(workorder["HardwareInfo"],workorder["Carrier"],raiseNoEquipmentError=False)
+    if(hardwareInfo):
+        deviceID = hardwareInfo["DeviceID"]
+    else:
+        b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+        userInput = input("No device is specified in the 'Hardware Info' section of Cimpl. Please manually select the ordered device, or enter anything else to cancel.\n\n"
+                          "1. iPhone 13 128gb\n2. Samsung Galaxy S23FE 128gb\n3. Verizon Orbic 5G UW\n")
+        if(userInput == "1"):
+            deviceID = "iPhone13_128GB"
+        elif(userInput == "2"):
+            deviceID = "GalaxyS23_128GB"
+        elif(userInput == "3"):
+            deviceID = "Orbic"
+        else:
+            return False
 
     # If operation type is a New Install
     if(workorder["OperationType"] == "New Request"):

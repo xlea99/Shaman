@@ -889,26 +889,33 @@ def getUserID(actionsList : list):
 # This helper method takes a raw hardwareInfo list and classifies it in to the final deviceID and set of
 # accessoryIDs.
 # TODO Add system for accessory backups i.e. when one accessory isn't available, go to another.
-def classifyHardwareInfo(hardwareInfo : list,carrier):
+def classifyHardwareInfo(hardwareInfo : list,carrier,raiseNoEquipmentError=True):
     allAccessoryIDs = []
     deviceID = None
-    for hardware in hardwareInfo:
-        if(hardware["Type"] == "Equipment"):
-            try:
-                deviceID = b.equipment["CimplMappings"][hardware["Name"]]
-            except KeyError:
-                raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl device.")
-        elif(hardware["Type"] == "Accessory"):
-            try:
-                thisAccessory = b.accessories["CimplMappings"][hardware["Name"]]
-            except KeyError:
-                #TODO TEMP - get rid of if i ever implement real ordering
-                thisAccessory = "SamsungVehicleCharger"
-                #raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl accessory.")
-            if(type(thisAccessory) is str):
-                allAccessoryIDs.append(thisAccessory)
-            else:
-                allAccessoryIDs.extend(thisAccessory)
+    if(hardwareInfo):
+        for hardware in hardwareInfo:
+            if(hardware["Type"] == "Equipment"):
+                try:
+                    deviceID = b.equipment["CimplMappings"][hardware["Name"]]
+                except KeyError:
+                    raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl device.")
+            elif(hardware["Type"] == "Accessory"):
+                try:
+                    thisAccessory = b.accessories["CimplMappings"][hardware["Name"]]
+                except KeyError:
+                    #TODO TEMP - get rid of if i ever implement real ordering
+                    thisAccessory = "SamsungVehicleCharger"
+                    #raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl accessory.")
+                if(type(thisAccessory) is str):
+                    allAccessoryIDs.append(thisAccessory)
+                else:
+                    allAccessoryIDs.extend(thisAccessory)
+    else:
+        if(raiseNoEquipmentError):
+            raise(ValueError("Hardware info is empty in Cimpl!"))
+        else:
+            return False
+
 
     # Check to ensure no duplicate accessory types due to a Sysco user getting a bit over-excited
     # with accessory the order page
