@@ -145,12 +145,19 @@ class VerizonDriver:
 
         # Header Values
         headerRowPrefix = "//tbody[@class='p-element p-datatable-tbody']/tr[1]"
-        order["OrderNumber"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[1]/div").text
-        order["WirelessNumber"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[2]/a").text
-        order["OrderDate"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[3]/div").text
-        order["ProductSolution"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[4]/div").text
-        order["OrderType"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[5]/div").text
-        order["Status"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[6]/div").text
+        try:
+            order["OrderNumber"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[1]/div").text
+            order["WirelessNumber"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[2]/a").text
+            order["OrderDate"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[3]/div").text
+            order["ProductSolution"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[4]/div").text
+            order["OrderType"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[5]/div").text
+            order["Status"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[6]/div").text
+        except selenium.common.exceptions.NoSuchElementException as e:
+            if(self.browser.elementExists(by=By.XPATH,value="//div[contains(text(),'No Results Found')]")):
+                b.log.warning("Tried to read a displayed Verizon order, but got 'No Results Found' on the order viewer.")
+                return None
+            else:
+                raise e
 
         # Body Values
         aceLocNumber = self.browser.find_element(by=By.XPATH, value="//div[text()='Ace/Loc Order number']/following-sibling::div").text
@@ -208,16 +215,16 @@ class VerizonDriver:
                                               "SimName" : sim_name,
                                               "OneTimeCost" : b.fuzzyStringToNumber(sim_oneTimeCost),
                                               "RecurringCost" : b.fuzzyStringToNumber(sim_recurringCost)}
-        featuresPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Features']/parent::div/parent::li")
-        if(featuresPackageList):
-            features_chargeableFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-4')]").text
-            features_chargeableFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-5')]").text
-            features_includedFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-4')]").text
-            features_includedFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-5')]").text
-            packageDetailsDict["ChargeableFeatures"] = {"OneTimeCost" : b.fuzzyStringToNumber(features_chargeableFeaturesOneTimeCost),
-                                                        "RecurringCost" : b.fuzzyStringToNumber(features_chargeableFeaturesRecurringCost)}
-            packageDetailsDict["IncludedFeatures"] =   {"OneTimeCost" : b.fuzzyStringToNumber(features_includedFeaturesOneTimeCost),
-                                                        "RecurringCost" : b.fuzzyStringToNumber(features_includedFeaturesRecurringCost)}
+        #featuresPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Features']/parent::div/parent::li")
+        #if(featuresPackageList):
+        #    features_chargeableFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-4')]").text
+        #    features_chargeableFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-5')]").text
+        #    features_includedFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-4')]").text
+        #    features_includedFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-5')]").text
+        #    packageDetailsDict["ChargeableFeatures"] = {"OneTimeCost" : b.fuzzyStringToNumber(features_chargeableFeaturesOneTimeCost),
+        #                                                "RecurringCost" : b.fuzzyStringToNumber(features_chargeableFeaturesRecurringCost)}
+        #    packageDetailsDict["IncludedFeatures"] =   {"OneTimeCost" : b.fuzzyStringToNumber(features_includedFeaturesOneTimeCost),
+        #                                                "RecurringCost" : b.fuzzyStringToNumber(features_includedFeaturesRecurringCost)}
         accessoryPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div/div[text()='Accessory']/parent::div/parent::div/parent::li")
         if(accessoryPackageList):
             packageDetailsDict["Accessory"] = []
