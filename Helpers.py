@@ -533,7 +533,10 @@ def processPostOrderWorkorder(drivers,workorderNumber):
     # Read Verizon Order
     if(carrier == "Verizon Wireless"):
         carrierOrder = readVerizonOrder(drivers=drivers,verizonOrderNumber=carrierOrderNumber)
-        if(carrierOrder["Status"] != "Completed"):
+        if(carrierOrder is None):
+            print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order number '{carrierOrderNumber}' is not yet showing in the Verizon Order Viewer.")
+            return False
+        elif(carrierOrder["Status"] != "Completed"):
             print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order number '{carrierOrderNumber}' has status '{carrierOrder['Status']}' and not Complete.")
             return False
     # Read Bell Order
