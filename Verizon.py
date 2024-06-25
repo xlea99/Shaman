@@ -131,7 +131,7 @@ class VerizonDriver:
                 viewOrdersLink = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'ordersPosition')]",timeout=15)
             viewOrdersLink.click()
 
-            self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'container view-orders-conatiner')]//h2[contains(text(),'Orders')]",testClick=True)
+            self.waitForPageLoad(by=By.XPATH,value="//div[contains(@class,'view-orders-conatiner')]//h2[contains(text(),'Orders')]",testClick=True)
             self.OrderViewer_WaitForLoadingScreen()
 
     #endregion === Site Navigation ===
@@ -139,8 +139,9 @@ class VerizonDriver:
     #region === Order Viewer ===
 
     # This method reads the entire displayed order and converts it into a formatted Python
-    # dictionary
-    def OrderViewer_ReadDisplayedOrder(self):
+    # dictionary. readUnloadingOrder is a special method for when Verizon orders show up but won't load
+    # for unknown reasons, so that it still returns something.
+    def OrderViewer_ReadDisplayedOrder(self,readUnloadingOrder=False):
         order = {}
 
         # Header Values
@@ -159,117 +160,130 @@ class VerizonDriver:
             else:
                 raise e
 
-        # Body Values
-        aceLocNumber = self.browser.find_element(by=By.XPATH, value="//div[text()='Ace/Loc Order number']/following-sibling::div").text
-        aceLocMatch = re.search(r"Order #: (\d+) Loc: (\w+)",aceLocNumber)
-        order["AceOrderNumber"] = aceLocMatch.group(1)
-        order["AceLocationNumber"] = aceLocMatch.group(2)
-        # Since these values may not yet exist if the order is not completed, we catch any NoSuchElementExceptions and
-        # store a None value instead.
         try:
-            order["ShipDate"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Ship Date']/following-sibling::div").text
-        except selenium.common.exceptions.NoSuchElementException:
-            order["ShipDate"] = None
-        order["ShipTo"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Ship To']/following-sibling::div/address").text
-        try:
-            order["Courier"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Courier']/following-sibling::div").text
-        except selenium.common.exceptions.NoSuchElementException:
-            order["Courier"] = None
-        try:
-            order["TrackingNumber"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Tracking Number']/following-sibling::div/a").text
-        except selenium.common.exceptions.NoSuchElementException:
-            order["TrackingNumber"] = None
+            # Body Values
+            aceLocNumber = self.browser.find_element(by=By.XPATH, value="//div[text()='Ace/Loc Order number']/following-sibling::div",timeout=10).text
+            aceLocMatch = re.search(r"Order #: (\d+) Loc: (\w+)",aceLocNumber)
+            order["AceOrderNumber"] = aceLocMatch.group(1)
+            order["AceLocationNumber"] = aceLocMatch.group(2)
+            # Since these values may not yet exist if the order is not completed, we catch any NoSuchElementExceptions and
+            # store a None value instead.
+            try:
+                order["ShipDate"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Ship Date']/following-sibling::div").text
+            except selenium.common.exceptions.NoSuchElementException:
+                order["ShipDate"] = None
+            order["ShipTo"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Ship To']/following-sibling::div/address").text
+            try:
+                order["Courier"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Courier']/following-sibling::div").text
+            except selenium.common.exceptions.NoSuchElementException:
+                order["Courier"] = None
+            try:
+                order["TrackingNumber"] = self.browser.find_element(by=By.XPATH, value="//div[text()='Tracking Number']/following-sibling::div/a").text
+            except selenium.common.exceptions.NoSuchElementException:
+                order["TrackingNumber"] = None
 
-        # Package Details
-        packageDetailsButton = self.browser.find_element(by=By.XPATH,value="//button[contains(text(),'Package Details')]",timeout=10)
-        packageDetailsButton.click()
-        packageDetailsHeader = "//div/div/ul/"
-        packageDetailsDict = {}
-        devicePackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/div/li/div/div[text()='Device']/parent::div")
-        if(devicePackageList):
-            device_count = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-2')]").text
-            device_name = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
-            device_oneTimeCost = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
-            device_recurringCost = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
-            packageDetailsDict["Device"] =   {"Count" : int(device_count),
-                                              "DeviceName" : device_name,
-                                              "OneTimeCost" : b.fuzzyStringToNumber(device_oneTimeCost),
-                                              "RecurringCost" : b.fuzzyStringToNumber(device_recurringCost)}
-        planPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Plan']/parent::div")
-        if(planPackageList):
-            plan_count = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-2')]").text
-            plan_name = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
-            plan_oneTimeCost = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
-            plan_recurringCost = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
-            packageDetailsDict["Plan"] =     {"Count" : int(plan_count),
-                                              "PlanName" : plan_name,
-                                              "OneTimeCost" : b.fuzzyStringToNumber(plan_oneTimeCost),
-                                              "RecurringCost" : b.fuzzyStringToNumber(plan_recurringCost)}
-        simPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Sim']/parent::div")
-        if(simPackageList):
-            sim_count = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-2')]").text
-            sim_name = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
-            sim_oneTimeCost = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
-            sim_recurringCost = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
-            packageDetailsDict["Sim"] =      {"Count" : int(sim_count),
-                                              "SimName" : sim_name,
-                                              "OneTimeCost" : b.fuzzyStringToNumber(sim_oneTimeCost),
-                                              "RecurringCost" : b.fuzzyStringToNumber(sim_recurringCost)}
-        #featuresPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Features']/parent::div/parent::li")
-        #if(featuresPackageList):
-        #    features_chargeableFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-4')]").text
-        #    features_chargeableFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-5')]").text
-        #    features_includedFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-4')]").text
-        #    features_includedFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-5')]").text
-        #    packageDetailsDict["ChargeableFeatures"] = {"OneTimeCost" : b.fuzzyStringToNumber(features_chargeableFeaturesOneTimeCost),
-        #                                                "RecurringCost" : b.fuzzyStringToNumber(features_chargeableFeaturesRecurringCost)}
-        #    packageDetailsDict["IncludedFeatures"] =   {"OneTimeCost" : b.fuzzyStringToNumber(features_includedFeaturesOneTimeCost),
-        #                                                "RecurringCost" : b.fuzzyStringToNumber(features_includedFeaturesRecurringCost)}
-        accessoryPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div/div[text()='Accessory']/parent::div/parent::div/parent::li")
-        if(accessoryPackageList):
-            packageDetailsDict["Accessory"] = []
-            accessoryPackages = accessoryPackageList.find_elements(by=By.XPATH,value="./div")
-            for accessoryPackage in accessoryPackages:
-                accessory_accessoryCount = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-2')]").text
-                accessory_accessoryName = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-3')]").text
-                accessory_accessoryOneTimeCost = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-4')]").text
-                accessory_accessoryRecurringCost = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-5')]").text
-                packageDetailsDict["Accessory"].append({"Count" : int(accessory_accessoryCount),
-                                                  "AccessoryName" : accessory_accessoryName,
-                                                  "OneTimeCost" : b.fuzzyStringToNumber(accessory_accessoryOneTimeCost),
-                                                  "RecurringCost" : b.fuzzyStringToNumber(accessory_accessoryRecurringCost)})
-        shippingPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Shipping']/parent::div")
-        if(shippingPackageList):
-            shipping_shippingName = shippingPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
-            shipping_oneTimeCost = shippingPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
-            shipping_recurringCost = shippingPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
-            packageDetailsDict["Shipping"] = {"ShippingName" : shipping_shippingName,
-                                              "OneTimeCost" : b.fuzzyStringToNumber(shipping_oneTimeCost),
-                                              "RecurringCost" : b.fuzzyStringToNumber(shipping_recurringCost)}
-        taxesFeesPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div/div[text()='Taxes and Fees ']/parent::div/parent::div/parent::li")
-        if(taxesFeesPackageList):
-            packageDetailsDict["TaxesFees"] = []
-            allTaxesFees = taxesFeesPackageList.find_elements(by=By.XPATH,value="./div")
+            #TODO Temp disabled. Not really used for anything.
+            '''
+            # Package Details
+            packageDetailsButton = self.browser.find_element(by=By.XPATH,value="//button[contains(text(),'Package Details')]",timeout=10)
+            packageDetailsButton.click()
+            packageDetailsHeader = "//div/div/ul/"
+            packageDetailsDict = {}
+            devicePackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/div/li/div/div[text()='Device']/parent::div")
+            if(devicePackageList):
+                device_count = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-2')]").text
+                device_name = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
+                device_oneTimeCost = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
+                device_recurringCost = devicePackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
+                packageDetailsDict["Device"] =   {"Count" : int(device_count),
+                                                  "DeviceName" : device_name,
+                                                  "OneTimeCost" : b.fuzzyStringToNumber(device_oneTimeCost),
+                                                  "RecurringCost" : b.fuzzyStringToNumber(device_recurringCost)}
+            planPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Plan']/parent::div")
+            if(planPackageList):
+                plan_count = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-2')]").text
+                plan_name = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
+                plan_oneTimeCost = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
+                plan_recurringCost = planPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
+                packageDetailsDict["Plan"] =     {"Count" : int(plan_count),
+                                                  "PlanName" : plan_name,
+                                                  "OneTimeCost" : b.fuzzyStringToNumber(plan_oneTimeCost),
+                                                  "RecurringCost" : b.fuzzyStringToNumber(plan_recurringCost)}
+            simPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Sim']/parent::div")
+            if(simPackageList):
+                sim_count = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-2')]").text
+                sim_name = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
+                sim_oneTimeCost = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
+                sim_recurringCost = simPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
+                packageDetailsDict["Sim"] =      {"Count" : int(sim_count),
+                                                  "SimName" : sim_name,
+                                                  "OneTimeCost" : b.fuzzyStringToNumber(sim_oneTimeCost),
+                                                  "RecurringCost" : b.fuzzyStringToNumber(sim_recurringCost)}
+            #featuresPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Features']/parent::div/parent::li")
+            #if(featuresPackageList):
+            #    features_chargeableFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-4')]").text
+            #    features_chargeableFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Chargeable or Selected Features')]/following-sibling::div[contains(@class,'column-5')]").text
+            #    features_includedFeaturesOneTimeCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-4')]").text
+            #    features_includedFeaturesRecurringCost = featuresPackageList.find_element(by=By.XPATH,value="./div/div[contains(text(),'Included Features')]/following-sibling::div[contains(@class,'column-5')]").text
+            #    packageDetailsDict["ChargeableFeatures"] = {"OneTimeCost" : b.fuzzyStringToNumber(features_chargeableFeaturesOneTimeCost),
+            #                                                "RecurringCost" : b.fuzzyStringToNumber(features_chargeableFeaturesRecurringCost)}
+            #    packageDetailsDict["IncludedFeatures"] =   {"OneTimeCost" : b.fuzzyStringToNumber(features_includedFeaturesOneTimeCost),
+            #                                                "RecurringCost" : b.fuzzyStringToNumber(features_includedFeaturesRecurringCost)}
+            accessoryPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div/div[text()='Accessory']/parent::div/parent::div/parent::li")
+            if(accessoryPackageList):
+                packageDetailsDict["Accessory"] = []
+                accessoryPackages = accessoryPackageList.find_elements(by=By.XPATH,value="./div")
+                for accessoryPackage in accessoryPackages:
+                    accessory_accessoryCount = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-2')]").text
+                    accessory_accessoryName = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-3')]").text
+                    accessory_accessoryOneTimeCost = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-4')]").text
+                    accessory_accessoryRecurringCost = accessoryPackage.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-5')]").text
+                    packageDetailsDict["Accessory"].append({"Count" : int(accessory_accessoryCount),
+                                                      "AccessoryName" : accessory_accessoryName,
+                                                      "OneTimeCost" : b.fuzzyStringToNumber(accessory_accessoryOneTimeCost),
+                                                      "RecurringCost" : b.fuzzyStringToNumber(accessory_accessoryRecurringCost)})
+            shippingPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div[text()='Shipping']/parent::div")
+            if(shippingPackageList):
+                shipping_shippingName = shippingPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-3')]").text
+                shipping_oneTimeCost = shippingPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-4')]").text
+                shipping_recurringCost = shippingPackageList.find_element(by=By.XPATH,value="./div[contains(@class,'column-5')]").text
+                packageDetailsDict["Shipping"] = {"ShippingName" : shipping_shippingName,
+                                                  "OneTimeCost" : b.fuzzyStringToNumber(shipping_oneTimeCost),
+                                                  "RecurringCost" : b.fuzzyStringToNumber(shipping_recurringCost)}
+            taxesFeesPackageList = self.browser.elementExists(by=By.XPATH,value=f"{packageDetailsHeader}/li/div/div/div[text()='Taxes and Fees ']/parent::div/parent::div/parent::li")
+            if(taxesFeesPackageList):
+                packageDetailsDict["TaxesFees"] = []
+                allTaxesFees = taxesFeesPackageList.find_elements(by=By.XPATH,value="./div")
 
-            for taxFee in allTaxesFees:
-                taxesFees_name = taxFee.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-3')]").text
-                taxesFees_oneTimeCost = taxFee.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-4')]").text
-                taxesFees_recurringCost = taxFee.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-5')]").text
-                packageDetailsDict["TaxesFees"].append({"TaxFeeName" : taxesFees_name,
-                                                  "OneTimeCost" : b.fuzzyStringToNumber(taxesFees_oneTimeCost),
-                                                  "RecurringCost" : b.fuzzyStringToNumber(taxesFees_recurringCost)})
-        order["PackageDetails"] = packageDetailsDict
+                for taxFee in allTaxesFees:
+                    taxesFees_name = taxFee.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-3')]").text
+                    taxesFees_oneTimeCost = taxFee.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-4')]").text
+                    taxesFees_recurringCost = taxFee.find_element(by=By.XPATH,value="./div/div[contains(@class,'column-5')]").text
+                    packageDetailsDict["TaxesFees"].append({"TaxFeeName" : taxesFees_name,
+                                                      "OneTimeCost" : b.fuzzyStringToNumber(taxesFees_oneTimeCost),
+                                                      "RecurringCost" : b.fuzzyStringToNumber(taxesFees_recurringCost)})
+            order["PackageDetails"] = packageDetailsDict
+            '''
+            order["PackageDetails"] = {}
 
-        # Line Information
-        lineInformationButton = self.browser.find_element(by=By.XPATH,value="//button[contains(text(),'Line Information')]",timeout=10)
-        lineInformationButton.click()
-        lineInformation = self.browser.find_element(by=By.XPATH,value="//div[@aria-labelledby='tab2']/ul/div/li/div[contains(@class,'column-2')]").text
-        imeiMatch = re.compile(r'Device ID: (\d+)').search(lineInformation)
-        simMatch = re.compile(r'SIM ID: (\d+)').search(lineInformation)
-        if(imeiMatch):
-            order["IMEI"] = imeiMatch.group(1)
-        if(simMatch):
-            order["SIM"] = simMatch.group(1)
+            # Line Information
+            lineInformationButton = self.browser.find_element(by=By.XPATH,value="//a[contains(text(),'Line Information')]",timeout=10)
+            lineInformationButton.click()
+            lineInformation = self.browser.find_element(by=By.XPATH,value="//div[@aria-labelledby='tab2']/ul/div/li/div[contains(@class,'column-2')]").text
+            imeiMatch = re.compile(r'Device ID: (\d+)').search(lineInformation)
+            simMatch = re.compile(r'SIM ID: (\d+)').search(lineInformation)
+            if(imeiMatch):
+                order["IMEI"] = imeiMatch.group(1)
+            if(simMatch):
+                order["SIM"] = simMatch.group(1)
+        except Exception as e:
+            if (not readUnloadingOrder):
+                raise e
+            else:
+                categoriesToAdd = ["IMEI","SIM","AceOrderNumber","AceLocationNumber","ShipTo","ShipDate","Courier","PackageDetails"]
+                for category in categoriesToAdd:
+                    if(category not in order.keys()):
+                        order[category] = None
 
         return order
 
