@@ -4,8 +4,6 @@ title = "Accessory Information Data"
 type = "wallAdapter"
 [SamsungVehicleCharger]
 type = "vehicleCharger"
-[iPhoneVehicleCharger]
-type = "vehicleCharger"
 [iPhoneDefender]
 type = "case"
 [iPhoneDefenderXT]
@@ -32,7 +30,6 @@ type = "case"
 "IPhone XR Accessory Bundle (Otterbox defender and Lightning Veh. Charger)" = "iPhoneDefender"
 "Otterbox Defender for Samsung Galaxy S21 FE" = "SamsungDefender"
 "Case for Samsung Galaxy S20 FE 5G" = "SamsungDefender"
-"Otterbox Symmetry Case Samsung Galasxy S23 FE 5G" = "SamsungDefender"
 "Car Charger for iPhone 13 128GB" = "SamsungVehicleCharger"
 "Car charger for Samsung Galaxy S21 FE 5G" = "SamsungVehicleCharger"
 "Car Charger for Samsung Galaxy S20 FE 5G" = "SamsungVehicleCharger"
@@ -44,11 +41,6 @@ type = "case"
 "USB-C Quick Car Charger for Verizon MIFI" = "SamsungVehicleCharger"
 "Otterbox Defender Case Samsung Galaxy S23FE 5G" = "SamsungDefender"
 "Car charger for Samsung Galaxy S23FE 5G" = "SamsungVehicleCharger"
-"Samsung 10e Accessory Bundle (Otterbox Defender + Vehicle charger)" = "SamsungDefender"
-"Verizon 2.4A Apple Lightning Vehicle Charger" = "iPhoneVehicleCharger"
-"Car Charger for iPhone 12 64 GB" = "iPhoneVehicleCharger"
-"iPhone Otterbox Defender Case for iPhone 12" = "iPhoneDefender"
-
 
 [VerizonMappings]
 [VerizonMappings.VerizonWallAdapter]
@@ -57,9 +49,6 @@ CardName = "Wall Adapter 20W USB-C"
 [VerizonMappings.SamsungVehicleCharger]
 SearchTerm = "40w car charger duo"
 CardName = "40W Car Charger Duo"
-[VerizonMappings.iPhoneVehicleCharger]
-SearchTerm = "Otterbox Charger"
-CardName = "BROKEN DONT USE"
 
 [VerizonMappings.iPhoneDefender]
 SearchTerm = "Defender"
