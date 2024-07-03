@@ -69,13 +69,13 @@ def readCimplWorkorder(drivers,workorderNumber):
     return drivers["Cimpl"].Workorders_ReadFullWorkorder()
 
 # Searches up, and reads, a full Verizon order number.
-def readVerizonOrder(drivers,verizonOrderNumber):
+def readVerizonOrder(drivers,verizonOrderNumber,readUnloadingOrder=False):
     verizonVerify(drivers=drivers)
     drivers["Verizon"].navToOrderViewer()
 
     drivers["Verizon"].OrderViewer_SearchOrder(orderNumber=verizonOrderNumber)
 
-    return drivers["Verizon"].OrderViewer_ReadDisplayedOrder()
+    return drivers["Verizon"].OrderViewer_ReadDisplayedOrder(readUnloadingOrder=readUnloadingOrder)
 
 # Searches up, and reads, a full Baka order number.
 def readBakaOrder(drivers,bakaOrderNumber):
@@ -123,7 +123,10 @@ def TMANewInstall(drivers,client,netID,serviceNum,installDate,device,imei,carrie
                                   make=b.equipment[device]["make"],
                                   model=b.equipment[device]["model"])
     newService.info_LinkedEquipment = thisEquipment
-    newService.info_LinkedEquipment.info_IMEI = imei
+    if(imei is None):
+        newService.info_LinkedEquipment.info_IMEI = ""
+    else:
+        newService.info_LinkedEquipment.info_IMEI = imei
 
     if(newService.info_ServiceType == "iPhone" or newService.info_ServiceType == "Android"):
         costType = "Smart Phone"
@@ -239,7 +242,10 @@ def TMAUpgrade(drivers,client,serviceNum,installDate,device,imei):
                                   make=b.equipment[device]["make"],
                                   model=b.equipment[device]["model"])
     deviceToBuild = thisEquipment
-    deviceToBuild.info_IMEI = imei
+    if(imei is None):
+        deviceToBuild.info_IMEI = ""
+    else:
+        deviceToBuild.info_IMEI = imei
     drivers["TMA"].Equipment_WriteAll(equipmentObject=deviceToBuild)
     drivers["TMA"].Equipment_InsertUpdate()
 
@@ -499,7 +505,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
 # Given a workorderNumber, this method examines it, tries to figure out the type of workorder it is and whether
 # it has a relevant order number, looks up to see if order is completed, and then closes it in TMA.
-def processPostOrderWorkorder(drivers,workorderNumber):
+def processPostOrderWorkorder(drivers,workorderNumber,readUnloadingOrder=False):
 
     print(f"Cimpl WO {workorderNumber}: Beginning automation")
     workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
@@ -532,7 +538,7 @@ def processPostOrderWorkorder(drivers,workorderNumber):
     # TODO only supports verizon and bell atm
     # Read Verizon Order
     if(carrier == "Verizon Wireless"):
-        carrierOrder = readVerizonOrder(drivers=drivers,verizonOrderNumber=carrierOrderNumber)
+        carrierOrder = readVerizonOrder(drivers=drivers,verizonOrderNumber=carrierOrderNumber,readUnloadingOrder=readUnloadingOrder)
         if(carrierOrder is None):
             print(f"Cimpl WO {workorderNumber}: Can't complete WO, as order number '{carrierOrderNumber}' is not yet showing in the Verizon Order Viewer.")
             return False
@@ -593,7 +599,8 @@ def processPostOrderWorkorder(drivers,workorderNumber):
     # Write tracking information
     drivers["Browser"].switchToTab("Cimpl")
     drivers["Cimpl"].Workorders_NavToSummaryTab()
-    drivers["Cimpl"].Workorders_WriteNote(subject="Tracking",noteType="Information Only",status="Completed",content=f"Courier: {carrierOrder['Courier']}\nTracking Number: {carrierOrder['TrackingNumber']}")
+    if(not readUnloadingOrder):
+        drivers["Cimpl"].Workorders_WriteNote(subject="Tracking",noteType="Information Only",status="Completed",content=f"Courier: {carrierOrder['Courier']}\nTracking Number: {carrierOrder['TrackingNumber']}")
 
     # Complete workorder
     drivers["Cimpl"].Workorders_SetStatus(status="Complete")
