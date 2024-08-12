@@ -25,10 +25,10 @@ try:
     # To attempt to close out a Cimpl Verizon Workorder (must be verizon and either a new install or upgrade, for now),
     # simply add the workorder number to the below list. If the program finds that it is suitable to close, it will
     # detect the order type, process/build TMA and Cimpl entries, then complete the order.
-    postCimplWOs = [46510,46738,46766,46850,46851,46852,46855,46859,46873,46874,46877,46895,46896,46898,
-                    46899,46900,46901,46902,46903,46908]
+    postCimplWOs = []
     for WO in postCimplWOs:
-        h.processPostOrderWorkorder(d,WO,readUnloadingOrder=False)
+        h.processPostOrderWorkorder(d,WO,readUnloadingOrder=True)
+
 
 
     # To build only TMA new install for a specific service, such as a non-verizon or even non-Sysco service, add the
@@ -41,6 +41,7 @@ try:
     #h.TMANewInstall(d,client="Sysco",netID="lmon9797",serviceNum="848-358-1331",installDate="4/4/2024",device="GalaxyS23_128GB",imei="351139212973243",carrier="Verizon Wireless")
     #h.TMANewInstall(d,client="Sysco",netID="rbra8180",serviceNum="908-524-9236",installDate="4/4/2024",device="iPhone13_128GB",imei="357573496930020",carrier="Verizon Wireless")
     #h.TMANewInstall(d,client="Sysco",netID="thay9537",serviceNum="629-395-9585",installDate="4/4/2024",device="iPhone13_128GB",imei="357573496624185",carrier="Verizon Wireless")
+    h.TMANewInstall(d,client="Sysco",netID="vjea9201",serviceNum="907-759-1716",installDate="6/25/2024",device="GalaxyS23_128GB",imei="",carrier="Verizon Wireless")
 
 
 

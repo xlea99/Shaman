@@ -85,31 +85,36 @@ class CimplDriver:
         else:
             self.browser.get("https://apps.cimpl.com/Cimpl/Authentication#/logon")
 
-            self.browser.implicitly_wait(10)
-            self.waitForLoadingScreen()
+            if(b.config["cimpl"]["manualLogin"]):
+                b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+                userResponse = input("Please log in to Cimpl, and press enter to continue. Type anything to cancel.")
+                return not userResponse
+            else:
+                self.browser.implicitly_wait(10)
+                self.waitForLoadingScreen()
 
-            usernameInput = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@id='username']")
-            usernameInput.send_keys(b.config["authentication"]["cimplUser"])
+                usernameInput = self.browser.waitForClickableElement(by=By.XPATH, value="//input[@id='username']")
+                usernameInput.send_keys(b.config["authentication"]["cimplUser"])
 
-            continueButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@type='submit']")
-            continueButton.click()
-            self.waitForLoadingScreen()
+                continueButton = self.browser.waitForClickableElement(by=By.XPATH,value="//button[@type='submit']")
+                continueButton.click()
+                self.waitForLoadingScreen()
 
-            #selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
-            #selectionDropdown.send_keys("Sysco")
-            #syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
-            #syscoSelection.click()
-            #self.waitForLoadingScreen()
+                #selectionDropdown = self.browser.find_element(by=By.XPATH,value="//input[@id='tenantTextBox']")
+                #selectionDropdown.send_keys("Sysco")
+                #syscoSelection = self.browser.find_element(by=By.XPATH,value="//li[text()='Sysco']")
+                #syscoSelection.click()
+                #self.waitForLoadingScreen()
 
-            passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
-            passwordInput.send_keys(b.config["authentication"]["cimplPass"])
+                passwordInput = self.browser.find_element(by=By.XPATH,value="//input[@id='password']")
+                passwordInput.send_keys(b.config["authentication"]["cimplPass"])
 
-            signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
-            signInButton.click()
-            self.waitForLoadingScreen()
+                signInButton = self.browser.find_element(by=By.XPATH,value="//button[@type='submit']")
+                signInButton.click()
+                self.waitForLoadingScreen()
 
-            #TODO glue
-            time.sleep(5)
+                #TODO glue
+                time.sleep(5)
 
     # Method to determine the current location of the CimplDriver
     def getLocation(self):
@@ -120,9 +125,9 @@ class CimplDriver:
             return {"LoggedIn" : False, "Location" : "NotOnCimpl"}
         elif(url.startswith("https://apps.cimpl.com/auth")):
             return {"LoggedIn" : False, "Location" : "LogInScreen"}
-        elif(url.startswith("https://apps.cimpl.com//Cimpl/Actions#/home/workorder")):
+        elif(url.startswith("https://apps.cimpl.com//Cimpl/Actions#/home/workorder") or url.startswith("https://apps.cimpl.com//Cimpl//Actions#/home/workorder")):
             return {"LoggedIn" : True, "Location" : "WorkorderCenter"}
-        elif(url.startswith("https://apps.cimpl.com/Cimpl/Actions#/home/workorderDetails")):
+        elif(url.startswith("https://apps.cimpl.com/Cimpl/Actions#/home/workorderDetails") or url.startswith("https://apps.cimpl.com/Cimpl//Actions#/home/workorderDetails")):
             thisWorkorder = self.browser.find_element(by=By.XPATH,value="//div[contains(@class,'workorder-details__woNumber')]").text
             return {"LoggedIn": True, "Location": f"Workorder_{thisWorkorder}"}
         else:
@@ -499,7 +504,15 @@ class CimplDriver:
         postalCodeLine = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.postalCodeLine']").text
         country = self.browser.find_element(by=By.XPATH,value=f"{prefix}//div[@ng-bind='vm.addressModel.country']").text
 
-        city, state, zipCode = postalCodeLine.split(",")
+        try:
+            city, state, zipCode = postalCodeLine.split(",")
+        except Exception as e:
+            b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+            userResponse = input("Strange address detected in Cimpl, causing program to halt. Press enter to continue as usual, and press any key to terminate.")
+            if(userResponse):
+                raise e
+            else:
+                city, state, zipCode = "","",""
 
         returnDict = {"Address1" : address1.strip(),
                       "City" : city.strip(),
@@ -872,7 +885,8 @@ def findPlacedOrderNumber(noteList : list,carrier : str):
         thisDate = datetime.strptime(note["CreatedDate"], '%m/%d/%Y %I:%M %p')
 
         subject = note["Subject"].strip().lower()
-        if(subject == "order placed" or subject == "order number" or subject == "new order number" or subject == "order re-placed" or subject == "order replaced"):
+        validOrderPlacedStrings = ["order placed","order number","new order number","order re-placed","order replaced","order confirmation"]
+        if(subject in validOrderPlacedStrings):
             match = targetOrderPattern.search(note["Content"])
             if match:
                 if(targetOrderDate is None or thisDate > targetOrderDate):

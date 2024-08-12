@@ -9,7 +9,7 @@ from datetime import datetime
 
 
 # This method builds our set of drivers/tabs that will be used.
-def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True,buildBaka=True):
+def buildDrivers(buildTMA=True,buildCimpl=True,buildVerizon=True,buildBaka=True,manualCimplLogin=False):
     browserDriver = Browser.Browser()
 
     tmaDriver = None
@@ -505,7 +505,7 @@ def processPreOrderWorkorder(drivers,workorderNumber,reviewMode=True,referenceNu
 
 # Given a workorderNumber, this method examines it, tries to figure out the type of workorder it is and whether
 # it has a relevant order number, looks up to see if order is completed, and then closes it in TMA.
-def processPostOrderWorkorder(drivers,workorderNumber,readUnloadingOrder=False):
+def processPostOrderWorkorder(drivers,workorderNumber,readUnloadingOrder=False,):
 
     print(f"Cimpl WO {workorderNumber}: Beginning automation")
     workorder = readCimplWorkorder(drivers=drivers,workorderNumber=workorderNumber)
