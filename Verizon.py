@@ -147,7 +147,7 @@ class VerizonDriver:
         # Header Values
         headerRowPrefix = "//tbody[@class='p-element p-datatable-tbody']/tr[1]"
         try:
-            order["OrderNumber"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[1]/div").text
+            order["OrderNumber"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[1]/div",timeout=60).text
             order["WirelessNumber"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[2]/a").text
             order["OrderDate"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[3]/div").text
             order["ProductSolution"] = self.browser.find_element(by=By.XPATH,value=f"{headerRowPrefix}/td[4]/div").text
@@ -162,7 +162,7 @@ class VerizonDriver:
 
         try:
             # Body Values
-            aceLocNumber = self.browser.find_element(by=By.XPATH, value="//div[text()='Ace/Loc Order number']/following-sibling::div",timeout=10).text
+            aceLocNumber = self.browser.find_element(by=By.XPATH, value="//div[text()='Ace/Loc Order number']/following-sibling::div",timeout=30).text
             aceLocMatch = re.search(r"Order #: (\d+) Loc: (\w+)",aceLocNumber)
             order["AceOrderNumber"] = aceLocMatch.group(1)
             order["AceLocationNumber"] = aceLocMatch.group(2)
@@ -301,9 +301,20 @@ class VerizonDriver:
         searchField.clear()
         searchField.send_keys(orderNumber)
 
-        searchButton = self.browser.find_element(by=By.XPATH,value="//span[@id='grid-search-icon']")
-        searchButton.click()
-        self.OrderViewer_WaitForLoadingScreen()
+        try:
+            searchButton = self.browser.find_element(by=By.XPATH,value="//span[@id='grid-search-icon']")
+            searchButton.click()
+            self.OrderViewer_WaitForLoadingScreen()
+        except selenium.common.exceptions.ElementClickInterceptedException as e:
+            b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+            userResponse = input("Program is halting on Verizon Order screen. Is the \"Are you still there?\" prompt displayed? If so, please click 'yes' and then press enter to continue. Press any other key to exit.")
+            if(userResponse):
+                raise e
+            else:
+                searchButton = self.browser.find_element(by=By.XPATH, value="//span[@id='grid-search-icon']")
+                searchButton.click()
+                self.OrderViewer_WaitForLoadingScreen()
+
 
         foundOrderLocator = self.browser.elementExists(by=By.XPATH,value=f"//div[text()='{orderNumber}']",timeout=1)
         if(foundOrderLocator):

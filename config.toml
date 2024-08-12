@@ -23,6 +23,7 @@ maxSize = 10240     # Maximum log file size in kilobytes
 backupCount = 10    # Number of old log files to keep
 
 [cimpl]
+manualLogin = true                              # If true, Cimpl won't attempt to login automatically and will prompt the user to manuall do so.
 skipVehicleCharger = true                       # If True, vehicle charger requests will be skipped entirely.
 verizonSmartphoneBaseAccessory = "VerizonWallAdapter" # If this accessory is set to a valid accessoryID, it will be purchased in EVERY Verizon order.
 
