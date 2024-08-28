@@ -7,6 +7,7 @@ import time
 from datetime import datetime
 import os
 import re
+import tomli
 
 class CimplDriver:
 
@@ -912,7 +913,15 @@ def classifyHardwareInfo(hardwareInfo : list,carrier,raiseNoEquipmentError=True)
                 try:
                     deviceID = b.equipment["CimplMappings"][hardware["Name"]]
                 except KeyError:
-                    raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl device.")
+                    b.playsoundAsync(f"{b.paths.media}/shaman_attention.mp3")
+                    # TODO pretty duct-tapey, huh?
+                    response = input(f"Unknown Cimpl device detected: '{hardware['Name']}'. If this is a valid Cimpl device, add it to the equipment.toml and press enter to reload the config. Type anything else to exit.")
+                    if(response):
+                        raise KeyError(f"'{hardware['Name']}' is not a mapped Cimpl device.")
+                    else:
+                        with open(f"{b.paths.data}/equipment.toml", "rb") as f:
+                            b.equipment = tomli.load(f)
+                        deviceID = b.equipment["CimplMappings"][hardware["Name"]]
             elif(hardware["Type"] == "Accessory"):
                 try:
                     thisAccessory = b.accessories["CimplMappings"][hardware["Name"]]
