@@ -803,15 +803,15 @@ class CimplDriver:
 
         # We make sure the "carrier confirmation" checkbox is selected (if we're not cancelling this order)
         if(status.lower() != "cancel"):
-            carrierCheckboxString = "//workorder-action-confirm-complete/div/div/div/div[contains(@class,'workorder-action-confirm-complete__header')]/cimpl-checkbox/div/div/label[@class='checkbox-container']/span[contains(@class,'checkbox-input')]/input[@type='checkbox']"
-            carrierCheckboxElement = self.browser.find_element(by=By.XPATH,value=carrierCheckboxString)
-            if("ng-empty" in carrierCheckboxElement.get_attribute("class")):
+            carrierCheckboxString = "//workorder-action-confirm-complete//div[contains(@class,'workorder-action-confirm-complete__header')]//input[@type='checkbox']"
+            carrierCheckboxElement = self.browser.find_element(by=By.XPATH,value=f"{carrierCheckboxString}/parent::span")
+            if("ng-empty" in carrierCheckboxElement.find_element(by=By.XPATH,value=carrierCheckboxString).get_attribute("class")):
                 carrierCheckboxElement.click()
 
         # We make sure that if we're sending an email, the email checkbox is selected, otherwise it's not.
         emailCheckboxString = "//workorder-action-confirm-complete/div/div/div/div/div/div/cimpl-checkbox/div/div/label[@class='checkbox-container']/span[contains(@class,'checkbox-input')]/input[@type='checkbox']"
-        emailCheckboxElement = self.browser.find_element(by=By.XPATH,value=emailCheckboxString)
-        if("ng-empty" in emailCheckboxElement.get_attribute("class")):
+        emailCheckboxElement = self.browser.find_element(by=By.XPATH,value=f"{emailCheckboxString}/parent::span")
+        if("ng-empty" in emailCheckboxElement.find_element(by=By.XPATH,value=emailCheckboxString).get_attribute("class")):
             if(sendEmail):
                 emailCheckboxElement.click()
         else:
