@@ -81,7 +81,7 @@ mainType = "Wireless"
 subType = "Aircard"
 make = "Verizon"
 model = "ORBIC SPEED 5G UW"
-[FranklinA10] #UPDATE WHEN UPDATED
+[FranklinA50] #UPDATE WHEN UPDATED
 serviceType = "Mifi"
 mainType = "Wireless"
 subType = "Aircard"
